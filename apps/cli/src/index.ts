@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 import { randomUUID } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import {
   AcceptedEventWriter,
   configFromEnv,
   eventTypes,
   loadEnvFile,
   S3ObjectStore,
+  type ApertoConfig,
   type IngestionEvent,
+  type ObjectStore,
+  type BatchManifest,
 } from "@aperto/core";
 import { ApertoDuckDb } from "@aperto/duckdb";
 
@@ -97,12 +101,8 @@ async function createScore(parsed: ParsedArgs, config: ReturnType<typeof configF
     },
   };
 
-  const writer = new AcceptedEventWriter({
-    store: new S3ObjectStore(config.s3),
-    projectId: config.projectId,
-    prefix: config.s3.prefix,
-  });
-  const manifest = await writer.writeAcceptedEvents([event]);
+  const store = new S3ObjectStore(config.s3);
+  const manifest = await writeEventsAndSyncCache(config, store, [event]);
   print({ eventId: event.id, scoreId: event.body.id, objects: manifest.objects }, json);
 }
 
@@ -125,13 +125,33 @@ async function createTrace(parsed: ParsedArgs, config: ReturnType<typeof configF
     },
   };
 
+  const store = new S3ObjectStore(config.s3);
+  const manifest = await writeEventsAndSyncCache(config, store, [event]);
+  print({ eventId: event.id, traceId, objects: manifest.objects }, json);
+}
+
+export async function writeEventsAndSyncCache(
+  config: Pick<ApertoConfig, "dbPath" | "projectId" | "s3">,
+  store: ObjectStore,
+  events: IngestionEvent[],
+): Promise<BatchManifest> {
   const writer = new AcceptedEventWriter({
-    store: new S3ObjectStore(config.s3),
+    store,
     projectId: config.projectId,
     prefix: config.s3.prefix,
   });
-  const manifest = await writer.writeAcceptedEvents([event]);
-  print({ eventId: event.id, traceId, objects: manifest.objects }, json);
+  const manifest = await writer.writeAcceptedEvents(events);
+  const db = new ApertoDuckDb(config.dbPath);
+  try {
+    await db.syncFromStore({
+      store,
+      projectId: config.projectId,
+      prefix: config.s3.prefix,
+    });
+  } finally {
+    await db.close();
+  }
+  return manifest;
 }
 
 async function runReadCommand(
@@ -292,4 +312,6 @@ function helpRows(resource: string): Record<string, unknown>[] {
 
 class CliError extends Error {}
 
-await main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}
