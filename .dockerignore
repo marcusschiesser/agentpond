@@ -1,0 +1,8 @@
+node_modules
+dist
+**/dist
+**/*.tsbuildinfo
+.git
+.env
+*.duckdb
+*.duckdb.wal

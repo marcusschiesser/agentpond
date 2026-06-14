@@ -37,7 +37,7 @@ services:
       AWS_SECRET_ACCESS_KEY: minio123
       AWS_REGION: us-east-1
     ports:
-      - "3000:3000"
+      - "3030:3000"
 
 volumes:
   minio-data:

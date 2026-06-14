@@ -53,6 +53,9 @@ export async function main(argv = process.argv): Promise<void> {
     if (resource === "scores" && action === "create") {
       return createScore(parsed, config, json);
     }
+    if (resource === "traces" && action === "create") {
+      return createTrace(parsed, config, json);
+    }
 
     const db = new ApertoDuckDb(config.dbPath);
     const rows = await runReadCommand(db, resource, action, rest, parsed);
@@ -82,12 +85,12 @@ async function createScore(parsed: ParsedArgs, config: ReturnType<typeof configF
     type: eventTypes.SCORE_CREATE,
     body: {
       id: stringFlag(parsed, "id") ?? randomUUID(),
-      traceId: stringFlag(parsed, "trace-id"),
-      observationId: stringFlag(parsed, "observation-id"),
-      sessionId: stringFlag(parsed, "session-id"),
+      traceId: stringFlag(parsed, "traceId"),
+      observationId: stringFlag(parsed, "observationId"),
+      sessionId: stringFlag(parsed, "sessionId"),
       name,
       value: parseScoreValue(value),
-      dataType: stringFlag(parsed, "data-type") as "NUMERIC" | "CATEGORICAL" | "BOOLEAN" | "CORRECTION" | "TEXT" | undefined,
+      dataType: stringFlag(parsed, "dataType") as "NUMERIC" | "CATEGORICAL" | "BOOLEAN" | "CORRECTION" | "TEXT" | undefined,
       source,
       comment: stringFlag(parsed, "comment"),
       createdAt: now,
@@ -101,6 +104,34 @@ async function createScore(parsed: ParsedArgs, config: ReturnType<typeof configF
   });
   const manifest = await writer.writeAcceptedEvents([event]);
   print({ eventId: event.id, scoreId: event.body.id, objects: manifest.objects }, json);
+}
+
+async function createTrace(parsed: ParsedArgs, config: ReturnType<typeof configFromEnv>, json: boolean): Promise<void> {
+  const now = new Date().toISOString();
+  const traceId = stringFlag(parsed, "id") ?? randomUUID();
+  const event: IngestionEvent = {
+    id: randomUUID(),
+    timestamp: now,
+    type: eventTypes.TRACE_CREATE,
+    body: {
+      id: traceId,
+      name: stringFlag(parsed, "name") ?? "manual trace",
+      userId: stringFlag(parsed, "userId"),
+      sessionId: stringFlag(parsed, "sessionId"),
+      metadata: jsonFlag(parsed, "metadata"),
+      input: jsonOrStringFlag(parsed, "input"),
+      output: jsonOrStringFlag(parsed, "output"),
+      startTime: now,
+    },
+  };
+
+  const writer = new AcceptedEventWriter({
+    store: new S3ObjectStore(config.s3),
+    projectId: config.projectId,
+    prefix: config.s3.prefix,
+  });
+  const manifest = await writer.writeAcceptedEvents([event]);
+  print({ eventId: event.id, traceId, objects: manifest.objects }, json);
 }
 
 async function runReadCommand(
@@ -121,7 +152,7 @@ async function runReadCommand(
     return db.query(`SELECT * FROM traces WHERE id = ${sql(id)} LIMIT 1`);
   }
   if (resource === "observations" && action === "list") {
-    const traceId = requiredFlag(parsed, "trace-id");
+    const traceId = requiredFlag(parsed, "traceId");
     return db.query(`SELECT * FROM observations WHERE trace_id = ${sql(traceId)} ORDER BY start_time ASC LIMIT ${limit(parsed)}`);
   }
   if (resource === "sessions" && action === "list") {
@@ -133,9 +164,9 @@ async function runReadCommand(
     return db.query(`SELECT * FROM sessions WHERE id = ${sql(id)} LIMIT 1`);
   }
   if (resource === "scores" && action === "list") {
-    const traceId = stringFlag(parsed, "trace-id");
-    const observationId = stringFlag(parsed, "observation-id");
-    if (!traceId && !observationId) throw new CliError("scores list requires --trace-id or --observation-id");
+    const traceId = stringFlag(parsed, "traceId");
+    const observationId = stringFlag(parsed, "observationId");
+    if (!traceId && !observationId) throw new CliError("scores list requires --traceId or --observationId");
     const filters = [
       traceId ? `trace_id = ${sql(traceId)}` : undefined,
       observationId ? `observation_id = ${sql(observationId)}` : undefined,
@@ -179,6 +210,26 @@ function requiredFlag(parsed: ParsedArgs, name: string): string {
   return value;
 }
 
+function jsonFlag(parsed: ParsedArgs, name: string): Record<string, unknown> | undefined {
+  const raw = stringFlag(parsed, name);
+  if (!raw) return undefined;
+  const value = JSON.parse(raw) as unknown;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new CliError(`--${name} must be a JSON object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function jsonOrStringFlag(parsed: ParsedArgs, name: string): unknown {
+  const raw = stringFlag(parsed, name);
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return raw;
+  }
+}
+
 function limit(parsed: ParsedArgs): number {
   const raw = stringFlag(parsed, "limit");
   if (!raw) return 100;
@@ -215,14 +266,15 @@ function printHelp(): void {
 
 Usage:
   aperto sync [--json]
+  aperto traces create [--id <trace-id>] [--name <name>] [--userId <user-id>] [--sessionId <session-id>]
   aperto traces list [--limit n] [--json]
   aperto traces get <trace-id> [--json]
-  aperto observations list --trace-id <trace-id> [--json]
+  aperto observations list --traceId <trace-id> [--json]
   aperto sessions list [--json]
   aperto sessions get <session-id> [--json]
-  aperto scores create --name <name> --value <value> --trace-id <trace-id>
-  aperto scores list --trace-id <trace-id> [--json]
-  aperto scores list --observation-id <observation-id> [--json]
+  aperto scores create --name <name> --value <value> --traceId <trace-id>
+  aperto scores list --traceId <trace-id> [--json]
+  aperto scores list --observationId <observation-id> [--json]
   aperto sql "select ..." [--json]
 
 Global flags:
