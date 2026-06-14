@@ -1,0 +1,35 @@
+{
+  "name": "aperto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "NODE_ENV=test node --test --import tsx tests/*.test.ts",
+    "typecheck": "tsc --noEmit --pretty false",
+    "ingest": "tsx apps/ingest/src/index.ts",
+    "cli": "tsx apps/cli/src/index.ts"
+  },
+  "bin": {
+    "aperto": "apps/cli/bin/aperto.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.936.0",
+    "@opentelemetry/otlp-transformer": "^0.208.0",
+    "duckdb": "^1.4.2",
+    "fastify": "^5.6.2",
+    "protobufjs": "^7.6.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@aperto/core": "workspace:*",
+    "@aperto/duckdb": "workspace:*",
+    "@types/node": "^24.10.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

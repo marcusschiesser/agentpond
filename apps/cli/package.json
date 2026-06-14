@@ -1,0 +1,13 @@
+{
+  "name": "aperto-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "aperto": "./bin/aperto.mjs"
+  },
+  "dependencies": {
+    "@aperto/core": "workspace:*",
+    "@aperto/duckdb": "workspace:*"
+  }
+}

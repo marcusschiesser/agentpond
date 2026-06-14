@@ -1,0 +1,12 @@
+{
+  "name": "aperto-ingest",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@aperto/core": "workspace:*"
+  }
+}
