@@ -1,4 +1,8 @@
 node_modules
+**/node_modules
+.uv-cache
+**/.venv
+**/__pycache__
 dist
 **/dist
 **/*.tsbuildinfo

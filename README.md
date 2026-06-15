@@ -19,6 +19,12 @@ Not included: web UI, Postgres, ClickHouse, Redis, background queues, prompts, d
 
 ## Local Demo
 
+Install workspace dependencies once before running local CLI commands, tests, or examples:
+
+```sh
+pnpm i
+```
+
 Start MinIO and the ingestion service:
 
 ```sh
@@ -60,17 +66,28 @@ pnpm cli sql "select id, name, session_id from traces"
 Point a Langfuse SDK at the Aperto ingestion service:
 
 ```sh
-LANGFUSE_BASE_URL=http://localhost:3030
-LANGFUSE_HOST=http://localhost:3030
-LANGFUSE_PUBLIC_KEY=pk-aperto
-LANGFUSE_SECRET_KEY=sk-aperto
+export LANGFUSE_BASE_URL=http://localhost:3030
+export LANGFUSE_PUBLIC_KEY=pk-aperto
+export LANGFUSE_SECRET_KEY=sk-aperto
 ```
 
 Use the normal Langfuse SDK setup for your language and framework. The latest Langfuse docs are here:
 
 - [Langfuse SDK overview](https://langfuse.com/docs/observability/sdk/overview)
 
-After your app sends traces, run:
+We provide matching Python and TypeScript examples using the Langfuse SDK. Both send the same two realistic traces and add one human annotation score. To run the Python example with `uv`:
+
+```sh
+uv run --project examples/python python examples/python/send_traces.py
+```
+
+Run the TypeScript SDK example:
+
+```sh
+pnpm --dir examples/typescript start
+```
+
+Each example prints the trace IDs it created and the `pnpm cli` commands to inspect observations and scores for one trace. After your app sends traces, run:
 
 ```sh
 pnpm cli sync

@@ -22,6 +22,18 @@ test("DuckDB sync is idempotent and projects traces, sessions, scores, and raw e
       type: eventTypes.SCORE_CREATE,
       body: { id: "score-1", traceId: "trace-1", name: "quality", value: 0.9, source: "EVAL" },
     },
+    {
+      id: "annotation-score-event",
+      timestamp: "2026-06-14T00:00:02.000Z",
+      type: eventTypes.SCORE_CREATE,
+      body: {
+        id: "score-2",
+        traceId: "trace-1",
+        name: "human-quality",
+        value: 1,
+        metadata: { source: "ANNOTATION", annotator: "human-reviewer" },
+      },
+    },
   ];
   await writer.writeAcceptedEvents(events, "batch-1");
 
@@ -30,11 +42,12 @@ test("DuckDB sync is idempotent and projects traces, sessions, scores, and raw e
   const second = await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
 
   assert.equal(first.manifestsProcessed, 1);
-  assert.equal(first.eventsProcessed, 2);
+  assert.equal(first.eventsProcessed, 3);
   assert.equal(second.manifestsProcessed, 0);
   assert.equal((await db.query("select * from traces")).length, 1);
   assert.equal((await db.query("select * from sessions")).length, 1);
-  assert.equal((await db.query("select * from scores")).length, 1);
-  assert.equal((await db.query("select * from events_raw")).length, 2);
+  assert.equal((await db.query("select * from scores")).length, 2);
+  assert.equal((await db.query("select * from scores where source = 'ANNOTATION'")).length, 1);
+  assert.equal((await db.query("select * from events_raw")).length, 3);
   await db.close();
 });

@@ -11,6 +11,7 @@ import {
 type DuckConnection = {
   run(sql: string, callback: (err: Error | null) => void): void;
   all<T = Record<string, unknown>>(sql: string, callback: (err: Error | null, rows: T[]) => void): void;
+  close(callback: (err: Error | null) => void): void;
 };
 
 export type SyncResult = {
@@ -148,8 +149,15 @@ export class ApertoDuckDb {
   }
 
   async close(): Promise<void> {
+    if (this.connection) {
+      const connection = this.connection;
+      this.connection = undefined;
+      await new Promise<void>((resolve, reject) => {
+        connection.close((err) => (err && !isAlreadyClosedConnectionError(err) ? reject(err) : resolve()));
+      });
+    }
     await new Promise<void>((resolve, reject) => {
-      this.db.close((err) => (err ? reject(err) : resolve()));
+      this.db.close((err) => (err && !isAlreadyClosedConnectionError(err) ? reject(err) : resolve()));
     });
   }
 
@@ -192,7 +200,7 @@ export class ApertoDuckDb {
           ${numberValue === null ? "NULL" : String(numberValue)},
           ${sql(scoreStringValue)},
           ${sql(dataType)},
-          ${sql(stringValue(body.source) ?? "API")},
+          ${sql(scoreSource(body))},
           ${sql(stringValue(body.comment))},
           ${sql(jsonString(body.metadata))},
           ${sql(timestampValue(body.createdAt ?? event.timestamp))},
@@ -298,6 +306,25 @@ function timestampValue(value: unknown): string | undefined {
 function jsonString(value: unknown): string | undefined {
   if (value === null || value === undefined) return undefined;
   return JSON.stringify(value);
+}
+
+function scoreSource(body: Record<string, unknown>): string {
+  const explicit = stringValue(body.source);
+  if (isScoreSource(explicit)) return explicit;
+  const metadata = body.metadata;
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    const metadataSource = stringValue((metadata as Record<string, unknown>).source);
+    if (isScoreSource(metadataSource)) return metadataSource;
+  }
+  return "API";
+}
+
+function isScoreSource(value: string | undefined): value is "API" | "EVAL" | "ANNOTATION" {
+  return value === "API" || value === "EVAL" || value === "ANNOTATION";
+}
+
+function isAlreadyClosedConnectionError(error: Error): boolean {
+  return error.message.includes("Connection was never established or has been closed already");
 }
 
 function scoreValue(value: unknown, declaredDataType: string | undefined): {

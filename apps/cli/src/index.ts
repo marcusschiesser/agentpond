@@ -271,7 +271,7 @@ function sql(value: string): string {
 
 function print(value: unknown, json: boolean): void {
   if (json) {
-    console.log(JSON.stringify(value, null, 2));
+    console.log(JSON.stringify(value, (_key, item) => (typeof item === "bigint" ? item.toString() : item), 2));
     return;
   }
   if (Array.isArray(value)) {

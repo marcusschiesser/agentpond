@@ -76,7 +76,15 @@ test("otel endpoint accepts JSON resource spans and writes trace data", async ()
                   name: "root span",
                   startTimeUnixNano: "1781395200000000000",
                   endTimeUnixNano: "1781395201000000000",
-                  attributes: [{ key: "service.name", value: { stringValue: "demo" } }],
+                  attributes: [
+                    { key: "service.name", value: { stringValue: "demo" } },
+                    { key: "user.id", value: { stringValue: "user-otel" } },
+                    { key: "session.id", value: { stringValue: "session-otel" } },
+                    { key: "langfuse.trace.name", value: { stringValue: "Langfuse OTel Trace" } },
+                    { key: "langfuse.trace.metadata.example", value: { stringValue: "sdk" } },
+                    { key: "langfuse.observation.input", value: { stringValue: "{\"question\":\"hello\"}" } },
+                    { key: "langfuse.observation.output", value: { stringValue: "{\"answer\":\"world\"}" } },
+                  ],
                 },
               ],
             },
@@ -88,8 +96,21 @@ test("otel endpoint accepts JSON resource spans and writes trace data", async ()
 
   assert.equal(response.statusCode, 200);
   assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
-  assert.equal((await store.listKeys("project-a/trace/")).length, 1);
+  const traceKeys = await store.listKeys("project-a/trace/");
+  assert.equal(traceKeys.length, 1);
   assert.equal((await store.listKeys("project-a/observation/")).length, 1);
+  const traceEvents = await store.getJson<Array<{ type: string; body: Record<string, unknown> }>>(traceKeys[0]);
+  assert.equal(traceEvents[0].type, "trace-create");
+  assert.deepEqual(traceEvents[0].body, {
+    id: "trace-otel",
+    name: "Langfuse OTel Trace",
+    userId: "user-otel",
+    sessionId: "session-otel",
+    startTime: "2026-06-14T00:00:00.000Z",
+    metadata: { example: "sdk" },
+    input: { question: "hello" },
+    output: { answer: "world" },
+  });
   await server.close();
 });
 

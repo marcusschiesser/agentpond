@@ -137,6 +137,7 @@ function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
         const timestamp = nanosToIso(stringField(span, "startTimeUnixNano")) ?? new Date().toISOString();
         const endTime = nanosToIso(stringField(span, "endTimeUnixNano"));
         const attributes = attributesToRecord(getArray(span, "attributes") ?? []);
+        const langfuse = langfuseAttributes(attributes);
         const name = stringField(span, "name") ?? "otel-span";
         const observationEvent: IngestionEvent = {
           id: randomUUID(),
@@ -151,6 +152,8 @@ function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
             startTime: timestamp,
             endTime,
             metadata: attributes,
+            input: parseJsonString(attributes["langfuse.observation.input"]),
+            output: parseJsonString(attributes["langfuse.observation.output"]),
           },
         };
         events.push(observationEvent);
@@ -163,9 +166,13 @@ function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
             metadata: { source: "otel" },
             body: {
               id: traceId,
-              name,
+              name: langfuse.traceName ?? name,
+              userId: langfuse.userId,
+              sessionId: langfuse.sessionId,
               startTime: timestamp,
-              metadata: attributes,
+              metadata: langfuse.traceMetadata ?? attributes,
+              input: parseJsonString(attributes["langfuse.observation.input"]),
+              output: parseJsonString(attributes["langfuse.observation.output"]),
             },
           });
         }
@@ -216,4 +223,40 @@ function unwrapOtelValue(value: unknown): unknown {
   }
   if (Array.isArray(object.arrayValue)) return object.arrayValue.map(unwrapOtelValue);
   return object;
+}
+
+function langfuseAttributes(attributes: Record<string, unknown>): {
+  traceName?: string;
+  userId?: string;
+  sessionId?: string;
+  traceMetadata?: Record<string, unknown>;
+} {
+  const traceMetadata: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(attributes)) {
+    if (key.startsWith("langfuse.trace.metadata.")) {
+      traceMetadata[key.slice("langfuse.trace.metadata.".length)] = value;
+    }
+  }
+
+  return {
+    traceName: stringValue(attributes["langfuse.trace.name"]),
+    userId: stringValue(attributes["user.id"]),
+    sessionId: stringValue(attributes["session.id"]),
+    traceMetadata: Object.keys(traceMetadata).length > 0 ? traceMetadata : undefined,
+  };
+}
+
+function parseJsonString(value: unknown): unknown {
+  if (typeof value !== "string") return undefined;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+}
+
+function stringValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return undefined;
 }
