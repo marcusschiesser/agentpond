@@ -27,10 +27,10 @@ importers:
         specifier: ^4.3.6
         version: 4.4.3
     devDependencies:
-      '@aperto/core':
+      '@agentpond/core':
         specifier: workspace:*
         version: link:packages/core
-      '@aperto/duckdb':
+      '@agentpond/duckdb':
         specifier: workspace:*
         version: link:packages/duckdb
       '@types/node':
@@ -45,16 +45,16 @@ importers:
 
   apps/cli:
     dependencies:
-      '@aperto/core':
+      '@agentpond/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@aperto/duckdb':
+      '@agentpond/duckdb':
         specifier: workspace:*
         version: link:../../packages/duckdb
 
   apps/ingest:
     dependencies:
-      '@aperto/core':
+      '@agentpond/core':
         specifier: workspace:*
         version: link:../../packages/core
 
@@ -87,7 +87,7 @@ importers:
 
   packages/duckdb:
     dependencies:
-      '@aperto/core':
+      '@agentpond/core':
         specifier: workspace:*
         version: link:../core
 

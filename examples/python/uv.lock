@@ -29,7 +29,7 @@ wheels = [
 ]
 
 [[package]]
-name = "aperto-python-langfuse-example"
+name = "agentpond-python-langfuse-example"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

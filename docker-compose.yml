@@ -1,3 +1,5 @@
+name: agentpond
+
 services:
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
@@ -18,7 +20,7 @@ services:
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://minio:9000 minio minio123; do sleep 1; done;
-      mc mb --ignore-existing local/aperto;
+      mc mb --ignore-existing local/agentpond;
       "
 
   ingest:
@@ -27,12 +29,12 @@ services:
       - create-bucket
     environment:
       PORT: 3000
-      APERTO_PROJECT_ID: default-project
-      LANGFUSE_PUBLIC_KEY: pk-aperto
-      LANGFUSE_SECRET_KEY: sk-aperto
-      APERTO_S3_BUCKET: aperto
-      APERTO_S3_ENDPOINT: http://minio:9000
-      APERTO_S3_FORCE_PATH_STYLE: "true"
+      AGENTPOND_PROJECT_ID: default-project
+      LANGFUSE_PUBLIC_KEY: pk-agentpond
+      LANGFUSE_SECRET_KEY: sk-agentpond
+      AGENTPOND_S3_BUCKET: agentpond
+      AGENTPOND_S3_ENDPOINT: http://minio:9000
+      AGENTPOND_S3_FORCE_PATH_STYLE: "true"
       AWS_ACCESS_KEY_ID: minio
       AWS_SECRET_ACCESS_KEY: minio123
       AWS_REGION: us-east-1

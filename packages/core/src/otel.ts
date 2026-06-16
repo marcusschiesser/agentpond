@@ -44,7 +44,7 @@ async function parseProtobufResourceSpans(body: unknown): Promise<unknown[]> {
     throw new Error("Failed to parse OTel Protobuf Trace");
   }
   try {
-    const type = otlpTraceRoot.lookupType("aperto.otlp.ExportTraceServiceRequest");
+    const type = otlpTraceRoot.lookupType("agentpond.otlp.ExportTraceServiceRequest");
     const decoded = type.decode(Buffer.from(body));
     const object = type.toObject(decoded, {
       longs: String,
@@ -59,7 +59,7 @@ async function parseProtobufResourceSpans(body: unknown): Promise<unknown[]> {
 
 const otlpTraceRoot = protobuf.parse(`
 syntax = "proto3";
-package aperto.otlp;
+package agentpond.otlp;
 
 message ExportTraceServiceRequest {
   repeated ResourceSpans resource_spans = 1;

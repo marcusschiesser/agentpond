@@ -18,7 +18,7 @@ export type AuthConfig = {
   secretKey: string;
 };
 
-export type ApertoConfig = {
+export type AgentPondConfig = {
   projectId: string;
   dbPath: string;
   s3: S3Config;
@@ -46,22 +46,22 @@ export function configFromEnv(overrides: Partial<{
   s3Bucket: string;
   s3Prefix: string;
   s3Endpoint: string;
-}> = {}): ApertoConfig {
-  const projectId = process.env.APERTO_PROJECT_ID ?? "default-project";
-  const publicKey = process.env.LANGFUSE_PUBLIC_KEY ?? process.env.APERTO_PUBLIC_KEY ?? "pk-aperto";
-  const secretKey = process.env.LANGFUSE_SECRET_KEY ?? process.env.APERTO_SECRET_KEY ?? "sk-aperto";
+}> = {}): AgentPondConfig {
+  const projectId = process.env.AGENTPOND_PROJECT_ID ?? "default-project";
+  const publicKey = process.env.LANGFUSE_PUBLIC_KEY ?? process.env.AGENTPOND_PUBLIC_KEY ?? "pk-agentpond";
+  const secretKey = process.env.LANGFUSE_SECRET_KEY ?? process.env.AGENTPOND_SECRET_KEY ?? "sk-agentpond";
 
   return {
     projectId,
-    dbPath: overrides.dbPath ?? process.env.APERTO_DB ?? join(homedir(), ".aperto", "cache.duckdb"),
+    dbPath: overrides.dbPath ?? process.env.AGENTPOND_DB ?? join(homedir(), ".agentpond", "cache.duckdb"),
     s3: {
-      bucket: overrides.s3Bucket ?? process.env.APERTO_S3_BUCKET ?? process.env.S3_BUCKET ?? "aperto",
-      prefix: normalizePrefix(overrides.s3Prefix ?? process.env.APERTO_S3_PREFIX ?? ""),
-      endpoint: overrides.s3Endpoint ?? process.env.APERTO_S3_ENDPOINT ?? process.env.S3_ENDPOINT,
-      region: process.env.AWS_REGION ?? process.env.APERTO_S3_REGION ?? "us-east-1",
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? process.env.APERTO_S3_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? process.env.APERTO_S3_SECRET_ACCESS_KEY,
-      forcePathStyle: (process.env.APERTO_S3_FORCE_PATH_STYLE ?? "true") !== "false",
+      bucket: overrides.s3Bucket ?? process.env.AGENTPOND_S3_BUCKET ?? process.env.S3_BUCKET ?? "agentpond",
+      prefix: normalizePrefix(overrides.s3Prefix ?? process.env.AGENTPOND_S3_PREFIX ?? ""),
+      endpoint: overrides.s3Endpoint ?? process.env.AGENTPOND_S3_ENDPOINT ?? process.env.S3_ENDPOINT,
+      region: process.env.AWS_REGION ?? process.env.AGENTPOND_S3_REGION ?? "us-east-1",
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? process.env.AGENTPOND_S3_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? process.env.AGENTPOND_S3_SECRET_ACCESS_KEY,
+      forcePathStyle: (process.env.AGENTPOND_S3_FORCE_PATH_STYLE ?? "true") !== "false",
     },
     auth: {
       projectId,

@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import { gzipSync } from "node:zlib";
 import protobuf from "protobufjs";
 import { buildServer } from "../apps/ingest/src/server.js";
-import { MemoryObjectStore, type ApertoConfig } from "@aperto/core";
+import { MemoryObjectStore, type AgentPondConfig } from "@agentpond/core";
 
-const config: ApertoConfig = {
+const config: AgentPondConfig = {
   projectId: "project-a",
-  dbPath: "/tmp/aperto-test.duckdb",
+  dbPath: "/tmp/agentpond-test.duckdb",
   s3: {
-    bucket: "aperto",
+    bucket: "agentpond",
     prefix: "",
     region: "us-east-1",
     forcePathStyle: true,
@@ -210,7 +210,7 @@ test("otel endpoint rejects unsupported ingestion versions", async () => {
 function makeOtlpTraceProtobuf(): Buffer {
   const root = protobuf.parse(`
 syntax = "proto3";
-package aperto.otlp;
+package agentpond.otlp;
 message ExportTraceServiceRequest { repeated ResourceSpans resource_spans = 1; }
 message ResourceSpans { repeated ScopeSpans scope_spans = 2; }
 message ScopeSpans { repeated Span spans = 2; }
@@ -224,7 +224,7 @@ message Span {
 message KeyValue { string key = 1; AnyValue value = 2; }
 message AnyValue { string string_value = 1; }
 `).root;
-  const type = root.lookupType("aperto.otlp.ExportTraceServiceRequest");
+  const type = root.lookupType("agentpond.otlp.ExportTraceServiceRequest");
   const message = type.create({
     resourceSpans: [
       {

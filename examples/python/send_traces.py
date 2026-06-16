@@ -15,7 +15,7 @@ def answer_checkout_question(langfuse, example_language):
             "cart_total": 128.45,
         },
         metadata={
-            "example": "aperto-python",
+            "example": "agentpond-python",
             "exampleLanguage": example_language,
             "route": "/support/checkout",
             "tenant": "acme-retail",
@@ -26,7 +26,7 @@ def answer_checkout_question(langfuse, example_language):
             session_id="sdk-example-session",
             trace_name="checkout support trace",
             metadata={
-                "example": "aperto-python",
+                "example": "agentpond-python",
                 "exampleLanguage": example_language,
                 "feature": "checkout-support",
                 "release": "2026-06-15",
@@ -92,7 +92,7 @@ def summarize_refund_policy(langfuse, example_language):
             session_id="sdk-example-session",
             trace_name="refund policy trace",
             metadata={
-                "example": "aperto-python",
+                "example": "agentpond-python",
                 "exampleLanguage": example_language,
                 "feature": "policy-answer",
             },

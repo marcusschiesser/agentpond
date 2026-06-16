@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AcceptedEventWriter, eventTypes, MemoryObjectStore, type IngestionEvent } from "@aperto/core";
+import { AcceptedEventWriter, eventTypes, MemoryObjectStore, type IngestionEvent } from "@agentpond/core";
 
 test("accepted event writer stores entity objects before the manifest", async () => {
   const store = new MemoryObjectStore();

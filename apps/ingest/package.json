@@ -1,5 +1,5 @@
 {
-  "name": "aperto-ingest",
+  "name": "agentpond-ingest",
   "version": "0.1.0",
   "type": "module",
   "private": true,
@@ -7,6 +7,6 @@
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
-    "@aperto/core": "workspace:*"
+    "@agentpond/core": "workspace:*"
   }
 }

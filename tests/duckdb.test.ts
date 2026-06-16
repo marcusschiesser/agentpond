@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AcceptedEventWriter, eventTypes, MemoryObjectStore, type IngestionEvent } from "@aperto/core";
-import { ApertoDuckDb } from "@aperto/duckdb";
+import { AcceptedEventWriter, eventTypes, MemoryObjectStore, type IngestionEvent } from "@agentpond/core";
+import { AgentPondDuckDb } from "@agentpond/duckdb";
 
 test("DuckDB sync is idempotent and projects traces, sessions, scores, and raw events", async () => {
   const store = new MemoryObjectStore();
@@ -37,7 +37,7 @@ test("DuckDB sync is idempotent and projects traces, sessions, scores, and raw e
   ];
   await writer.writeAcceptedEvents(events, "batch-1");
 
-  const db = new ApertoDuckDb(join(mkdtempSync(join(tmpdir(), "aperto-")), "cache.duckdb"));
+  const db = new AgentPondDuckDb(join(mkdtempSync(join(tmpdir(), "agentpond-")), "cache.duckdb"));
   const first = await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
   const second = await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
 

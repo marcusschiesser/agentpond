@@ -1,11 +1,11 @@
 {
-  "name": "@aperto/duckdb",
+  "name": "@agentpond/duckdb",
   "version": "0.1.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@aperto/core": "workspace:*"
+    "@agentpond/core": "workspace:*"
   }
 }

@@ -3,18 +3,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { eventTypes, MemoryObjectStore, type ApertoConfig, type IngestionEvent } from "@aperto/core";
-import { ApertoDuckDb } from "@aperto/duckdb";
+import { eventTypes, MemoryObjectStore, type AgentPondConfig, type IngestionEvent } from "@agentpond/core";
+import { AgentPondDuckDb } from "@agentpond/duckdb";
 import { writeEventsAndSyncCache } from "../apps/cli/src/index.js";
 
 test("CLI-created scores are immediately visible to score list queries", async () => {
   const store = new MemoryObjectStore();
-  const dbPath = join(mkdtempSync(join(tmpdir(), "aperto-cli-")), "cache.duckdb");
-  const config: ApertoConfig = {
+  const dbPath = join(mkdtempSync(join(tmpdir(), "agentpond-cli-")), "cache.duckdb");
+  const config: AgentPondConfig = {
     projectId: "default-project",
     dbPath,
     s3: {
-      bucket: "aperto",
+      bucket: "agentpond",
       prefix: "",
       region: "us-east-1",
       forcePathStyle: true,
@@ -36,7 +36,7 @@ test("CLI-created scores are immediately visible to score list queries", async (
 
   await writeEventsAndSyncCache(config, store, [event]);
 
-  const db = new ApertoDuckDb(dbPath);
+  const db = new AgentPondDuckDb(dbPath);
   const rows = await db.query<{ id: string; trace_id: string; name: string; value: number }>(
     "SELECT id, trace_id, name, value FROM scores WHERE trace_id = '0'",
   );

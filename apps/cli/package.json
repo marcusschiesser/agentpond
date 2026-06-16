@@ -1,13 +1,13 @@
 {
-  "name": "aperto-cli",
+  "name": "agentpond-cli",
   "version": "0.1.0",
   "type": "module",
   "private": true,
   "bin": {
-    "aperto": "./bin/aperto.mjs"
+    "agentpond": "./bin/agentpond.mjs"
   },
   "dependencies": {
-    "@aperto/core": "workspace:*",
-    "@aperto/duckdb": "workspace:*"
+    "@agentpond/core": "workspace:*",
+    "@agentpond/duckdb": "workspace:*"
   }
 }

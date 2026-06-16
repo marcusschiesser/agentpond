@@ -8,12 +8,12 @@ import {
   otelBodyToEvents,
   S3ObjectStore,
   verifyBasicAuth,
-  type ApertoConfig,
+  type AgentPondConfig,
   type ObjectStore,
-} from "@aperto/core";
+} from "@agentpond/core";
 
 export type BuildServerOptions = {
-  config?: ApertoConfig;
+  config?: AgentPondConfig;
   store?: ObjectStore;
 };
 

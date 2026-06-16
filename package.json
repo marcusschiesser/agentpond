@@ -1,5 +1,5 @@
 {
-  "name": "aperto",
+  "name": "agentpond",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "cli": "tsx apps/cli/src/index.ts"
   },
   "bin": {
-    "aperto": "apps/cli/bin/aperto.mjs"
+    "agentpond": "apps/cli/bin/agentpond.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.936.0",
@@ -26,8 +26,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@aperto/core": "workspace:*",
-    "@aperto/duckdb": "workspace:*",
+    "@agentpond/core": "workspace:*",
+    "@agentpond/duckdb": "workspace:*",
     "@types/node": "^24.10.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

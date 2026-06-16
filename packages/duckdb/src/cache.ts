@@ -6,7 +6,7 @@ import {
   type BatchManifest,
   type IngestionEvent,
   type ObjectStore,
-} from "@aperto/core";
+} from "@agentpond/core";
 
 type DuckConnection = {
   run(sql: string, callback: (err: Error | null) => void): void;
@@ -20,7 +20,7 @@ export type SyncResult = {
   eventsProcessed: number;
 };
 
-export class ApertoDuckDb {
+export class AgentPondDuckDb {
   private readonly db: duckdb.Database;
   private connection?: DuckConnection;
 

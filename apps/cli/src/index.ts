@@ -7,12 +7,12 @@ import {
   eventTypes,
   loadEnvFile,
   S3ObjectStore,
-  type ApertoConfig,
+  type AgentPondConfig,
   type IngestionEvent,
   type ObjectStore,
   type BatchManifest,
-} from "@aperto/core";
-import { ApertoDuckDb } from "@aperto/duckdb";
+} from "@agentpond/core";
+import { AgentPondDuckDb } from "@agentpond/duckdb";
 
 type ParsedArgs = {
   flags: Record<string, string | boolean>;
@@ -37,7 +37,7 @@ export async function main(argv = process.argv): Promise<void> {
   try {
     if (!resource || parsed.flags.help || parsed.flags.h) return printHelp();
     if (resource === "sync") {
-      const db = new ApertoDuckDb(config.dbPath);
+      const db = new AgentPondDuckDb(config.dbPath);
       const result = await db.syncFromStore({
         store: new S3ObjectStore(config.s3),
         projectId: config.projectId,
@@ -49,7 +49,7 @@ export async function main(argv = process.argv): Promise<void> {
     if (resource === "sql") {
       const query = rest.length > 0 ? [action, ...rest].join(" ") : action;
       if (!query) throw new CliError("Missing SQL query");
-      const db = new ApertoDuckDb(config.dbPath);
+      const db = new AgentPondDuckDb(config.dbPath);
       const rows = await db.query(query);
       await db.close();
       return print(rows, json);
@@ -61,7 +61,7 @@ export async function main(argv = process.argv): Promise<void> {
       return createTrace(parsed, config, json);
     }
 
-    const db = new ApertoDuckDb(config.dbPath);
+    const db = new AgentPondDuckDb(config.dbPath);
     const rows = await runReadCommand(db, resource, action, rest, parsed);
     await db.close();
     return print(rows, json);
@@ -131,7 +131,7 @@ async function createTrace(parsed: ParsedArgs, config: ReturnType<typeof configF
 }
 
 export async function writeEventsAndSyncCache(
-  config: Pick<ApertoConfig, "dbPath" | "projectId" | "s3">,
+  config: Pick<AgentPondConfig, "dbPath" | "projectId" | "s3">,
   store: ObjectStore,
   events: IngestionEvent[],
 ): Promise<BatchManifest> {
@@ -141,7 +141,7 @@ export async function writeEventsAndSyncCache(
     prefix: config.s3.prefix,
   });
   const manifest = await writer.writeAcceptedEvents(events);
-  const db = new ApertoDuckDb(config.dbPath);
+  const db = new AgentPondDuckDb(config.dbPath);
   try {
     await db.syncFromStore({
       store,
@@ -155,7 +155,7 @@ export async function writeEventsAndSyncCache(
 }
 
 async function runReadCommand(
-  db: ApertoDuckDb,
+  db: AgentPondDuckDb,
   resource: string,
   action: string | undefined,
   rest: string[],
@@ -282,20 +282,20 @@ function print(value: unknown, json: boolean): void {
 }
 
 function printHelp(): void {
-  console.log(`aperto - local Langfuse-compatible trace analytics
+  console.log(`agentpond - local Langfuse-compatible trace analytics
 
 Usage:
-  aperto sync [--json]
-  aperto traces create [--id <trace-id>] [--name <name>] [--userId <user-id>] [--sessionId <session-id>]
-  aperto traces list [--limit n] [--json]
-  aperto traces get <trace-id> [--json]
-  aperto observations list --traceId <trace-id> [--json]
-  aperto sessions list [--json]
-  aperto sessions get <session-id> [--json]
-  aperto scores create --name <name> --value <value> --traceId <trace-id>
-  aperto scores list --traceId <trace-id> [--json]
-  aperto scores list --observationId <observation-id> [--json]
-  aperto sql "select ..." [--json]
+  agentpond sync [--json]
+  agentpond traces create [--id <trace-id>] [--name <name>] [--userId <user-id>] [--sessionId <session-id>]
+  agentpond traces list [--limit n] [--json]
+  agentpond traces get <trace-id> [--json]
+  agentpond observations list --traceId <trace-id> [--json]
+  agentpond sessions list [--json]
+  agentpond sessions get <session-id> [--json]
+  agentpond scores create --name <name> --value <value> --traceId <trace-id>
+  agentpond scores list --traceId <trace-id> [--json]
+  agentpond scores list --observationId <observation-id> [--json]
+  agentpond sql "select ..." [--json]
 
 Global flags:
   --env <path>
@@ -307,7 +307,7 @@ Global flags:
 }
 
 function helpRows(resource: string): Record<string, unknown>[] {
-  return [{ resource, hint: "Run aperto --help for command usage." }];
+  return [{ resource, hint: "Run agentpond --help for command usage." }];
 }
 
 class CliError extends Error {}

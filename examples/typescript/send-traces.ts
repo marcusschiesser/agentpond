@@ -25,7 +25,7 @@ async function answerCheckoutQuestion(exampleLanguage: string) {
         cart_total: 128.45,
       },
       metadata: {
-        example: "aperto-typescript",
+        example: "agentpond-typescript",
         exampleLanguage,
         route: "/support/checkout",
         tenant: "acme-retail",
@@ -38,7 +38,7 @@ async function answerCheckoutQuestion(exampleLanguage: string) {
         sessionId: "sdk-example-session",
         traceName: "checkout support trace",
         metadata: {
-          example: "aperto-typescript",
+          example: "agentpond-typescript",
           exampleLanguage,
           feature: "checkout-support",
           release: "2026-06-15",
@@ -111,7 +111,7 @@ async function summarizeRefundPolicy(exampleLanguage: string) {
         sessionId: "sdk-example-session",
         traceName: "refund policy trace",
         metadata: {
-          example: "aperto-typescript",
+          example: "agentpond-typescript",
           exampleLanguage,
           feature: "policy-answer",
         },
