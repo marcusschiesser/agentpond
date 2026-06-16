@@ -62,6 +62,7 @@ export class AgentPondDuckDb {
         metadata_json TEXT,
         input_json TEXT,
         output_json TEXT,
+        total_cost DOUBLE,
         updated_at TIMESTAMP
       );
       CREATE TABLE IF NOT EXISTS observations (
@@ -76,6 +77,9 @@ export class AgentPondDuckDb {
         metadata_json TEXT,
         input_json TEXT,
         output_json TEXT,
+        usage_details_json TEXT,
+        cost_details_json TEXT,
+        total_cost DOUBLE,
         updated_at TIMESTAMP
       );
       CREATE TABLE IF NOT EXISTS scores (
@@ -104,6 +108,12 @@ export class AgentPondDuckDb {
         FROM traces
         WHERE session_id IS NOT NULL AND session_id <> ''
         GROUP BY session_id, project_id;
+    `);
+    await this.exec(`
+      ALTER TABLE traces ADD COLUMN IF NOT EXISTS total_cost DOUBLE;
+      ALTER TABLE observations ADD COLUMN IF NOT EXISTS usage_details_json TEXT;
+      ALTER TABLE observations ADD COLUMN IF NOT EXISTS cost_details_json TEXT;
+      ALTER TABLE observations ADD COLUMN IF NOT EXISTS total_cost DOUBLE;
     `);
   }
 
@@ -168,7 +178,20 @@ export class AgentPondDuckDb {
       if (!id) return;
       await this.exec(`DELETE FROM traces WHERE id = ${sql(id)}`);
       await this.exec(`
-        INSERT INTO traces VALUES (
+        INSERT INTO traces (
+          id,
+          project_id,
+          name,
+          user_id,
+          session_id,
+          start_time,
+          end_time,
+          metadata_json,
+          input_json,
+          output_json,
+          total_cost,
+          updated_at
+        ) VALUES (
           ${sql(id)},
           ${sql(projectId)},
           ${sql(stringValue(body.name))},
@@ -179,9 +202,11 @@ export class AgentPondDuckDb {
           ${sql(jsonString(body.metadata))},
           ${sql(jsonString(body.input))},
           ${sql(jsonString(body.output))},
+          NULL,
           ${sql(timestampValue(event.timestamp))}
         )
       `);
+      await this.refreshTraceTotalCost(id);
       return;
     }
 
@@ -211,12 +236,31 @@ export class AgentPondDuckDb {
     }
 
     const id = stringValue(body.id) ?? event.id;
+    const traceId = stringValue(body.traceId);
+    const costDetails = objectValue(body.costDetails);
+    const totalCost = numericValue(body.totalCost) ?? costDetailsTotal(costDetails);
     await this.exec(`DELETE FROM observations WHERE id = ${sql(id)}`);
     await this.exec(`
-      INSERT INTO observations VALUES (
+      INSERT INTO observations (
+        id,
+        project_id,
+        trace_id,
+        parent_observation_id,
+        type,
+        name,
+        start_time,
+        end_time,
+        metadata_json,
+        input_json,
+        output_json,
+        usage_details_json,
+        cost_details_json,
+        total_cost,
+        updated_at
+      ) VALUES (
         ${sql(id)},
         ${sql(projectId)},
-        ${sql(stringValue(body.traceId))},
+        ${sql(traceId)},
         ${sql(stringValue(body.parentObservationId))},
         ${sql(event.type)},
         ${sql(stringValue(body.name))},
@@ -225,8 +269,24 @@ export class AgentPondDuckDb {
         ${sql(jsonString(body.metadata))},
         ${sql(jsonString(body.input))},
         ${sql(jsonString(body.output))},
+        ${sql(jsonString(body.usageDetails))},
+        ${sql(jsonString(costDetails))},
+        ${totalCost === undefined ? "NULL" : String(totalCost)},
         ${sql(timestampValue(event.timestamp))}
       )
+    `);
+    if (traceId) await this.refreshTraceTotalCost(traceId);
+  }
+
+  private async refreshTraceTotalCost(traceId: string): Promise<void> {
+    await this.exec(`
+      UPDATE traces
+      SET total_cost = (
+        SELECT CASE WHEN count(total_cost) = 0 THEN NULL ELSE sum(total_cost) END
+        FROM observations
+        WHERE trace_id = ${sql(traceId)}
+      )
+      WHERE id = ${sql(traceId)}
     `);
   }
 
@@ -306,6 +366,35 @@ function timestampValue(value: unknown): string | undefined {
 function jsonString(value: unknown): string | undefined {
   if (value === null || value === undefined) return undefined;
   return JSON.stringify(value);
+}
+
+function objectValue(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+}
+
+function numericValue(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function costDetailsTotal(costDetails: Record<string, unknown> | undefined): number | undefined {
+  if (!costDetails) return undefined;
+  const explicitTotal = numericValue(costDetails.total);
+  if (explicitTotal !== undefined) return explicitTotal;
+
+  let total = 0;
+  let hasCost = false;
+  for (const [key, value] of Object.entries(costDetails)) {
+    if (key === "total") continue;
+    const numeric = numericValue(value);
+    if (numeric === undefined) continue;
+    total += numeric;
+    hasCost = true;
+  }
+  return hasCost ? total : undefined;
 }
 
 function scoreSource(body: Record<string, unknown>): string {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { gzipSync } from "node:zlib";
 import protobuf from "protobufjs";
 import { buildServer } from "../apps/ingest/src/server.js";
-import { MemoryObjectStore, type AgentPondConfig } from "@agentpond/core";
+import { eventTypes, MemoryObjectStore, type AgentPondConfig } from "@agentpond/core";
 
 const config: AgentPondConfig = {
   projectId: "project-a",
@@ -50,6 +50,95 @@ test("ingestion endpoint validates auth and returns 207 batch result", async () 
   assert.equal(response.statusCode, 207);
   assert.deepEqual(response.json().successes, [{ id: "event-1", status: 201 }]);
   assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
+  await server.close();
+});
+
+test("ingestion endpoint rejects invalid auth without writing objects", async () => {
+  const cases = [
+    {},
+    { authorization: `Basic ${Buffer.from("pk:wrong").toString("base64")}` },
+    { authorization: `Basic ${Buffer.from("wrong:sk").toString("base64")}` },
+    { authorization: "Bearer token" },
+  ];
+
+  for (const headers of cases) {
+    const store = new MemoryObjectStore();
+    const server = buildServer({ config, store });
+    const response = await server.inject({
+      method: "POST",
+      url: "/api/public/ingestion",
+      headers: {
+        ...headers,
+        "content-type": "application/json",
+      },
+      payload: JSON.stringify({
+        batch: [
+          {
+            id: "event-1",
+            timestamp: "2026-06-14T00:00:00.000Z",
+            type: eventTypes.TRACE_CREATE,
+            body: { id: "trace-1", name: "Trace 1" },
+          },
+        ],
+      }),
+    });
+
+    assert.equal(response.statusCode, 401);
+    assert.deepEqual(await store.listKeys("project-a/"), []);
+    await server.close();
+  }
+});
+
+test("ingestion endpoint writes trace observation and score bodies to raw storage", async () => {
+  const store = new MemoryObjectStore();
+  const server = buildServer({ config, store });
+  const response = await server.inject({
+    method: "POST",
+    url: "/api/public/ingestion",
+    headers: {
+      authorization: authHeader(),
+      "content-type": "application/json",
+    },
+    payload: JSON.stringify({
+      batch: [
+        {
+          id: "trace-event",
+          timestamp: "2026-06-14T00:00:00.000Z",
+          type: eventTypes.TRACE_CREATE,
+          body: { id: "trace-1", name: "Trace 1" },
+        },
+        {
+          id: "observation-event",
+          timestamp: "2026-06-14T00:00:01.000Z",
+          type: eventTypes.GENERATION_CREATE,
+          body: {
+            id: "observation-1",
+            traceId: "trace-1",
+            name: "Generation 1",
+            usageDetails: { input: 10, output: 5, total: 15 },
+            costDetails: { input: 0.01, output: 0.02, total: 0.03 },
+          },
+        },
+        {
+          id: "score-event",
+          timestamp: "2026-06-14T00:00:02.000Z",
+          type: eventTypes.SCORE_CREATE,
+          body: { id: "score-1", traceId: "trace-1", name: "quality", value: 0.9 },
+        },
+      ],
+    }),
+  });
+
+  assert.equal(response.statusCode, 207);
+  assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
+
+  const observationEvents = await store.getJson<Array<{ id: string; body: Record<string, unknown> }>>(
+    "project-a/observation/observation-1/observation-event.json",
+  );
+  assert.deepEqual(observationEvents[0].body.usageDetails, { input: 10, output: 5, total: 15 });
+  assert.deepEqual(observationEvents[0].body.costDetails, { input: 0.01, output: 0.02, total: 0.03 });
+  assert.equal((await store.listKeys("project-a/trace/")).length, 1);
+  assert.equal((await store.listKeys("project-a/score/")).length, 1);
   await server.close();
 });
 
@@ -111,6 +200,42 @@ test("otel endpoint accepts JSON resource spans and writes trace data", async ()
     input: { question: "hello" },
     output: { answer: "world" },
   });
+  await server.close();
+});
+
+test("otel endpoint accepts ingestion version header in underscore format", async () => {
+  const store = new MemoryObjectStore();
+  const server = buildServer({ config, store });
+  const response = await server.inject({
+    method: "POST",
+    url: "/api/public/otel/v1/traces",
+    headers: {
+      authorization: authHeader(),
+      "content-type": "application/json",
+      "x_langfuse_ingestion_version": "4",
+    },
+    payload: JSON.stringify({
+      resourceSpans: [
+        {
+          scopeSpans: [
+            {
+              spans: [
+                {
+                  traceId: "trace-underscore",
+                  spanId: "span-underscore",
+                  name: "underscore header span",
+                  startTimeUnixNano: "1781395200000000000",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
   await server.close();
 });
 
