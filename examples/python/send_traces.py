@@ -1,11 +1,27 @@
+import os
+
 from langfuse import get_client, propagate_attributes
 
 SCORE_NAME = "human-quality"
 SCORE_VALUE = 1
 SCORE_COMMENT = "Human review: answer is accurate and actionable."
+COST_DETAILS = {"input": 0.038, "output": 0.044, "total": 0.082}
 
 
-def answer_checkout_question(langfuse, example_language):
+def require_langfuse_env():
+    missing = [
+        key
+        for key in ("LANGFUSE_BASE_URL", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY")
+        if not os.getenv(key)
+    ]
+    if missing:
+        raise RuntimeError(
+            f"Missing required Langfuse environment variables: {', '.join(missing)}. "
+            "Set LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY, and LANGFUSE_SECRET_KEY before running this example."
+        )
+
+
+def answer_checkout_question(langfuse):
     with langfuse.start_as_current_observation(
         as_type="span",
         name="checkout support trace",
@@ -16,7 +32,6 @@ def answer_checkout_question(langfuse, example_language):
         },
         metadata={
             "example": "agentpond-python",
-            "exampleLanguage": example_language,
             "route": "/support/checkout",
             "tenant": "acme-retail",
         },
@@ -27,7 +42,6 @@ def answer_checkout_question(langfuse, example_language):
             trace_name="checkout support trace",
             metadata={
                 "example": "agentpond-python",
-                "exampleLanguage": example_language,
                 "feature": "checkout-support",
                 "release": "2026-06-15",
             },
@@ -67,6 +81,7 @@ def answer_checkout_question(langfuse, example_language):
                         "confidence": 0.92,
                     },
                     usage_details={"input": 38, "output": 22, "total": 60},
+                    cost_details=COST_DETAILS,
                 )
 
             trace.update(
@@ -78,41 +93,7 @@ def answer_checkout_question(langfuse, example_language):
         return getattr(trace, "trace_id", None)
 
 
-def summarize_refund_policy(langfuse, example_language):
-    with langfuse.start_as_current_observation(
-        as_type="span",
-        name="refund policy trace",
-        input={
-            "question": "Can I get a refund after the package ships?",
-            "order_status": "shipped",
-        },
-    ) as trace:
-        with propagate_attributes(
-            user_id="user_77",
-            session_id="sdk-example-session",
-            trace_name="refund policy trace",
-            metadata={
-                "example": "agentpond-python",
-                "exampleLanguage": example_language,
-                "feature": "policy-answer",
-            },
-        ):
-            with langfuse.start_as_current_observation(
-                as_type="generation",
-                name="summarize refund policy",
-                model="gpt-5.5-mini",
-                input="Summarize refund policy for a shipped package.",
-            ) as generation:
-                generation.update(
-                    output="Refunds are available after delivery if the item is returned within 30 days.",
-                    usage_details={"input": 18, "output": 16, "total": 34},
-                )
-
-            trace.update(output={"policy": "return_after_delivery", "return_window_days": 30})
-        return getattr(trace, "trace_id", None)
-
-
-def create_annotation_score(langfuse, trace_id, example_language):
+def create_annotation_score(langfuse, trace_id):
     langfuse.create_score(
         trace_id=trace_id,
         name=SCORE_NAME,
@@ -122,7 +103,6 @@ def create_annotation_score(langfuse, trace_id, example_language):
         metadata={
             "source": "ANNOTATION",
             "annotator": "human-reviewer",
-            "exampleLanguage": example_language,
         },
     )
 
@@ -133,29 +113,26 @@ def require_trace_id(trace_id, trace_name):
     return trace_id
 
 
-def print_summary(trace_ids):
-    checkout_trace_id, refund_trace_id = trace_ids
-    print("Sent 2 Python Langfuse SDK traces and 1 annotation score:")
+def print_summary(checkout_trace_id):
+    print("Sent 1 Python Langfuse SDK trace and 1 annotation score:")
     print(f"- checkout support trace ({checkout_trace_id})")
-    print(f"- refund policy trace ({refund_trace_id})")
     print(f"- {SCORE_NAME}={SCORE_VALUE} on checkout support trace")
+    print(f"- generation cost_details total: {COST_DETAILS['total']}")
     print("")
-    print("Inspect checkout observations and scores:")
+    print("Inspect checkout trace cost, observations, and scores:")
     print("pnpm cli sync")
+    print(f"pnpm cli traces get {checkout_trace_id}")
     print(f"pnpm cli observations list --traceId {checkout_trace_id}")
     print(f"pnpm cli scores list --traceId {checkout_trace_id}")
 
 
 def main():
+    require_langfuse_env()
     langfuse = get_client()
-    example_language = "python"
-    trace_ids = [
-        require_trace_id(answer_checkout_question(langfuse, example_language), "checkout support trace"),
-        require_trace_id(summarize_refund_policy(langfuse, example_language), "refund policy trace"),
-    ]
-    create_annotation_score(langfuse, trace_ids[0], example_language)
+    checkout_trace_id = require_trace_id(answer_checkout_question(langfuse), "checkout support trace")
+    create_annotation_score(langfuse, checkout_trace_id)
     langfuse.flush()
-    print_summary(trace_ids)
+    print_summary(checkout_trace_id)
 
 
 if __name__ == "__main__":

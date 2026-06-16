@@ -1,21 +1,24 @@
 # AgentPond
 
-AgentPond is a small Langfuse-compatible trace store with local DuckDB analytics.
+AgentPond is a data pond for AI agent traces with a agent-native CLI for local analytics. It accepts Langfuse SDK ingestion and its using the same data format, so you can use it as a drop-in replacement.
 
-It is for projects that want to store valuable traces, analyze them from a CLI either manually or automatically with a coding agent, and avoid operating a Kubernetes cluster or sending trace data to a public cloud.
+It is for AI projects that want to privately store valuable traces, analyze them automatically with a coding agent, and avoid operating a Kubernetes cluster or sending trace data to a public cloud. You just need a S3-compatible object storage with a serverless ingestion service.
 
-AgentPond accepts Langfuse SDK ingestion, writes raw accepted events to S3-compatible object storage, and syncs those events into a local DuckDB cache for SQL queries.
+Raw events from the object storage are synced into a local DuckDB cache for fast, agent-native queries.
 
 ## Scope
 
-AgentPond v1 focuses on the trace analytics path:
+AgentPond focuses on collecting and analysing agent traces:
 
 - Langfuse-compatible ingestion endpoints for SDK traces and OTLP traces
 - S3-compatible raw event storage with manifest-based discovery
 - Local DuckDB cache with `events_raw`, `traces`, `observations`, `scores`, and `sessions`
-- CLI commands to create test traces, sync, list/read resources, create scores, and run SQL
+- CLI commands to create list/read traces, observations, scores, and to run custom SQL
 
-Not included: web UI, Postgres, ClickHouse, Redis, background queues, prompts, datasets, media, users, organizations, billing, integrations, or eval workers.
+Compared to Langfuse there's no: 
+- Web UI: Your coding agent talks directly to the CLI
+- Postgres, ClickHouse, Redis or background queues: Simplified infrastructure by just using S3 with ingestion service
+- Prompts, datasets, evals: Let your coding agent generate and store them in GitHub
 
 ## Local Demo
 
@@ -75,7 +78,7 @@ Use the normal Langfuse SDK setup for your language and framework. The latest La
 
 - [Langfuse SDK overview](https://langfuse.com/docs/observability/sdk/overview)
 
-We provide matching Python and TypeScript examples using the Langfuse SDK. Both send the same two realistic traces and add one human annotation score. To run the Python example with `uv`:
+We provide matching Python and TypeScript examples using the Langfuse SDK. Both send one realistic trace with generation cost details and one human annotation score. To keep dependencies simple, the examples do not call an LLM; they directly call the Langfuse SDK with fixture inputs, outputs, usage, and cost data. To run the Python example with `uv`:
 
 ```sh
 uv run --project examples/python python examples/python/send_traces.py
@@ -87,7 +90,7 @@ Run the TypeScript SDK example:
 pnpm --dir examples/typescript start
 ```
 
-Each example prints the trace IDs it created and the `pnpm cli` commands to inspect observations and scores for one trace. After your app sends traces, run:
+Each example prints the trace ID it created and the `pnpm cli` commands to inspect trace cost, observations, and scores. After your app sends traces, run:
 
 ```sh
 pnpm cli sync
