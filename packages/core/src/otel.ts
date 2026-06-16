@@ -139,10 +139,11 @@ function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
         const attributes = attributesToRecord(getArray(span, "attributes") ?? []);
         const langfuse = langfuseAttributes(attributes);
         const name = stringField(span, "name") ?? "otel-span";
+        const observationType = stringValue(attributes["langfuse.observation.type"]);
         const observationEvent: IngestionEvent = {
           id: randomUUID(),
           timestamp,
-          type: eventTypes.SPAN_CREATE,
+          type: observationTypeToEventType(observationType),
           metadata: { source: "otel" },
           body: {
             id: spanId,
@@ -154,6 +155,10 @@ function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
             metadata: attributes,
             input: parseJsonString(attributes["langfuse.observation.input"]),
             output: parseJsonString(attributes["langfuse.observation.output"]),
+            usageDetails: parseJsonRecordString(attributes["langfuse.observation.usage_details"]),
+            costDetails: parseJsonRecordString(attributes["langfuse.observation.cost_details"]),
+            model: stringValue(attributes["langfuse.observation.model.name"]),
+            modelParameters: parseJsonRecordString(attributes["langfuse.observation.model.parameters"]),
           },
         };
         events.push(observationEvent);
@@ -181,6 +186,18 @@ function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
   }
 
   return events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+}
+
+function observationTypeToEventType(observationType: string | undefined): IngestionEvent["type"] {
+  if (observationType === "generation") return eventTypes.GENERATION_CREATE;
+  if (observationType === "event") return eventTypes.EVENT_CREATE;
+  if (observationType === "agent") return eventTypes.AGENT_CREATE;
+  if (observationType === "tool") return eventTypes.TOOL_CREATE;
+  if (observationType === "chain") return eventTypes.CHAIN_CREATE;
+  if (observationType === "retriever") return eventTypes.RETRIEVER_CREATE;
+  if (observationType === "embedding") return eventTypes.EMBEDDING_CREATE;
+  if (observationType === "guardrail") return eventTypes.GUARDRAIL_CREATE;
+  return eventTypes.SPAN_CREATE;
 }
 
 function getArray(value: unknown, key: string): unknown[] | undefined {
@@ -253,6 +270,11 @@ function parseJsonString(value: unknown): unknown {
   } catch {
     return value;
   }
+}
+
+function parseJsonRecordString(value: unknown): Record<string, unknown> | undefined {
+  const parsed = parseJsonString(value);
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined;
 }
 
 function stringValue(value: unknown): string | undefined {

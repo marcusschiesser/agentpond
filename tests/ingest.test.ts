@@ -171,8 +171,15 @@ test("otel endpoint accepts JSON resource spans and writes trace data", async ()
                     { key: "session.id", value: { stringValue: "session-otel" } },
                     { key: "langfuse.trace.name", value: { stringValue: "Langfuse OTel Trace" } },
                     { key: "langfuse.trace.metadata.example", value: { stringValue: "sdk" } },
+                    { key: "langfuse.observation.type", value: { stringValue: "generation" } },
                     { key: "langfuse.observation.input", value: { stringValue: "{\"question\":\"hello\"}" } },
                     { key: "langfuse.observation.output", value: { stringValue: "{\"answer\":\"world\"}" } },
+                    { key: "langfuse.observation.model.name", value: { stringValue: "gpt-5.5-mini" } },
+                    { key: "langfuse.observation.usage_details", value: { stringValue: "{\"input\":38,\"output\":22,\"total\":60}" } },
+                    {
+                      key: "langfuse.observation.cost_details",
+                      value: { stringValue: "{\"input\":0.038,\"output\":0.044,\"total\":0.082}" },
+                    },
                   ],
                 },
               ],
@@ -186,8 +193,9 @@ test("otel endpoint accepts JSON resource spans and writes trace data", async ()
   assert.equal(response.statusCode, 200);
   assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
   const traceKeys = await store.listKeys("project-a/trace/");
+  const observationKeys = await store.listKeys("project-a/observation/");
   assert.equal(traceKeys.length, 1);
-  assert.equal((await store.listKeys("project-a/observation/")).length, 1);
+  assert.equal(observationKeys.length, 1);
   const traceEvents = await store.getJson<Array<{ type: string; body: Record<string, unknown> }>>(traceKeys[0]);
   assert.equal(traceEvents[0].type, "trace-create");
   assert.deepEqual(traceEvents[0].body, {
@@ -200,6 +208,11 @@ test("otel endpoint accepts JSON resource spans and writes trace data", async ()
     input: { question: "hello" },
     output: { answer: "world" },
   });
+  const observationEvents = await store.getJson<Array<{ type: string; body: Record<string, unknown> }>>(observationKeys[0]);
+  assert.equal(observationEvents[0].type, "generation-create");
+  assert.deepEqual(observationEvents[0].body.usageDetails, { input: 38, output: 22, total: 60 });
+  assert.deepEqual(observationEvents[0].body.costDetails, { input: 0.038, output: 0.044, total: 0.082 });
+  assert.equal(observationEvents[0].body.model, "gpt-5.5-mini");
   await server.close();
 });
 
