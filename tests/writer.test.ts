@@ -32,7 +32,7 @@ test("memory object store lists sorted keys within the requested prefix", async 
   ]);
 });
 
-test("processBatch returns Langfuse-style per-event successes and errors", async () => {
+test("processBatch accepts valid events and reports invalid events individually", async () => {
   const store = new MemoryObjectStore();
   const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
   const result = await writer.processBatch([
@@ -79,4 +79,29 @@ test("processBatch rejects carriage returns in ids while processing valid events
   assert.equal(result.errors[0].id, "bad\r-event");
   assert.equal(result.errors[0].status, 400);
   assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
+});
+
+test("processBatch rejects unsupported event types while writing valid events", async () => {
+  const store = new MemoryObjectStore();
+  const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
+  const result = await writer.processBatch([
+    {
+      id: "event-1",
+      timestamp: "2026-06-14T00:00:00.000Z",
+      type: eventTypes.TRACE_CREATE,
+      body: { id: "trace-1" },
+    },
+    {
+      id: "unsupported-event",
+      timestamp: "2026-06-14T00:00:01.000Z",
+      type: "unsupported-create",
+      body: { id: "unsupported-1" },
+    },
+  ]);
+
+  assert.deepEqual(result.successes, [{ id: "event-1", status: 201 }]);
+  assert.equal(result.errors.length, 1);
+  assert.equal(result.errors[0].id, "unsupported-event");
+  assert.equal(result.errors[0].status, 400);
+  assert.equal((await store.listKeys("project-a/trace/")).length, 1);
 });

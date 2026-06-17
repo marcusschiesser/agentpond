@@ -22,10 +22,23 @@ async function captureStdout(fn: () => Promise<void>): Promise<string> {
   return chunks.join("");
 }
 
-test("CLI-created scores are immediately visible to score list queries", async () => {
-  const store = new MemoryObjectStore();
-  const dbPath = join(mkdtempSync(join(tmpdir(), "agentpond-cli-")), "cache.duckdb");
-  const config: AgentPondConfig = {
+async function captureStderr(fn: () => Promise<void>): Promise<string> {
+  const stderrWrite = process.stderr.write.bind(process.stderr);
+  const chunks: string[] = [];
+  process.stderr.write = ((chunk: any) => {
+    chunks.push(String(chunk));
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    await fn();
+  } finally {
+    process.stderr.write = stderrWrite;
+  }
+  return chunks.join("");
+}
+
+function testConfig(dbPath: string): AgentPondConfig {
+  return {
     projectId: "default-project",
     dbPath,
     s3: {
@@ -35,6 +48,12 @@ test("CLI-created scores are immediately visible to score list queries", async (
       forcePathStyle: true,
     },
   };
+}
+
+test("CLI-created scores are immediately visible to score list queries", async () => {
+  const store = new MemoryObjectStore();
+  const dbPath = join(mkdtempSync(join(tmpdir(), "agentpond-cli-")), "cache.duckdb");
+  const config = testConfig(dbPath);
   const event: IngestionEvent = {
     id: "score-event-1",
     timestamp: "2026-06-14T11:03:19.419Z",
@@ -63,16 +82,7 @@ test("CLI-created scores are immediately visible to score list queries", async (
 test("CLI trace and observation reads expose provided usage and cost fields as JSON", async () => {
   const store = new MemoryObjectStore();
   const dbPath = join(mkdtempSync(join(tmpdir(), "agentpond-cli-")), "cache.duckdb");
-  const config: AgentPondConfig = {
-    projectId: "default-project",
-    dbPath,
-    s3: {
-      bucket: "agentpond",
-      prefix: "",
-      region: "us-east-1",
-      forcePathStyle: true,
-    },
-  };
+  const config = testConfig(dbPath);
   const events: IngestionEvent[] = [
     {
       id: "trace-event-1",
@@ -127,6 +137,89 @@ test("CLI trace and observation reads expose provided usage and cost fields as J
     assert.equal(traces[0].id, "trace-1");
     assert.equal(traces[0].total_cost, 0.082);
     assert.equal(process.exitCode, undefined);
+  } finally {
+    process.exitCode = originalExitCode;
+  }
+});
+
+test("CLI read commands report missing required score filters", async () => {
+  const dbPath = join(mkdtempSync(join(tmpdir(), "agentpond-cli-")), "cache.duckdb");
+  const originalExitCode = process.exitCode;
+  process.exitCode = undefined;
+  try {
+    const stderr = await captureStderr(() => main(["node", "agentpond", "--db", dbPath, "scores", "list", "--json"]));
+
+    assert.equal(process.exitCode, 2);
+    assert.match(stderr, /scores list requires --traceId or --observationId/);
+  } finally {
+    process.exitCode = originalExitCode;
+  }
+});
+
+test("CLI returns non-zero errors for invalid resources and actions", async () => {
+  const dbPath = join(mkdtempSync(join(tmpdir(), "agentpond-cli-")), "cache.duckdb");
+  const originalExitCode = process.exitCode;
+  process.exitCode = undefined;
+  try {
+    const stderr = await captureStderr(() => main(["node", "agentpond", "--db", dbPath, "frobs", "list"]));
+
+    assert.equal(process.exitCode, 2);
+    assert.match(stderr, /Unknown command: frobs list/);
+  } finally {
+    process.exitCode = originalExitCode;
+  }
+});
+
+test("CLI --limit caps list result count", async () => {
+  const store = new MemoryObjectStore();
+  const dbPath = join(mkdtempSync(join(tmpdir(), "agentpond-cli-")), "cache.duckdb");
+  const config = testConfig(dbPath);
+  await writeEventsAndSyncCache(config, store, [
+    {
+      id: "trace-event-1",
+      timestamp: "2026-06-14T00:00:00.000Z",
+      type: eventTypes.TRACE_CREATE,
+      body: { id: "trace-1", name: "Trace 1" },
+    },
+    {
+      id: "trace-event-2",
+      timestamp: "2026-06-14T00:00:01.000Z",
+      type: eventTypes.TRACE_CREATE,
+      body: { id: "trace-2", name: "Trace 2" },
+    },
+    {
+      id: "trace-event-3",
+      timestamp: "2026-06-14T00:00:02.000Z",
+      type: eventTypes.TRACE_CREATE,
+      body: { id: "trace-3", name: "Trace 3" },
+    },
+  ]);
+
+  const originalExitCode = process.exitCode;
+  process.exitCode = undefined;
+  try {
+    const output = await captureStdout(() => main(["node", "agentpond", "--db", dbPath, "traces", "list", "--limit", "2", "--json"]));
+    const traces = JSON.parse(output) as Array<{ id: string }>;
+
+    assert.equal(process.exitCode, undefined);
+    assert.equal(traces.length, 2);
+  } finally {
+    process.exitCode = originalExitCode;
+  }
+});
+
+test("CLI --json returns parseable JSON for empty result sets", async () => {
+  const dbPath = join(mkdtempSync(join(tmpdir(), "agentpond-cli-")), "cache.duckdb");
+  const db = new AgentPondDuckDb(dbPath);
+  await db.close();
+
+  const originalExitCode = process.exitCode;
+  process.exitCode = undefined;
+  try {
+    const output = await captureStdout(() => main(["node", "agentpond", "--db", dbPath, "traces", "get", "missing", "--json"]));
+
+    assert.equal(process.exitCode, undefined);
+    assert.deepEqual(JSON.parse(output), []);
   } finally {
     process.exitCode = originalExitCode;
   }

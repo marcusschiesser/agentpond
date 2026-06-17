@@ -2,6 +2,15 @@ import { gunzipSync } from "node:zlib";
 import { randomUUID } from "node:crypto";
 import protobuf from "protobufjs";
 import { eventTypes, type IngestionEvent } from "./schemas.js";
+import {
+  arrayValue,
+  booleanValue,
+  isObservationLevel,
+  parseJsonRecordString,
+  parseJsonString,
+  stringValue,
+  unwrapOtelValue,
+} from "./otel-parsers.js";
 
 type RawOtelRequest = {
   resourceSpans?: unknown[];
@@ -140,6 +149,7 @@ function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
         const langfuse = langfuseAttributes(attributes);
         const name = stringField(span, "name") ?? "otel-span";
         const observationType = stringValue(attributes["langfuse.observation.type"]);
+        const level = stringValue(attributes["langfuse.observation.level"]);
         const observationEvent: IngestionEvent = {
           id: randomUUID(),
           timestamp,
@@ -159,6 +169,10 @@ function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
             costDetails: parseJsonRecordString(attributes["langfuse.observation.cost_details"]),
             model: stringValue(attributes["langfuse.observation.model.name"]),
             modelParameters: parseJsonRecordString(attributes["langfuse.observation.model.parameters"]),
+            level: isObservationLevel(level) ? level : undefined,
+            statusMessage: stringValue(attributes["langfuse.observation.status_message"]),
+            version: stringValue(attributes["langfuse.version"]),
+            environment: stringValue(attributes["langfuse.environment"]),
           },
         };
         events.push(observationEvent);
@@ -176,8 +190,12 @@ function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
               sessionId: langfuse.sessionId,
               startTime: timestamp,
               metadata: langfuse.traceMetadata ?? attributes,
-              input: parseJsonString(attributes["langfuse.observation.input"]),
-              output: parseJsonString(attributes["langfuse.observation.output"]),
+              input: langfuse.traceInput ?? parseJsonString(attributes["langfuse.observation.input"]),
+              output: langfuse.traceOutput ?? parseJsonString(attributes["langfuse.observation.output"]),
+              tags: langfuse.traceTags,
+              public: langfuse.tracePublic,
+              version: stringValue(attributes["langfuse.version"]),
+              environment: stringValue(attributes["langfuse.environment"]),
             },
           });
         }
@@ -216,8 +234,12 @@ function stringField(value: unknown, key: string): string | undefined {
 
 function nanosToIso(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
-  const nanos = BigInt(raw);
-  return new Date(Number(nanos / 1_000_000n)).toISOString();
+  try {
+    const nanos = BigInt(raw);
+    return new Date(Number(nanos / 1_000_000n)).toISOString();
+  } catch {
+    return undefined;
+  }
 }
 
 function attributesToRecord(attributes: unknown[]): Record<string, unknown> {
@@ -232,21 +254,15 @@ function attributesToRecord(attributes: unknown[]): Record<string, unknown> {
   return record;
 }
 
-function unwrapOtelValue(value: unknown): unknown {
-  if (!value || typeof value !== "object") return value;
-  const object = value as Record<string, unknown>;
-  for (const key of ["stringValue", "intValue", "doubleValue", "boolValue", "bytesValue"]) {
-    if (key in object) return object[key];
-  }
-  if (Array.isArray(object.arrayValue)) return object.arrayValue.map(unwrapOtelValue);
-  return object;
-}
-
 function langfuseAttributes(attributes: Record<string, unknown>): {
   traceName?: string;
   userId?: string;
   sessionId?: string;
   traceMetadata?: Record<string, unknown>;
+  traceInput?: unknown;
+  traceOutput?: unknown;
+  traceTags?: unknown[];
+  tracePublic?: boolean;
 } {
   const traceMetadata: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(attributes)) {
@@ -260,25 +276,9 @@ function langfuseAttributes(attributes: Record<string, unknown>): {
     userId: stringValue(attributes["user.id"]),
     sessionId: stringValue(attributes["session.id"]),
     traceMetadata: Object.keys(traceMetadata).length > 0 ? traceMetadata : undefined,
+    traceInput: parseJsonString(attributes["langfuse.trace.input"]),
+    traceOutput: parseJsonString(attributes["langfuse.trace.output"]),
+    traceTags: arrayValue(attributes["langfuse.trace.tags"]),
+    tracePublic: booleanValue(attributes["langfuse.trace.public"]),
   };
-}
-
-function parseJsonString(value: unknown): unknown {
-  if (typeof value !== "string") return undefined;
-  try {
-    return JSON.parse(value) as unknown;
-  } catch {
-    return value;
-  }
-}
-
-function parseJsonRecordString(value: unknown): Record<string, unknown> | undefined {
-  const parsed = parseJsonString(value);
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined;
-}
-
-function stringValue(value: unknown): string | undefined {
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return undefined;
 }

@@ -1,9 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import protobuf from "protobufjs";
 import { buildServer } from "../apps/ingest/src/server.js";
 import { eventTypes, MemoryObjectStore, type AgentPondConfig } from "@agentpond/core";
+import { AgentPondDuckDb } from "@agentpond/duckdb";
 
 const config: AgentPondConfig = {
   projectId: "project-a",
@@ -23,6 +27,43 @@ const config: AgentPondConfig = {
 
 function authHeader(): string {
   return `Basic ${Buffer.from("pk:sk").toString("base64")}`;
+}
+
+async function postOtelJson(store: MemoryObjectStore, payload: unknown, headers: Record<string, string> = {}) {
+  const server = buildServer({ config, store });
+  try {
+    return await server.inject({
+      method: "POST",
+      url: "/api/public/otel/v1/traces",
+      headers: {
+        authorization: authHeader(),
+        "content-type": "application/json",
+        "x-langfuse-ingestion-version": "4",
+        ...headers,
+      },
+      payload: JSON.stringify(payload),
+    });
+  } finally {
+    await server.close();
+  }
+}
+
+async function readSingleObject<T>(store: MemoryObjectStore, prefix: string): Promise<T> {
+  const keys = await store.listKeys(prefix);
+  assert.equal(keys.length, 1);
+  return store.getJson<T>(keys[0]);
+}
+
+function otelPayload(spans: Array<Record<string, unknown>>): Record<string, unknown> {
+  return { resourceSpans: [{ scopeSpans: [{ spans }] }] };
+}
+
+function attr(key: string, value: unknown): Record<string, unknown> {
+  if (typeof value === "string") return { key, value: { stringValue: value } };
+  if (typeof value === "boolean") return { key, value: { boolValue: value } };
+  if (typeof value === "number") return { key, value: { doubleValue: value } };
+  if (Array.isArray(value)) return { key, value: { arrayValue: { values: value.map((item) => ({ stringValue: String(item) })) } } };
+  return { key, value: { stringValue: JSON.stringify(value) } };
 }
 
 test("ingestion endpoint validates auth and returns 207 batch result", async () => {
@@ -51,6 +92,45 @@ test("ingestion endpoint validates auth and returns 207 batch result", async () 
   assert.deepEqual(response.json().successes, [{ id: "event-1", status: 201 }]);
   assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
   await server.close();
+});
+
+test("ingestion endpoint accepts empty batches without writing a manifest", async () => {
+  const store = new MemoryObjectStore();
+  const server = buildServer({ config, store });
+  const response = await server.inject({
+    method: "POST",
+    url: "/api/public/ingestion",
+    headers: {
+      authorization: authHeader(),
+      "content-type": "application/json",
+    },
+    payload: JSON.stringify({ batch: [] }),
+  });
+
+  assert.equal(response.statusCode, 207);
+  assert.deepEqual(response.json(), { successes: [], errors: [] });
+  assert.deepEqual(await store.listKeys("project-a/"), []);
+  await server.close();
+});
+
+test("ingestion endpoint rejects missing or non-array batches", async () => {
+  for (const payload of [{}, { batch: {} }]) {
+    const store = new MemoryObjectStore();
+    const server = buildServer({ config, store });
+    const response = await server.inject({
+      method: "POST",
+      url: "/api/public/ingestion",
+      headers: {
+        authorization: authHeader(),
+        "content-type": "application/json",
+      },
+      payload: JSON.stringify(payload),
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.deepEqual(await store.listKeys("project-a/"), []);
+    await server.close();
+  }
 });
 
 test("ingestion endpoint rejects invalid auth without writing objects", async () => {
@@ -216,6 +296,286 @@ test("otel endpoint accepts JSON resource spans and writes trace data", async ()
   await server.close();
 });
 
+test("otel generation costs project end-to-end into DuckDB", async () => {
+  const store = new MemoryObjectStore();
+  const response = await postOtelJson(
+    store,
+    otelPayload([
+      {
+        traceId: "trace-cost",
+        spanId: "span-cost",
+        name: "costed generation",
+        startTimeUnixNano: "1781395200000000000",
+        endTimeUnixNano: "1781395201000000000",
+        attributes: [
+          attr("langfuse.observation.type", "generation"),
+          attr("langfuse.observation.usage_details", { input: 38, output: 22, total: 60 }),
+          attr("langfuse.observation.cost_details", { input: 0.038, output: 0.044, total: 0.082 }),
+        ],
+      },
+    ]),
+  );
+
+  assert.equal(response.statusCode, 200);
+  const db = new AgentPondDuckDb(join(mkdtempSync(join(tmpdir(), "agentpond-ingest-")), "cache.duckdb"));
+  await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+  const observations = await db.query<{
+    type: string;
+    usage_details_json: string | null;
+    cost_details_json: string | null;
+    total_cost: number | null;
+  }>("select type, usage_details_json, cost_details_json, total_cost from observations where id = 'span-cost'");
+  const traces = await db.query<{ total_cost: number | null }>("select total_cost from traces where id = 'trace-cost'");
+  await db.close();
+
+  assert.deepEqual(observations, [
+    {
+      type: "generation-create",
+      usage_details_json: JSON.stringify({ input: 38, output: 22, total: 60 }),
+      cost_details_json: JSON.stringify({ input: 0.038, output: 0.044, total: 0.082 }),
+      total_cost: 0.082,
+    },
+  ]);
+  assert.deepEqual(traces, [{ total_cost: 0.082 }]);
+});
+
+test("otel maps Langfuse SDK observation attributes to raw events", async () => {
+  const store = new MemoryObjectStore();
+  const response = await postOtelJson(
+    store,
+    otelPayload([
+      {
+        traceId: "trace-sdk",
+        spanId: "span-sdk",
+        name: "sdk generation",
+        startTimeUnixNano: "1781395200000000000",
+        attributes: [
+          attr("langfuse.observation.type", "generation"),
+          attr("langfuse.observation.model.name", "gpt-5.5-mini"),
+          attr("langfuse.observation.model.parameters", { temperature: 0.2, max_tokens: 128 }),
+          attr("langfuse.observation.usage_details", { input: 38, output: 22, total: 60 }),
+          attr("langfuse.observation.cost_details", { input: 0.038, output: 0.044, total: 0.082 }),
+          attr("langfuse.observation.level", "WARNING"),
+          attr("langfuse.observation.status_message", "review needed"),
+          attr("langfuse.version", "2026-06-15"),
+          attr("langfuse.environment", "production"),
+          attr("langfuse.release", "0.0.1"),
+        ],
+      },
+    ]),
+  );
+
+  assert.equal(response.statusCode, 200);
+  const observationEvents = await readSingleObject<Array<{ type: string; body: Record<string, unknown> }>>(
+    store,
+    "project-a/observation/",
+  );
+  assert.equal(observationEvents[0].type, "generation-create");
+  assert.equal(observationEvents[0].body.model, "gpt-5.5-mini");
+  assert.deepEqual(observationEvents[0].body.modelParameters, { temperature: 0.2, max_tokens: 128 });
+  assert.deepEqual(observationEvents[0].body.usageDetails, { input: 38, output: 22, total: 60 });
+  assert.deepEqual(observationEvents[0].body.costDetails, { input: 0.038, output: 0.044, total: 0.082 });
+  assert.equal(observationEvents[0].body.level, "WARNING");
+  assert.equal(observationEvents[0].body.statusMessage, "review needed");
+  assert.equal(observationEvents[0].body.version, "2026-06-15");
+  assert.equal(observationEvents[0].body.environment, "production");
+});
+
+test("otel trace fields come from trace attributes", async () => {
+  const store = new MemoryObjectStore();
+  const response = await postOtelJson(
+    store,
+    otelPayload([
+      {
+        traceId: "trace-fields",
+        spanId: "span-fields",
+        name: "trace fields",
+        startTimeUnixNano: "1781395200000000000",
+        attributes: [
+          attr("langfuse.observation.input", { observation: "input" }),
+          attr("langfuse.observation.output", { observation: "output" }),
+          attr("langfuse.trace.input", { trace: "input" }),
+          attr("langfuse.trace.output", { trace: "output" }),
+          attr("langfuse.trace.tags", ["checkout", "support"]),
+          attr("langfuse.trace.public", true),
+          attr("langfuse.trace.metadata.team", "success"),
+        ],
+      },
+    ]),
+  );
+
+  assert.equal(response.statusCode, 200);
+  const traceEvents = await readSingleObject<Array<{ body: Record<string, unknown> }>>(store, "project-a/trace/");
+  assert.deepEqual(traceEvents[0].body.input, { trace: "input" });
+  assert.deepEqual(traceEvents[0].body.output, { trace: "output" });
+  assert.deepEqual(traceEvents[0].body.tags, ["checkout", "support"]);
+  assert.equal(traceEvents[0].body.public, true);
+  assert.deepEqual(traceEvents[0].body.metadata, { team: "success" });
+});
+
+test("otel maps multiple spans in one trace with parent and aggregate cost", async () => {
+  const store = new MemoryObjectStore();
+  const response = await postOtelJson(
+    store,
+    otelPayload([
+      {
+        traceId: "trace-multi",
+        spanId: "span-root",
+        name: "root span",
+        startTimeUnixNano: "1781395200000000000",
+      },
+      {
+        traceId: "trace-multi",
+        spanId: "span-child",
+        parentSpanId: "span-root",
+        name: "child generation",
+        startTimeUnixNano: "1781395201000000000",
+        attributes: [
+          attr("langfuse.observation.type", "generation"),
+          attr("langfuse.observation.cost_details", { input: 0.038, output: 0.044, total: 0.082 }),
+        ],
+      },
+    ]),
+  );
+
+  assert.equal(response.statusCode, 200);
+  const traceKeys = await store.listKeys("project-a/trace/");
+  const observationKeys = await store.listKeys("project-a/observation/");
+  assert.equal(traceKeys.length, 1);
+  assert.equal(observationKeys.length, 2);
+
+  const observations = (
+    await Promise.all(
+      observationKeys.map((key) => store.getJson<Array<{ body: Record<string, unknown> }>>(key).then((events) => events[0])),
+    )
+  ).sort((a, b) => String(a.body.id).localeCompare(String(b.body.id)));
+  assert.equal(observations.find((event) => event.body.id === "span-root")?.body.parentObservationId, undefined);
+  assert.equal(observations.find((event) => event.body.id === "span-child")?.body.parentObservationId, "span-root");
+
+  const db = new AgentPondDuckDb(join(mkdtempSync(join(tmpdir(), "agentpond-ingest-")), "cache.duckdb"));
+  await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+  const traces = await db.query<{ total_cost: number | null }>("select total_cost from traces where id = 'trace-multi'");
+  await db.close();
+  assert.deepEqual(traces, [{ total_cost: 0.082 }]);
+});
+
+test("otel observation types map to supported event types", async () => {
+  const cases: Array<[string | undefined, string]> = [
+    ["span", "span-create"],
+    ["generation", "generation-create"],
+    ["event", "event-create"],
+    ["agent", "agent-create"],
+    ["tool", "tool-create"],
+    ["chain", "chain-create"],
+    ["retriever", "retriever-create"],
+    ["embedding", "embedding-create"],
+    ["guardrail", "guardrail-create"],
+    ["unknown", "span-create"],
+    [undefined, "span-create"],
+  ];
+
+  for (const [observationType, expectedEventType] of cases) {
+    const store = new MemoryObjectStore();
+    const attributes = observationType ? [attr("langfuse.observation.type", observationType)] : [];
+    const response = await postOtelJson(
+      store,
+      otelPayload([
+        {
+          traceId: `trace-type-${observationType ?? "missing"}`,
+          spanId: `span-type-${observationType ?? "missing"}`,
+          name: "typed observation",
+          startTimeUnixNano: "1781395200000000000",
+          attributes,
+        },
+      ]),
+    );
+
+    assert.equal(response.statusCode, 200);
+    const entityPrefix = expectedEventType === "event-create" ? "project-a/event/" : "project-a/observation/";
+    const rawEvents = await readSingleObject<Array<{ type: string }>>(store, entityPrefix);
+    assert.equal(rawEvents[0].type, expectedEventType);
+  }
+});
+
+test("otel handles id and timestamp edge cases", async () => {
+  const store = new MemoryObjectStore();
+  const jsonResponse = await postOtelJson(
+    store,
+    otelPayload([
+      {
+        traceId: "trace-timestamps",
+        spanId: "span-missing-start",
+        name: "missing start",
+      },
+      {
+        traceId: "trace-timestamps-2",
+        spanId: "span-number-start",
+        name: "number start",
+        startTimeUnixNano: 1781395200000000000,
+        endTimeUnixNano: "1781395201000000000",
+      },
+    ]),
+  );
+  assert.equal(jsonResponse.statusCode, 200);
+  const observationKeys = await store.listKeys("project-a/observation/");
+  assert.equal(observationKeys.length, 2);
+  const observations = await Promise.all(
+    observationKeys.map((key) => store.getJson<Array<{ body: Record<string, unknown> }>>(key).then((events) => events[0])),
+  );
+  const missingStartEvent = observations.find((event) => event.body.id === "span-missing-start");
+  const numberStartEvent = observations.find((event) => event.body.id === "span-number-start");
+  assert.equal(Number.isFinite(Date.parse(String(missingStartEvent?.body.startTime))), true);
+  assert.equal(missingStartEvent?.body.endTime, undefined);
+  assert.equal(Number.isFinite(Date.parse(String(numberStartEvent?.body.startTime))), true);
+
+  const protobufStore = new MemoryObjectStore();
+  const server = buildServer({ config, store: protobufStore });
+  const protobufResponse = await server.inject({
+    method: "POST",
+    url: "/api/public/otel/v1/traces",
+    headers: {
+      authorization: authHeader(),
+      "content-type": "application/x-protobuf",
+    },
+    payload: makeOtlpTraceProtobuf({ parentSpanId: Buffer.alloc(0), endTimeUnixNano: undefined }),
+  });
+  await server.close();
+
+  assert.equal(protobufResponse.statusCode, 200);
+  const protobufEvents = await readSingleObject<Array<{ body: Record<string, unknown> }>>(protobufStore, "project-a/observation/");
+  assert.equal(protobufEvents[0].body.parentObservationId, undefined);
+  assert.equal(protobufEvents[0].body.endTime, undefined);
+});
+
+test("otel ignores malformed usage and cost attributes without rejecting the span", async () => {
+  const store = new MemoryObjectStore();
+  const response = await postOtelJson(
+    store,
+    otelPayload([
+      {
+        traceId: "trace-malformed",
+        spanId: "span-malformed",
+        name: "malformed generation",
+        startTimeUnixNano: "1781395200000000000",
+        attributes: [
+          attr("langfuse.observation.type", "generation"),
+          attr("langfuse.observation.usage_details", "not-json"),
+          attr("langfuse.observation.cost_details", "{bad"),
+        ],
+      },
+    ]),
+  );
+
+  assert.equal(response.statusCode, 200);
+  const observationEvents = await readSingleObject<Array<{ type: string; body: Record<string, unknown> }>>(
+    store,
+    "project-a/observation/",
+  );
+  assert.equal(observationEvents[0].type, "generation-create");
+  assert.equal(observationEvents[0].body.usageDetails, undefined);
+  assert.equal(observationEvents[0].body.costDetails, undefined);
+});
+
 test("otel endpoint accepts ingestion version header in underscore format", async () => {
   const store = new MemoryObjectStore();
   const server = buildServer({ config, store });
@@ -345,7 +705,7 @@ test("otel endpoint rejects unsupported ingestion versions", async () => {
   await server.close();
 });
 
-function makeOtlpTraceProtobuf(): Buffer {
+function makeOtlpTraceProtobuf(options: { parentSpanId?: Buffer; endTimeUnixNano?: string } = {}): Buffer {
   const root = protobuf.parse(`
 syntax = "proto3";
 package agentpond.otlp;
@@ -355,8 +715,10 @@ message ScopeSpans { repeated Span spans = 2; }
 message Span {
   bytes trace_id = 1;
   bytes span_id = 2;
+  bytes parent_span_id = 4;
   string name = 5;
   fixed64 start_time_unix_nano = 7;
+  fixed64 end_time_unix_nano = 8;
   repeated KeyValue attributes = 9;
 }
 message KeyValue { string key = 1; AnyValue value = 2; }
@@ -372,8 +734,10 @@ message AnyValue { string string_value = 1; }
               {
                 traceId: Buffer.from("00112233445566778899aabbccddeeff", "hex"),
                 spanId: Buffer.from("0011223344556677", "hex"),
+                parentSpanId: options.parentSpanId,
                 name: "protobuf span",
                 startTimeUnixNano: "1781395200000000000",
+                endTimeUnixNano: options.endTimeUnixNano,
                 attributes: [{ key: "service.name", value: { stringValue: "demo" } }],
               },
             ],

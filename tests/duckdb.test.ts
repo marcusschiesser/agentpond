@@ -6,6 +6,19 @@ import assert from "node:assert/strict";
 import { AcceptedEventWriter, eventTypes, MemoryObjectStore, type IngestionEvent } from "@agentpond/core";
 import { AgentPondDuckDb } from "@agentpond/duckdb";
 
+function createTempDb(): AgentPondDuckDb {
+  return new AgentPondDuckDb(join(mkdtempSync(join(tmpdir(), "agentpond-")), "cache.duckdb"));
+}
+
+async function writeAndSync(events: IngestionEvent[]): Promise<{ store: MemoryObjectStore; db: AgentPondDuckDb }> {
+  const store = new MemoryObjectStore();
+  const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
+  await writer.writeAcceptedEvents(events, "batch-1");
+  const db = createTempDb();
+  await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+  return { store, db };
+}
+
 test("DuckDB sync is idempotent and projects traces, sessions, scores, and raw events", async () => {
   const store = new MemoryObjectStore();
   const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
@@ -61,7 +74,7 @@ test("DuckDB sync is idempotent and projects traces, sessions, scores, and raw e
   ];
   await writer.writeAcceptedEvents(events, "batch-1");
 
-  const db = new AgentPondDuckDb(join(mkdtempSync(join(tmpdir(), "agentpond-")), "cache.duckdb"));
+  const db = createTempDb();
   const first = await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
   const second = await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
 
@@ -126,7 +139,7 @@ test("DuckDB sessions view exposes session rows in stable last seen order", asyn
     "batch-1",
   );
 
-  const db = new AgentPondDuckDb(join(mkdtempSync(join(tmpdir(), "agentpond-")), "cache.duckdb"));
+  const db = createTempDb();
   await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
   const sessions = await db.query<{ id: string; trace_count: bigint }>(
     "select id, trace_count from sessions order by last_seen_at desc",
@@ -140,15 +153,13 @@ test("DuckDB sessions view exposes session rows in stable last seen order", asyn
 });
 
 test("DuckDB scores support trace and observation filters across value types", async () => {
-  const store = new MemoryObjectStore();
-  const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
-  await writer.writeAcceptedEvents(
+  const { db } = await writeAndSync(
     [
       {
         id: "numeric-score-event",
         timestamp: "2026-06-14T00:00:00.000Z",
         type: eventTypes.SCORE_CREATE,
-        body: { id: "score-numeric", traceId: "trace-1", name: "quality", value: 0.9 },
+        body: { id: "score-numeric", traceId: "trace-1", name: "quality", value: 0.9, source: "EVAL" },
       },
       {
         id: "string-score-event",
@@ -167,25 +178,68 @@ test("DuckDB scores support trace and observation filters across value types", a
         id: "boolean-score-event",
         timestamp: "2026-06-14T00:00:02.000Z",
         type: eventTypes.SCORE_CREATE,
-        body: { id: "score-boolean", observationId: "observation-1", name: "accepted", value: true },
+        body: { id: "score-boolean", observationId: "observation-1", name: "accepted", value: true, source: "API" },
       },
-    ],
-    "batch-1",
+      {
+        id: "text-score-event",
+        timestamp: "2026-06-14T00:00:03.000Z",
+        type: eventTypes.SCORE_CREATE,
+        body: {
+          id: "score-text",
+          observationId: "observation-1",
+          name: "note",
+          value: "needs follow-up",
+          dataType: "TEXT",
+          source: "EVAL",
+        },
+      },
+      {
+        id: "correction-score-event",
+        timestamp: "2026-06-14T00:00:04.000Z",
+        type: eventTypes.SCORE_CREATE,
+        body: {
+          id: "score-correction",
+          observationId: "observation-1",
+          name: "correction",
+          value: "Use checkout instead of payment.",
+          dataType: "CORRECTION",
+          source: "ANNOTATION",
+        },
+      },
+    ]
   );
 
-  const db = new AgentPondDuckDb(join(mkdtempSync(join(tmpdir(), "agentpond-")), "cache.duckdb"));
-  await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
-  const traceScores = await db.query<{ id: string; value: number; data_type: string }>(
-    "select id, value, data_type from scores where trace_id = 'trace-1'",
+  const traceScores = await db.query<{ id: string; value: number; data_type: string; source: string }>(
+    "select id, value, data_type, source from scores where trace_id = 'trace-1'",
   );
-  const observationScores = await db.query<{ id: string; value: number | null; string_value: string | null; source: string }>(
-    "select id, value, string_value, source from scores where observation_id = 'observation-1' order by timestamp asc",
+  const observationScores = await db.query<{
+    id: string;
+    value: number | null;
+    string_value: string | null;
+    data_type: string;
+    source: string;
+  }>(
+    "select id, value, string_value, data_type, source from scores where observation_id = 'observation-1' order by timestamp asc",
+  );
+  const evalScores = await db.query<{ id: string }>("select id from scores where source = 'EVAL' order by timestamp asc");
+  const annotationScores = await db.query<{ id: string }>(
+    "select id from scores where source = 'ANNOTATION' order by timestamp asc",
   );
   await db.close();
 
-  assert.deepEqual(traceScores, [{ id: "score-numeric", value: 0.9, data_type: "NUMERIC" }]);
+  assert.deepEqual(traceScores, [{ id: "score-numeric", value: 0.9, data_type: "NUMERIC", source: "EVAL" }]);
   assert.deepEqual(observationScores, [
-    { id: "score-string", value: null, string_value: "good", source: "ANNOTATION" },
-    { id: "score-boolean", value: 1, string_value: "true", source: "API" },
+    { id: "score-string", value: null, string_value: "good", data_type: "CATEGORICAL", source: "ANNOTATION" },
+    { id: "score-boolean", value: 1, string_value: "true", data_type: "BOOLEAN", source: "API" },
+    { id: "score-text", value: null, string_value: "needs follow-up", data_type: "TEXT", source: "EVAL" },
+    {
+      id: "score-correction",
+      value: null,
+      string_value: "Use checkout instead of payment.",
+      data_type: "CORRECTION",
+      source: "ANNOTATION",
+    },
   ]);
+  assert.deepEqual(evalScores, [{ id: "score-numeric" }, { id: "score-text" }]);
+  assert.deepEqual(annotationScores, [{ id: "score-string" }, { id: "score-correction" }]);
 });
