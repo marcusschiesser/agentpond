@@ -6,7 +6,7 @@ import {
 	configFromEnv,
 	ingestionBatchSchema,
 	type ObjectStore,
-	otelBodyToEvents,
+	otelBodyToResourceSpans,
 	S3ObjectStore,
 	verifyBasicAuth,
 } from "@agentpond/core";
@@ -89,20 +89,20 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 			}
 
 			const contentType = request.headers["content-type"];
-			const events = await otelBodyToEvents({
+			const resourceSpans = await otelBodyToResourceSpans({
 				body: request.body,
 				contentType: Array.isArray(contentType) ? contentType[0] : contentType,
 				contentEncoding: headerToString(request.headers["content-encoding"]),
 				projectId: auth.projectId,
 			});
-			if (events.length === 0) return reply.status(200).send({});
+			if (resourceSpans.length === 0) return reply.status(200).send({});
 
 			const writer = new AcceptedEventWriter({
 				store,
 				projectId: auth.projectId,
 				prefix: config.s3.prefix,
 			});
-			await writer.writeAcceptedEvents(events);
+			await writer.writeOtelResourceSpans(resourceSpans);
 			return reply.status(200).send({});
 		} catch (error) {
 			return handleRouteError(error, reply);

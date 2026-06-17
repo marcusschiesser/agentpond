@@ -24,6 +24,11 @@ export type BatchManifest = {
 	objects: ManifestObject[];
 };
 
+export type OtelStorageObject = {
+	key: string;
+	spanCount: number;
+};
+
 export type AcceptedEventWriterOptions = {
 	store: ObjectStore;
 	projectId: string;
@@ -99,6 +104,40 @@ export class AcceptedEventWriter {
 		};
 	}
 
+	async writeOtelResourceSpans(
+		resourceSpans: unknown[],
+		batchId = randomUUID(),
+	): Promise<BatchManifest | undefined> {
+		if (resourceSpans.length === 0) return undefined;
+
+		const key = `${this.prefix}otel/${this.options.projectId}/${this.currentTimePath()}/${batchId}.json`;
+		const serialized = JSON.stringify(resourceSpans);
+		await this.options.store.putJson(key, resourceSpans);
+
+		const createdAt = new Date().toISOString();
+		const manifest: BatchManifest = {
+			batchId,
+			projectId: this.options.projectId,
+			createdAt,
+			objects: [
+				{
+					key,
+					entityType: "otel",
+					entityId: batchId,
+					eventIds: [],
+					minTimestamp: createdAt,
+					maxTimestamp: createdAt,
+					sha256: createHash("sha256").update(serialized).digest("hex"),
+				},
+			],
+		};
+		await this.options.store.putJson(
+			this.manifestKey(batchId, createdAt),
+			manifest,
+		);
+		return manifest;
+	}
+
 	private manifestKey(batchId: string, timestamp: string): string {
 		const date = new Date(timestamp);
 		const yyyy = String(date.getUTCFullYear());
@@ -106,6 +145,16 @@ export class AcceptedEventWriter {
 		const dd = String(date.getUTCDate()).padStart(2, "0");
 		const hh = String(date.getUTCHours()).padStart(2, "0");
 		return `${this.prefix}${this.options.projectId}/manifests/${yyyy}/${mm}/${dd}/${hh}/${batchId}.json`;
+	}
+
+	private currentTimePath(): string {
+		const date = new Date();
+		const yyyy = String(date.getFullYear());
+		const mm = String(date.getMonth() + 1).padStart(2, "0");
+		const dd = String(date.getDate()).padStart(2, "0");
+		const hh = String(date.getHours()).padStart(2, "0");
+		const min = String(date.getMinutes()).padStart(2, "0");
+		return `${yyyy}/${mm}/${dd}/${hh}/${min}`;
 	}
 }
 

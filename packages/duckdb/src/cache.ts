@@ -5,6 +5,7 @@ import {
 	type IngestionEvent,
 	manifestPrefix,
 	type ObjectStore,
+	otelResourceSpansToEvents,
 } from "@agentpond/core";
 import duckdb from "duckdb";
 
@@ -140,13 +141,23 @@ export class AgentPondDuckDb {
 			const manifest = await params.store.getJson<BatchManifest>(manifestKey);
 			for (const object of manifest.objects) {
 				if (await this.exists("processed_objects", object.key)) continue;
-				const events = await params.store.getJson<IngestionEvent[]>(object.key);
+				const events =
+					object.entityType === "otel"
+						? otelResourceSpansToEvents(
+								await params.store.getJson<unknown[]>(object.key),
+							)
+						: await params.store.getJson<IngestionEvent[]>(object.key);
 				for (const event of events) {
+					const entityId =
+						object.entityType === "otel"
+							? (stringValue((event.body as Record<string, unknown>).id) ??
+								object.entityId)
+							: object.entityId;
 					await this.upsertRawEvent({
 						projectId: manifest.projectId,
 						manifestKey,
 						objectKey: object.key,
-						entityId: object.entityId,
+						entityId,
 						event,
 					});
 					await this.projectEvent(manifest.projectId, event);

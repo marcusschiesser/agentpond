@@ -1,0 +1,487 @@
+{
+	"version": 1,
+	"projectId": "project-a",
+	"prefix": "",
+	"nonOtel": {
+		"input": {
+			"batch": [
+				{
+					"id": "trace-event",
+					"timestamp": "2026-06-14T00:00:00.000Z",
+					"type": "trace-create",
+					"body": {
+						"id": "trace-1",
+						"timestamp": "2026-06-14T00:00:00.000Z",
+						"name": "Trace 1",
+						"userId": "user-1",
+						"sessionId": "session-1",
+						"metadata": {
+							"source": "fixture"
+						},
+						"input": {
+							"question": "hello"
+						},
+						"output": {
+							"answer": "world"
+						},
+						"tags": ["parity"],
+						"public": false
+					}
+				},
+				{
+					"id": "span-event",
+					"timestamp": "2026-06-14T00:00:01.000Z",
+					"type": "span-create",
+					"body": {
+						"id": "span-1",
+						"traceId": "trace-1",
+						"name": "Span 1",
+						"startTime": "2026-06-14T00:00:01.000Z",
+						"endTime": "2026-06-14T00:00:02.000Z",
+						"metadata": {
+							"span": true
+						},
+						"input": {
+							"value": 1
+						},
+						"output": {
+							"value": 2
+						}
+					}
+				},
+				{
+					"id": "generation-event",
+					"timestamp": "2026-06-14T00:00:03.000Z",
+					"type": "generation-create",
+					"body": {
+						"id": "generation-1",
+						"traceId": "trace-1",
+						"parentObservationId": "span-1",
+						"name": "Generation 1",
+						"startTime": "2026-06-14T00:00:03.000Z",
+						"endTime": "2026-06-14T00:00:05.000Z",
+						"completionStartTime": "2026-06-14T00:00:04.000Z",
+						"model": "gpt-5.5-mini",
+						"modelParameters": {
+							"temperature": 0.2,
+							"stop": ["done"]
+						},
+						"usage": {
+							"promptTokens": 10,
+							"completionTokens": 5,
+							"totalTokens": 15
+						},
+						"usageDetails": {
+							"input": 10,
+							"output": "5",
+							"total": 15,
+							"invalid": -1
+						},
+						"costDetails": {
+							"input": 0.01,
+							"output": 0.02,
+							"total": 0.03,
+							"invalid": -1
+						},
+						"input": {
+							"messages": ["hello"]
+						},
+						"output": {
+							"message": "world"
+						}
+					}
+				},
+				{
+					"id": "score-event",
+					"timestamp": "2026-06-14T00:00:06.000Z",
+					"type": "score-create",
+					"body": {
+						"id": "score-1",
+						"traceId": "trace-1",
+						"observationId": "generation-1",
+						"name": "quality",
+						"value": 0.9,
+						"metadata": {
+							"reviewer": "fixture"
+						}
+					}
+				},
+				{
+					"id": "event-create-event",
+					"timestamp": "2026-06-14T00:00:07.000Z",
+					"type": "event-create",
+					"body": {
+						"id": "event-obs-1",
+						"traceId": "trace-1",
+						"name": "Event 1",
+						"startTime": "2026-06-14T00:00:07.000Z",
+						"metadata": {
+							"category": "marker"
+						},
+						"input": {
+							"clicked": true
+						}
+					}
+				},
+				{
+					"id": "generation-update-event",
+					"timestamp": "2026-06-14T00:00:08.000Z",
+					"type": "generation-update",
+					"body": {
+						"id": "generation-1",
+						"traceId": "trace-1",
+						"name": "Generation 1 updated",
+						"startTime": "2026-06-14T00:00:03.000Z",
+						"endTime": "2026-06-14T00:00:06.000Z",
+						"completionStartTime": "2026-06-14T00:00:04.000Z",
+						"model": "gpt-5.5-mini",
+						"usageDetails": {
+							"input": 10,
+							"output": 6,
+							"total": 16
+						},
+						"costDetails": {
+							"input": 0.01,
+							"output": 0.024,
+							"total": 0.034
+						},
+						"output": {
+							"message": "world!"
+						}
+					}
+				}
+			]
+		},
+		"expectedObjects": [
+			{
+				"key": "project-a/observation/event-obs-1/event-create-event.json",
+				"value": [
+					{
+						"id": "event-create-event",
+						"timestamp": "2026-06-14T00:00:07.000Z",
+						"type": "event-create",
+						"body": {
+							"traceId": "trace-1",
+							"environment": "default",
+							"name": "Event 1",
+							"startTime": "2026-06-14T00:00:07.000Z",
+							"metadata": {
+								"category": "marker"
+							},
+							"input": {
+								"clicked": true
+							},
+							"id": "event-obs-1"
+						}
+					}
+				]
+			},
+			{
+				"key": "project-a/observation/generation-1/generation-event.json",
+				"value": [
+					{
+						"id": "generation-event",
+						"timestamp": "2026-06-14T00:00:03.000Z",
+						"type": "generation-create",
+						"body": {
+							"traceId": "trace-1",
+							"environment": "default",
+							"name": "Generation 1",
+							"startTime": "2026-06-14T00:00:03.000Z",
+							"input": {
+								"messages": ["hello"]
+							},
+							"output": {
+								"message": "world"
+							},
+							"parentObservationId": "span-1",
+							"id": "generation-1",
+							"endTime": "2026-06-14T00:00:05.000Z",
+							"completionStartTime": "2026-06-14T00:00:04.000Z",
+							"model": "gpt-5.5-mini",
+							"modelParameters": {
+								"temperature": 0.2,
+								"stop": ["done"]
+							},
+							"usage": {
+								"input": 10,
+								"output": 5,
+								"total": 15,
+								"unit": "TOKENS"
+							},
+							"usageDetails": {
+								"input": 10,
+								"output": 5,
+								"total": 15
+							},
+							"costDetails": {
+								"input": 0.01,
+								"output": 0.02,
+								"total": 0.03
+							}
+						}
+					},
+					{
+						"id": "generation-update-event",
+						"timestamp": "2026-06-14T00:00:08.000Z",
+						"type": "generation-update",
+						"body": {
+							"traceId": "trace-1",
+							"environment": "default",
+							"name": "Generation 1 updated",
+							"startTime": "2026-06-14T00:00:03.000Z",
+							"output": {
+								"message": "world!"
+							},
+							"id": "generation-1",
+							"endTime": "2026-06-14T00:00:06.000Z",
+							"completionStartTime": "2026-06-14T00:00:04.000Z",
+							"model": "gpt-5.5-mini",
+							"usage": null,
+							"usageDetails": {
+								"input": 10,
+								"output": 6,
+								"total": 16
+							},
+							"costDetails": {
+								"input": 0.01,
+								"output": 0.024,
+								"total": 0.034
+							}
+						}
+					}
+				]
+			},
+			{
+				"key": "project-a/observation/span-1/span-event.json",
+				"value": [
+					{
+						"id": "span-event",
+						"timestamp": "2026-06-14T00:00:01.000Z",
+						"type": "span-create",
+						"body": {
+							"traceId": "trace-1",
+							"environment": "default",
+							"name": "Span 1",
+							"startTime": "2026-06-14T00:00:01.000Z",
+							"metadata": {
+								"span": true
+							},
+							"input": {
+								"value": 1
+							},
+							"output": {
+								"value": 2
+							},
+							"id": "span-1",
+							"endTime": "2026-06-14T00:00:02.000Z"
+						}
+					}
+				]
+			},
+			{
+				"key": "project-a/score/score-1/score-event.json",
+				"value": [
+					{
+						"id": "score-event",
+						"timestamp": "2026-06-14T00:00:06.000Z",
+						"type": "score-create",
+						"body": {
+							"id": "score-1",
+							"name": "quality",
+							"traceId": "trace-1",
+							"environment": "default",
+							"observationId": "generation-1",
+							"metadata": {
+								"reviewer": "fixture"
+							},
+							"source": "API",
+							"value": 0.9
+						}
+					}
+				]
+			},
+			{
+				"key": "project-a/trace/trace-1/trace-event.json",
+				"value": [
+					{
+						"id": "trace-event",
+						"timestamp": "2026-06-14T00:00:00.000Z",
+						"type": "trace-create",
+						"body": {
+							"id": "trace-1",
+							"timestamp": "2026-06-14T00:00:00.000Z",
+							"name": "Trace 1",
+							"input": {
+								"question": "hello"
+							},
+							"output": {
+								"answer": "world"
+							},
+							"sessionId": "session-1",
+							"userId": "user-1",
+							"environment": "default",
+							"metadata": {
+								"source": "fixture"
+							},
+							"public": false,
+							"tags": ["parity"]
+						}
+					}
+				]
+			}
+		]
+	},
+	"otel": {
+		"input": {
+			"resourceSpans": [
+				{
+					"resource": {
+						"attributes": [
+							{
+								"key": "service.name",
+								"value": {
+									"stringValue": "fixture-service"
+								}
+							}
+						]
+					},
+					"scopeSpans": [
+						{
+							"scope": {
+								"name": "fixture-scope",
+								"version": "1.0.0"
+							},
+							"spans": [
+								{
+									"traceId": "trace-otel",
+									"spanId": "span-root",
+									"name": "root span",
+									"startTimeUnixNano": "1781395200000000000",
+									"endTimeUnixNano": "1781395201000000000",
+									"attributes": [
+										{
+											"key": "langfuse.observation.type",
+											"value": {
+												"stringValue": "generation"
+											}
+										},
+										{
+											"key": "langfuse.observation.input",
+											"value": {
+												"stringValue": "{\"question\":\"hello\"}"
+											}
+										},
+										{
+											"key": "langfuse.observation.output",
+											"value": {
+												"stringValue": "{\"answer\":\"world\"}"
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		"expectedObject": {
+			"keyPattern": "^otel/project-a/\\d{4}/\\d{2}/\\d{2}/\\d{2}/\\d{2}/[0-9a-f-]{36}\\.json$",
+			"value": [
+				{
+					"resource": {
+						"attributes": [
+							{
+								"key": "service.name",
+								"value": {
+									"stringValue": "fixture-service"
+								}
+							}
+						]
+					},
+					"scopeSpans": [
+						{
+							"scope": {
+								"name": "fixture-scope",
+								"version": "1.0.0"
+							},
+							"spans": [
+								{
+									"traceId": "trace-otel",
+									"spanId": "span-root",
+									"name": "root span",
+									"startTimeUnixNano": "1781395200000000000",
+									"endTimeUnixNano": "1781395201000000000",
+									"attributes": [
+										{
+											"key": "langfuse.observation.type",
+											"value": {
+												"stringValue": "generation"
+											}
+										},
+										{
+											"key": "langfuse.observation.input",
+											"value": {
+												"stringValue": "{\"question\":\"hello\"}"
+											}
+										},
+										{
+											"key": "langfuse.observation.output",
+											"value": {
+												"stringValue": "{\"answer\":\"world\"}"
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	},
+	"otelProtobuf": {
+		"payloadBase64": "ClASThJMChAAESIzRFVmd4iZqrvM3e7/EggAESIzRFVmdyoNcHJvdG9idWYgc3BhbjkAAJYEf8m4GEoWCgxzZXJ2aWNlLm5hbWUSBgoEZGVtbw==",
+		"expectedObject": {
+			"keyPattern": "^otel/project-a/\\d{4}/\\d{2}/\\d{2}/\\d{2}/\\d{2}/[0-9a-f-]{36}\\.json$",
+			"value": [
+				{
+					"scopeSpans": [
+						{
+							"spans": [
+								{
+									"traceId": {
+										"type": "Buffer",
+										"data": [
+											0, 17, 34, 51, 68, 85, 102, 119, 136, 153, 170, 187, 204,
+											221, 238, 255
+										]
+									},
+									"spanId": {
+										"type": "Buffer",
+										"data": [0, 17, 34, 51, 68, 85, 102, 119]
+									},
+									"name": "protobuf span",
+									"startTimeUnixNano": {
+										"low": 76939264,
+										"high": 414763391,
+										"unsigned": true
+									},
+									"attributes": [
+										{
+											"key": "service.name",
+											"value": {
+												"stringValue": "demo"
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	}
+}

@@ -19,7 +19,7 @@ export const eventTypes = {
 } as const;
 
 export type EventType = (typeof eventTypes)[keyof typeof eventTypes];
-export type EntityType = "trace" | "observation" | "score" | "event";
+export type EntityType = "trace" | "observation" | "score" | "otel";
 
 const jsonValue: z.ZodType<unknown> = z.lazy(() =>
 	z.union([
@@ -44,41 +44,192 @@ export const idSchema = z
 
 const isoTimestampSchema = z.iso.datetime({ offset: true });
 const nullableIsoTimestampSchema = isoTimestampSchema.nullish();
+const environmentSchema = z
+	.string()
+	.toLowerCase()
+	.transform((value) => {
+		const stripped = value.replace(/^langfuse[-_]?/, "");
+		const truncated = stripped.slice(0, 40);
+		if (!truncated || !/^[a-z0-9-_]+$/.test(truncated)) return "default";
+		return truncated;
+	})
+	.catch("default")
+	.default("default");
 
-const baseBodySchema = z
+const usageSchema = z
+	.object({
+		input: z.number().int().nullish(),
+		output: z.number().int().nullish(),
+		total: z.number().int().nullish(),
+		unit: z
+			.enum([
+				"CHARACTERS",
+				"TOKENS",
+				"SECONDS",
+				"MILLISECONDS",
+				"IMAGES",
+				"REQUESTS",
+			])
+			.nullish(),
+		promptTokens: z.number().int().nullish(),
+		completionTokens: z.number().int().nullish(),
+		totalTokens: z.number().int().nullish(),
+		inputCost: z.number().nullish(),
+		outputCost: z.number().nullish(),
+		totalCost: z.number().nullish(),
+	})
+	.nullish()
+	.transform((value) => {
+		if (!value) return null;
+		if (
+			"promptTokens" in value ||
+			"completionTokens" in value ||
+			"totalTokens" in value
+		) {
+			return {
+				input: value.promptTokens,
+				output: value.completionTokens,
+				total: value.totalTokens,
+				unit: "TOKENS" as const,
+			};
+		}
+		if (
+			Object.values(value).every(
+				(entry) => entry === null || entry === undefined,
+			)
+		) {
+			return undefined;
+		}
+		return value;
+	})
+	.pipe(
+		z
+			.object({
+				input: z.number().int().nullish(),
+				output: z.number().int().nullish(),
+				total: z.number().int().nullish(),
+				unit: z
+					.enum([
+						"CHARACTERS",
+						"TOKENS",
+						"SECONDS",
+						"MILLISECONDS",
+						"IMAGES",
+						"REQUESTS",
+					])
+					.nullish(),
+				inputCost: z.number().nullish(),
+				outputCost: z.number().nullish(),
+				totalCost: z.number().nullish(),
+			})
+			.nullish(),
+	);
+
+const usageDetailsSchema = z
+	.record(z.string(), z.unknown())
+	.nullish()
+	.transform((value) => {
+		if (!value) return value;
+		const result: Record<string, number> = {};
+		for (const [key, entry] of Object.entries(value)) {
+			if (typeof entry === "number" && Number.isInteger(entry) && entry >= 0) {
+				result[key] = entry;
+			} else if (typeof entry === "string") {
+				const parsed = Number.parseInt(entry, 10);
+				if (!Number.isNaN(parsed) && parsed >= 0) result[key] = parsed;
+			}
+		}
+		return Object.keys(result).length > 0 ? result : undefined;
+	})
+	.nullish();
+
+const costDetailsSchema = z
+	.record(z.string(), z.unknown())
+	.nullish()
+	.transform((value) => {
+		if (!value) return value;
+		const result: Record<string, number> = {};
+		for (const [key, entry] of Object.entries(value)) {
+			if (typeof entry === "number" && Number.isFinite(entry) && entry >= 0) {
+				result[key] = entry;
+			}
+		}
+		return Object.keys(result).length > 0 ? result : undefined;
+	})
+	.nullish();
+
+const traceBodySchema = z
 	.object({
 		id: idSchema.nullish(),
-		traceId: idSchema.nullish(),
+		timestamp: nullableIsoTimestampSchema,
+		name: z.string().max(1000).nullish(),
+		externalId: z.string().nullish(),
+		input: jsonValue.nullish(),
+		output: jsonValue.nullish(),
 		sessionId: z.string().nullish(),
-		name: z.string().nullish(),
 		userId: z.string().nullish(),
+		environment: environmentSchema,
+		metadata: jsonRecordSchema.nullish(),
+		release: z.string().nullish(),
+		version: z.string().nullish(),
+		public: z.boolean().nullish(),
+		tags: z.array(z.string()).nullish(),
+	})
+	.catchall(jsonValue);
+
+const optionalObservationBodySchema = z
+	.object({
+		traceId: idSchema.nullish(),
+		environment: environmentSchema,
+		name: z.string().nullish(),
+		startTime: nullableIsoTimestampSchema,
 		metadata: jsonRecordSchema.nullish(),
 		input: jsonValue.nullish(),
 		output: jsonValue.nullish(),
 		level: z.enum(["DEBUG", "DEFAULT", "WARNING", "ERROR"]).nullish(),
 		statusMessage: z.string().nullish(),
-		startTime: nullableIsoTimestampSchema,
-		endTime: nullableIsoTimestampSchema,
-		createdAt: nullableIsoTimestampSchema,
-		completionStartTime: nullableIsoTimestampSchema,
+		parentObservationId: idSchema.nullish(),
 		version: z.string().nullish(),
-		environment: z.string().nullish(),
 	})
 	.catchall(jsonValue);
 
-const traceBodySchema = baseBodySchema.extend({
+const eventBodySchema = optionalObservationBodySchema.extend({
 	id: idSchema.nullish(),
 });
 
-const observationBodySchema = baseBodySchema.extend({
+const spanBodySchema = eventBodySchema.extend({
+	endTime: nullableIsoTimestampSchema,
+});
+
+const generationBodySchema = spanBodySchema.extend({
+	completionStartTime: nullableIsoTimestampSchema,
+	model: z.string().nullish(),
+	modelParameters: z
+		.record(
+			z.string(),
+			z
+				.union([
+					z.string(),
+					z.number(),
+					z.boolean(),
+					z.array(z.string()),
+					z.record(z.string(), z.string()),
+				])
+				.nullish(),
+		)
+		.nullish(),
+	usage: usageSchema,
+	usageDetails: usageDetailsSchema,
+	costDetails: costDetailsSchema,
+	promptName: z.string().nullish(),
+	promptVersion: z.number().int().nullish(),
+});
+
+// Langfuse keeps observation-create/update for backwards compatibility.
+const legacyObservationBodySchema = generationBodySchema.extend({
 	id: idSchema.nullish(),
 	traceId: idSchema.nullish(),
-	parentObservationId: idSchema.nullish(),
-	usage: jsonRecordSchema.nullish(),
-	usageDetails: jsonRecordSchema.nullish(),
-	costDetails: jsonRecordSchema.nullish(),
-	model: z.string().nullish(),
-	modelParameters: jsonRecordSchema.nullish(),
+	type: z.enum(["GENERATION", "SPAN", "EVENT"]).nullish(),
 });
 
 const scoreBodySchema = z
@@ -92,14 +243,14 @@ const scoreBodySchema = z
 		dataType: z
 			.enum(["NUMERIC", "CATEGORICAL", "BOOLEAN", "CORRECTION", "TEXT"])
 			.nullish(),
-		source: z.enum(["API", "EVAL", "ANNOTATION"]).nullish(),
+		source: z.enum(["API", "EVAL", "ANNOTATION"]).default("API"),
 		comment: z.string().nullish(),
 		metadata: jsonRecordSchema.nullish(),
 		configId: z.string().nullish(),
 		queueId: z.string().nullish(),
 		authorUserId: z.string().nullish(),
 		createdAt: nullableIsoTimestampSchema,
-		environment: z.string().nullish(),
+		environment: environmentSchema,
 	})
 	.catchall(jsonValue);
 
@@ -116,23 +267,23 @@ export const ingestionEventSchema = z.discriminatedUnion("type", [
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.SPAN_CREATE),
-		body: observationBodySchema,
+		body: spanBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.SPAN_UPDATE),
-		body: observationBodySchema,
+		body: spanBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.GENERATION_CREATE),
-		body: observationBodySchema,
+		body: generationBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.GENERATION_UPDATE),
-		body: observationBodySchema,
+		body: generationBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.EVENT_CREATE),
-		body: observationBodySchema,
+		body: eventBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.SCORE_CREATE),
@@ -140,35 +291,35 @@ export const ingestionEventSchema = z.discriminatedUnion("type", [
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.AGENT_CREATE),
-		body: observationBodySchema,
+		body: generationBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.TOOL_CREATE),
-		body: observationBodySchema,
+		body: generationBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.CHAIN_CREATE),
-		body: observationBodySchema,
+		body: generationBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.RETRIEVER_CREATE),
-		body: observationBodySchema,
+		body: generationBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.EMBEDDING_CREATE),
-		body: observationBodySchema,
+		body: generationBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.GUARDRAIL_CREATE),
-		body: observationBodySchema,
+		body: generationBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.OBSERVATION_CREATE),
-		body: observationBodySchema,
+		body: legacyObservationBodySchema,
 	}),
 	baseEventSchema.extend({
 		type: z.literal(eventTypes.OBSERVATION_UPDATE),
-		body: observationBodySchema,
+		body: legacyObservationBodySchema,
 	}),
 ]);
 
@@ -187,15 +338,12 @@ export type BatchResult = {
 export function entityTypeForEvent(type: EventType): EntityType {
 	if (type === eventTypes.TRACE_CREATE) return "trace";
 	if (type === eventTypes.SCORE_CREATE) return "score";
-	if (type === eventTypes.EVENT_CREATE) return "event";
 	return "observation";
 }
 
 export function bodyIdForEvent(event: IngestionEvent): string | undefined {
 	if ("id" in event.body && typeof event.body.id === "string")
 		return event.body.id;
-	if ("traceId" in event.body && typeof event.body.traceId === "string")
-		return event.body.traceId;
 	return undefined;
 }
 

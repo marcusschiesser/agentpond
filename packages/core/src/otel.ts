@@ -22,6 +22,16 @@ export async function otelBodyToEvents(params: {
 	contentEncoding?: string;
 	projectId: string;
 }): Promise<IngestionEvent[]> {
+	const resourceSpans = await otelBodyToResourceSpans(params);
+	return otelResourceSpansToEvents(resourceSpans);
+}
+
+export async function otelBodyToResourceSpans(params: {
+	body: unknown;
+	contentType?: string;
+	contentEncoding?: string;
+	projectId?: string;
+}): Promise<unknown[]> {
 	const body = decodeBody(params.body, params.contentEncoding);
 	const contentType = params.contentType?.toLowerCase() ?? "";
 
@@ -41,7 +51,7 @@ export async function otelBodyToEvents(params: {
 	}
 
 	if (!resourceSpans || resourceSpans.length === 0) return [];
-	return convertResourceSpans(resourceSpans);
+	return resourceSpans;
 }
 
 function decodeBody(body: unknown, contentEncoding?: string): unknown {
@@ -61,12 +71,8 @@ async function parseProtobufResourceSpans(body: unknown): Promise<unknown[]> {
 			"agentpond.otlp.ExportTraceServiceRequest",
 		);
 		const decoded = type.decode(Buffer.from(body));
-		const object = type.toObject(decoded, {
-			longs: String,
-			bytes: Array,
-			defaults: false,
-		}) as { resourceSpans?: unknown[] };
-		return normalizeProtobufResourceSpans(object.resourceSpans ?? []);
+		const object = type.toObject(decoded) as { resourceSpans?: unknown[] };
+		return object.resourceSpans ?? [];
 	} catch (error) {
 		throw new Error(
 			`Failed to parse OTel Protobuf Trace: ${error instanceof Error ? error.message : String(error)}`,
@@ -119,31 +125,42 @@ message ArrayValue {
 }
 `).root;
 
-function normalizeProtobufResourceSpans(resourceSpans: unknown[]): unknown[] {
-	return resourceSpans.map((resourceSpan) => {
-		const scopeSpans = getArray(resourceSpan, "scopeSpans") ?? [];
-		return {
-			scopeSpans: scopeSpans.map((scopeSpan) => ({
-				spans: (getArray(scopeSpan, "spans") ?? []).map((span) => ({
-					...(span as Record<string, unknown>),
-					traceId: bytesToHex((span as Record<string, unknown>).traceId),
-					spanId: bytesToHex((span as Record<string, unknown>).spanId),
-					parentSpanId: bytesToHex(
-						(span as Record<string, unknown>).parentSpanId,
-					),
-				})),
-			})),
-		};
-	});
-}
-
 function bytesToHex(value: unknown): string | undefined {
-	if (!Array.isArray(value)) return undefined;
-	if (value.length === 0) return undefined;
-	return Buffer.from(value as number[]).toString("hex");
+	if (Array.isArray(value)) {
+		if (value.length === 0) return undefined;
+		return Buffer.from(value as number[]).toString("hex");
+	}
+	if (value instanceof Uint8Array) {
+		if (value.length === 0) return undefined;
+		return Buffer.from(value).toString("hex");
+	}
+	if (value && typeof value === "object") {
+		const object = value as Record<string, unknown>;
+		if (object.type === "Buffer" && Array.isArray(object.data)) {
+			if (object.data.length === 0) return undefined;
+			return Buffer.from(object.data as number[]).toString("hex");
+		}
+		const numericEntries = Object.entries(object).sort(
+			([a], [b]) => Number(a) - Number(b),
+		);
+		if (
+			numericEntries.length > 0 &&
+			numericEntries.every(
+				([key, entry]) =>
+					String(Number(key)) === key && typeof entry === "number",
+			)
+		) {
+			return Buffer.from(
+				numericEntries.map(([, entry]) => entry as number),
+			).toString("hex");
+		}
+	}
+	return undefined;
 }
 
-function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
+export function otelResourceSpansToEvents(
+	resourceSpans: unknown[],
+): IngestionEvent[] {
 	const events: IngestionEvent[] = [];
 
 	for (const resourceSpan of resourceSpans) {
@@ -153,9 +170,9 @@ function convertResourceSpans(resourceSpans: unknown[]): IngestionEvent[] {
 			[];
 		for (const scopeSpan of scopeSpans) {
 			for (const span of getArray(scopeSpan, "spans") ?? []) {
-				const traceId = stringField(span, "traceId") ?? randomUUID();
-				const spanId = stringField(span, "spanId") ?? randomUUID();
-				const parentSpanId = stringField(span, "parentSpanId");
+				const traceId = idField(span, "traceId") ?? randomUUID();
+				const spanId = idField(span, "spanId") ?? randomUUID();
+				const parentSpanId = idField(span, "parentSpanId");
 				const timestamp =
 					nanosToIso(stringField(span, "startTimeUnixNano")) ??
 					new Date().toISOString();
@@ -263,7 +280,31 @@ function stringField(value: unknown, key: string): string | undefined {
 	if (typeof field === "string") return field;
 	if (typeof field === "number" || typeof field === "bigint")
 		return String(field);
+	const longValue = longLikeToString(field);
+	if (longValue) return longValue;
 	return undefined;
+}
+
+function longLikeToString(value: unknown): string | undefined {
+	if (!value || typeof value !== "object") return undefined;
+	const object = value as Record<string, unknown>;
+	const low = object.low;
+	const high = object.high;
+	if (typeof low !== "number" || typeof high !== "number") return undefined;
+	const lowBig = BigInt(low >>> 0);
+	const highBig = BigInt(high >>> 0);
+	let combined = (highBig << 32n) | lowBig;
+	if (object.unsigned !== true && (high & 0x80000000) !== 0) {
+		combined -= 1n << 64n;
+	}
+	return combined.toString();
+}
+
+function idField(value: unknown, key: string): string | undefined {
+	const stringId = stringField(value, key);
+	if (stringId) return stringId;
+	if (!value || typeof value !== "object") return undefined;
+	return bytesToHex((value as Record<string, unknown>)[key]);
 }
 
 function nanosToIso(raw: string | undefined): string | undefined {
