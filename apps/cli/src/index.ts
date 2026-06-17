@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { randomUUID } from "node:crypto";
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
 	AcceptedEventWriter,
 	type AgentPondConfig,
@@ -110,6 +111,7 @@ async function createScore(
 			source,
 			comment: stringFlag(parsed, "comment"),
 			createdAt: now,
+			environment: "default",
 		},
 	};
 
@@ -141,6 +143,7 @@ async function createTrace(
 			input: jsonOrStringFlag(parsed, "input"),
 			output: jsonOrStringFlag(parsed, "output"),
 			startTime: now,
+			environment: "default",
 		},
 	};
 
@@ -351,9 +354,18 @@ function helpRows(resource: string): Record<string, unknown>[] {
 
 class CliError extends Error {}
 
-if (
-	process.argv[1] &&
-	import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+function isCliEntryPoint(): boolean {
+	if (!process.argv[1]) return false;
+	try {
+		return (
+			realpathSync(fileURLToPath(import.meta.url)) ===
+			realpathSync(process.argv[1])
+		);
+	} catch {
+		return import.meta.url === pathToFileURL(process.argv[1]).href;
+	}
+}
+
+if (isCliEntryPoint()) {
 	await main();
 }

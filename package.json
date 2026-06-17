@@ -1,5 +1,5 @@
 {
-	"name": "agentpond",
+	"name": "@agentpond/workspace",
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
@@ -8,7 +8,7 @@
 		"node": ">=24"
 	},
 	"scripts": {
-		"build": "tsc -b",
+		"build": "tsc -b && pnpm --filter agentpond build",
 		"format": "biome format --write . --files-ignore-unknown=true",
 		"format:check": "biome format . --files-ignore-unknown=true",
 		"lint": "biome lint . --files-ignore-unknown=true",
@@ -16,11 +16,11 @@
 		"prepare": "husky",
 		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts",
 		"typecheck": "tsc --noEmit --pretty false",
+		"changeset": "changeset",
+		"version-packages": "changeset version",
+		"release": "changeset publish",
 		"ingest": "tsx apps/ingest/src/index.ts",
 		"cli": "tsx apps/cli/src/index.ts"
-	},
-	"bin": {
-		"agentpond": "apps/cli/bin/agentpond.mjs"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.936.0",
@@ -34,8 +34,10 @@
 		"@agentpond/core": "workspace:*",
 		"@agentpond/duckdb": "workspace:*",
 		"@biomejs/biome": "^2.5.0",
+		"@changesets/cli": "^2.29.7",
 		"@types/node": "^24.10.1",
 		"husky": "^9.1.7",
+		"tsup": "^8.5.1",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3"
 	}

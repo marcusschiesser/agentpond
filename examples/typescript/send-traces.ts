@@ -141,10 +141,10 @@ function printSummary(checkoutTraceId: string) {
 	console.log(`- generation costDetails total: ${COST_DETAILS.total}`);
 	console.log("");
 	console.log("Inspect checkout trace cost, observations, and scores:");
-	console.log("pnpm cli sync");
-	console.log(`pnpm cli traces get ${checkoutTraceId}`);
-	console.log(`pnpm cli observations list --traceId ${checkoutTraceId}`);
-	console.log(`pnpm cli scores list --traceId ${checkoutTraceId}`);
+	console.log("agentpond sync");
+	console.log(`agentpond traces get ${checkoutTraceId}`);
+	console.log(`agentpond observations list --traceId ${checkoutTraceId}`);
+	console.log(`agentpond scores list --traceId ${checkoutTraceId}`);
 }
 
 async function main() {

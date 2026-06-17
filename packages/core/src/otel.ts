@@ -16,6 +16,11 @@ type RawOtelRequest = {
 	resourceSpans?: unknown[];
 };
 
+type ObservationEventType = Exclude<
+	IngestionEvent["type"],
+	typeof eventTypes.TRACE_CREATE | typeof eventTypes.SCORE_CREATE
+>;
+
 export async function otelBodyToEvents(params: {
 	body: unknown;
 	contentType?: string;
@@ -186,7 +191,7 @@ export function otelResourceSpansToEvents(
 					attributes["langfuse.observation.type"],
 				);
 				const level = stringValue(attributes["langfuse.observation.level"]);
-				const observationEvent: IngestionEvent = {
+				const observationEvent = {
 					id: randomUUID(),
 					timestamp,
 					type: observationTypeToEventType(observationType),
@@ -216,9 +221,10 @@ export function otelResourceSpansToEvents(
 							attributes["langfuse.observation.status_message"],
 						),
 						version: stringValue(attributes["langfuse.version"]),
-						environment: stringValue(attributes["langfuse.environment"]),
+						environment:
+							stringValue(attributes["langfuse.environment"]) ?? "default",
 					},
-				};
+				} as IngestionEvent;
 				events.push(observationEvent);
 
 				if (!parentSpanId) {
@@ -243,7 +249,8 @@ export function otelResourceSpansToEvents(
 							tags: langfuse.traceTags,
 							public: langfuse.tracePublic,
 							version: stringValue(attributes["langfuse.version"]),
-							environment: stringValue(attributes["langfuse.environment"]),
+							environment:
+								stringValue(attributes["langfuse.environment"]) ?? "default",
 						},
 					});
 				}
@@ -256,7 +263,7 @@ export function otelResourceSpansToEvents(
 
 function observationTypeToEventType(
 	observationType: string | undefined,
-): IngestionEvent["type"] {
+): ObservationEventType {
 	if (observationType === "generation") return eventTypes.GENERATION_CREATE;
 	if (observationType === "event") return eventTypes.EVENT_CREATE;
 	if (observationType === "agent") return eventTypes.AGENT_CREATE;
@@ -336,7 +343,7 @@ function langfuseAttributes(attributes: Record<string, unknown>): {
 	traceMetadata?: Record<string, unknown>;
 	traceInput?: unknown;
 	traceOutput?: unknown;
-	traceTags?: unknown[];
+	traceTags?: string[];
 	tracePublic?: boolean;
 } {
 	const traceMetadata: Record<string, unknown> = {};
@@ -354,7 +361,9 @@ function langfuseAttributes(attributes: Record<string, unknown>): {
 			Object.keys(traceMetadata).length > 0 ? traceMetadata : undefined,
 		traceInput: parseJsonString(attributes["langfuse.trace.input"]),
 		traceOutput: parseJsonString(attributes["langfuse.trace.output"]),
-		traceTags: arrayValue(attributes["langfuse.trace.tags"]),
+		traceTags: arrayValue(attributes["langfuse.trace.tags"])?.filter(
+			(value): value is string => typeof value === "string",
+		),
 		tracePublic: booleanValue(attributes["langfuse.trace.public"]),
 	};
 }

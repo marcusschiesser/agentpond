@@ -120,10 +120,10 @@ def print_summary(checkout_trace_id):
     print(f"- generation cost_details total: {COST_DETAILS['total']}")
     print("")
     print("Inspect checkout trace cost, observations, and scores:")
-    print("pnpm cli sync")
-    print(f"pnpm cli traces get {checkout_trace_id}")
-    print(f"pnpm cli observations list --traceId {checkout_trace_id}")
-    print(f"pnpm cli scores list --traceId {checkout_trace_id}")
+    print("agentpond sync")
+    print(f"agentpond traces get {checkout_trace_id}")
+    print(f"agentpond observations list --traceId {checkout_trace_id}")
+    print(f"agentpond scores list --traceId {checkout_trace_id}")
 
 
 def main():

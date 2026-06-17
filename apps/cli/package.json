@@ -1,13 +1,31 @@
 {
-	"name": "agentpond-cli",
-	"version": "0.1.0",
+	"name": "agentpond",
+	"version": "0.0.0",
+	"description": "Agent-native CLI for local Langfuse-compatible trace analytics",
 	"type": "module",
-	"private": true,
 	"bin": {
-		"agentpond": "./bin/agentpond.mjs"
+		"agentpond": "./dist/index.js"
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"engines": {
+		"node": ">=20"
+	},
+	"scripts": {
+		"build": "tsup",
+		"prepack": "node ./scripts/copy-readme.mjs"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/marcusschiesser/agentpond.git",
+		"directory": "apps/cli"
 	},
 	"dependencies": {
-		"@agentpond/core": "workspace:*",
-		"@agentpond/duckdb": "workspace:*"
+		"@aws-sdk/client-s3": "^3.936.0",
+		"duckdb": "^1.4.2",
+		"protobufjs": "^7.6.4",
+		"zod": "^4.3.6"
 	}
 }

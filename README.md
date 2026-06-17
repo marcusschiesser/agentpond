@@ -22,10 +22,10 @@ Compared to Langfuse there's no:
 
 ## Local Demo
 
-Install workspace dependencies once before running local CLI commands, tests, or examples:
+Install the AgentPond CLI from npm:
 
 ```sh
-pnpm i
+npm install -g agentpond
 ```
 
 Start MinIO and the ingestion service:
@@ -46,7 +46,7 @@ export AWS_SECRET_ACCESS_KEY=minio123
 Create a test trace directly through the CLI:
 
 ```sh
-pnpm cli traces create \
+agentpond traces create \
   --id trace-demo-checkout-001 \
   --name "checkout support answer" \
   --userId user_42 \
@@ -59,9 +59,9 @@ pnpm cli traces create \
 Sync S3 data into DuckDB and query it:
 
 ```sh
-pnpm cli sync
-pnpm cli traces list
-pnpm cli sql "select id, name, session_id from traces"
+agentpond sync
+agentpond traces list
+agentpond sql "select id, name, session_id from traces"
 ```
 
 ## Real Ingestion
@@ -90,11 +90,11 @@ Run the TypeScript SDK example:
 pnpm --dir examples/typescript start
 ```
 
-Each example prints the trace ID it created and the `pnpm cli` commands to inspect trace cost, observations, and scores. After your app sends traces, run:
+Each example prints the trace ID it created and the `agentpond` commands to inspect trace cost, observations, and scores. After your app sends traces, run:
 
 ```sh
-pnpm cli sync
-pnpm cli traces list
+agentpond sync
+agentpond traces list
 ```
 
 ## CLI
@@ -132,3 +132,17 @@ AGENTPOND_DB=~/.agentpond/cache.duckdb
 ```
 
 If `--s3-endpoint` and `AGENTPOND_S3_ENDPOINT` are both omitted, AgentPond uses the default AWS S3 endpoint for `AWS_REGION`. For local MinIO, set `AGENTPOND_S3_ENDPOINT` or pass `--s3-endpoint`.
+
+## Development
+
+Install workspace dependencies once before running tests, examples, or local development commands:
+
+```sh
+pnpm i
+```
+
+Run the CLI from source:
+
+```sh
+pnpm cli --help
+```
