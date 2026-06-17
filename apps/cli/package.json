@@ -1,13 +1,13 @@
 {
-  "name": "agentpond-cli",
-  "version": "0.1.0",
-  "type": "module",
-  "private": true,
-  "bin": {
-    "agentpond": "./bin/agentpond.mjs"
-  },
-  "dependencies": {
-    "@agentpond/core": "workspace:*",
-    "@agentpond/duckdb": "workspace:*"
-  }
+	"name": "agentpond-cli",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"bin": {
+		"agentpond": "./bin/agentpond.mjs"
+	},
+	"dependencies": {
+		"@agentpond/core": "workspace:*",
+		"@agentpond/duckdb": "workspace:*"
+	}
 }

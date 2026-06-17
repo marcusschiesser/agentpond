@@ -1,18 +1,18 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./packages/core" },
-    { "path": "./packages/duckdb" },
-    { "path": "./apps/ingest" },
-    { "path": "./apps/cli" }
-  ],
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
-  }
+	"files": [],
+	"references": [
+		{ "path": "./packages/core" },
+		{ "path": "./packages/duckdb" },
+		{ "path": "./apps/ingest" },
+		{ "path": "./apps/cli" }
+	],
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"strict": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true
+	}
 }

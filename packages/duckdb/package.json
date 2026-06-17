@@ -1,11 +1,11 @@
 {
-  "name": "@agentpond/duckdb",
-  "version": "0.1.0",
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "dependencies": {
-    "@agentpond/core": "workspace:*"
-  }
+	"name": "@agentpond/duckdb",
+	"version": "0.1.0",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@agentpond/core": "workspace:*"
+	}
 }

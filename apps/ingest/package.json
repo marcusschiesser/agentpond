@@ -1,12 +1,12 @@
 {
-  "name": "agentpond-ingest",
-  "version": "0.1.0",
-  "type": "module",
-  "private": true,
-  "scripts": {
-    "dev": "tsx src/index.ts"
-  },
-  "dependencies": {
-    "@agentpond/core": "workspace:*"
-  }
+	"name": "agentpond-ingest",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "tsx src/index.ts"
+	},
+	"dependencies": {
+		"@agentpond/core": "workspace:*"
+	}
 }
