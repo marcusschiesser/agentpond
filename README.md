@@ -21,15 +21,7 @@ AgentPond provides Langfuse-compatible ingestion endpoints, so supported Langfus
 
 ## How it works
 
-```mermaid
-flowchart LR
-    A[Agent or application] --> B[Langfuse SDK or OTLP]
-    B --> C[AgentPond ingestion service]
-    C --> D[S3-compatible object storage]
-    D -->|agentpond sync| E[Local DuckDB cache]
-    E --> F[CLI and SQL]
-    F --> G[Developers and coding agents]
-```
+![AgentPond data flow from agent traces through object storage and local CLI analysis](./docs/assets/agentpond-how-it-works.png)
 
 S3-compatible object storage is the source of truth. The local DuckDB database is a rebuildable cache optimized for fast analytical queries.
 
