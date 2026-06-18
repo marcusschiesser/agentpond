@@ -15,7 +15,7 @@ AgentPond focuses on collecting and analysing agent traces:
 - Langfuse-compatible ingestion endpoints for SDK traces and OTLP traces
 - S3-compatible raw event storage with manifest-based discovery
 - Local DuckDB cache with `events_raw`, `traces`, `observations`, `scores`, and `sessions`
-- CLI commands to create list/read traces, observations, scores, and to run custom SQL
+- CLI commands to create list/read traces, observations, scores (e.g. annotations), and to run custom SQL
 
 Compared to Langfuse there's no: 
 - Web UI: Your coding agent talks directly to the CLI

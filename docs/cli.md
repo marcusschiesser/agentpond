@@ -120,7 +120,7 @@ agentpond scores create \
   --traceId <trace-id>
 ```
 
-Create an annotation score:
+Create an human annotation score:
 
 ```sh
 agentpond scores create \
