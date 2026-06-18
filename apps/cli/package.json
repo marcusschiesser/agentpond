@@ -1,6 +1,6 @@
 {
 	"name": "agentpond",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Agent-native CLI for local Langfuse-compatible trace analytics",
 	"type": "module",
 	"bin": {
