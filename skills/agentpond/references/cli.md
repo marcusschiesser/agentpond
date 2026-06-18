@@ -39,18 +39,6 @@ Run sync before analysis when fresh data may exist in object storage.
 
 ## Traces
 
-Create a manual trace:
-
-```bash
-npx agentpond traces create \
-  --name "manual trace" \
-  --userId user_42 \
-  --sessionId session_42 \
-  --metadata '{"env":"local","feature":"checkout"}' \
-  --input '{"question":"Why was my card declined?"}' \
-  --output '{"answer":"The bank declined the authorization."}'
-```
-
 List and read traces:
 
 ```bash
@@ -78,27 +66,7 @@ npx agentpond sessions get <session-id>
 
 ## Scores
 
-Create a score for a trace:
-
-```bash
-npx agentpond scores create \
-  --name quality \
-  --value 0.9 \
-  --traceId <trace-id>
-```
-
-Create a human annotation score:
-
-```bash
-npx agentpond scores create \
-  --name reviewed \
-  --value true \
-  --traceId <trace-id> \
-  --source ANNOTATION \
-  --comment "Looks good"
-```
-
-List scores for a trace or observation:
+List scores (e.g. human annotations) for a trace or observation:
 
 ```bash
 npx agentpond scores list --traceId <trace-id>

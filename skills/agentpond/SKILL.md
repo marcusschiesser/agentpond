@@ -1,6 +1,6 @@
 ---
 name: agentpond
-description: Work with AgentPond trace analytics. Use when needing to sync AgentPond object-store events into DuckDB, inspect traces, observations, sessions, or scores, create manual traces or scores, run local SQL analysis, or configure Langfuse-compatible SDK ingestion into AgentPond.
+description: Work with AgentPond trace analytics. Use when needing to inspect traces, observations, sessions, or scores (e.g. annotations), run local SQL analysis, or configure Langfuse-compatible SDK ingestion into AgentPond.
 allowed-tools:
   - Bash(npx agentpond --help *)
   - Bash(npx agentpond sync *)
@@ -24,7 +24,7 @@ AgentPond is a data pond for AI agent traces with an agent-native CLI for local 
 Follow these principles for AgentPond work:
 
 1. **Sync before analysis**: Run `npx agentpond sync` before querying recent production data unless the user is intentionally inspecting an existing local cache.
-2. **Use supported CLI commands**: AgentPond exposes focused trace analytics commands and local SQL. Do not use Langfuse REST API discovery or arbitrary API-resource commands.
+2. **Use supported CLI commands**: AgentPond exposes focused trace analytics commands and local SQL. 
 3. **Use DuckDB for deeper analysis**: Prefer `npx agentpond sql "..."` when a question requires joins, aggregation, time filtering, raw event inspection, or cost analysis.
 4. **Keep credentials out of chat**: Ask the user to set environment variables or an `.env` file instead of pasting secrets into the conversation.
 
