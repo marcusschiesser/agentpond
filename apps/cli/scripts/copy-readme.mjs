@@ -8,3 +8,8 @@ copyFileSync(
 	resolve(__dirname, "../../../README.md"),
 	resolve(__dirname, "../README.md"),
 );
+
+copyFileSync(
+	resolve(__dirname, "../../../LICENSE"),
+	resolve(__dirname, "../LICENSE"),
+);
