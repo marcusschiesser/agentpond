@@ -13,31 +13,34 @@ import { AgentPondDuckDb } from "@agentpond/duckdb";
 import { main, writeEventsAndSyncCache } from "../apps/cli/src/index.js";
 
 async function captureStdout(fn: () => Promise<void>): Promise<string> {
-	const stdoutWrite = process.stdout.write.bind(process.stdout);
+	const consoleLog = console.log;
+	const consoleTable = console.table;
 	const chunks: string[] = [];
-	process.stdout.write = ((chunk: string | Uint8Array) => {
-		chunks.push(String(chunk));
-		return true;
-	}) as typeof process.stdout.write;
+	console.log = (...args: unknown[]) => {
+		chunks.push(`${args.map(String).join(" ")}\n`);
+	};
+	console.table = (tabularData?: unknown) => {
+		chunks.push(`${JSON.stringify(tabularData)}\n`);
+	};
 	try {
 		await fn();
 	} finally {
-		process.stdout.write = stdoutWrite;
+		console.log = consoleLog;
+		console.table = consoleTable;
 	}
 	return chunks.join("");
 }
 
 async function captureStderr(fn: () => Promise<void>): Promise<string> {
-	const stderrWrite = process.stderr.write.bind(process.stderr);
+	const consoleError = console.error;
 	const chunks: string[] = [];
-	process.stderr.write = ((chunk: string | Uint8Array) => {
-		chunks.push(String(chunk));
-		return true;
-	}) as typeof process.stderr.write;
+	console.error = (...args: unknown[]) => {
+		chunks.push(`${args.map(String).join(" ")}\n`);
+	};
 	try {
 		await fn();
 	} finally {
-		process.stderr.write = stderrWrite;
+		console.error = consoleError;
 	}
 	return chunks.join("");
 }

@@ -24,7 +24,7 @@
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.936.0",
-		"duckdb": "^1.4.2",
+		"@duckdb/node-api": "^1.5.4-r.1",
 		"protobufjs": "^7.6.4",
 		"zod": "^4.3.6"
 	}
