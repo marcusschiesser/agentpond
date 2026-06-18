@@ -7,16 +7,7 @@ import {
 	type ObjectStore,
 	otelResourceSpansToEvents,
 } from "@agentpond/core";
-import duckdb from "duckdb";
-
-type DuckConnection = {
-	run(sql: string, callback: (err: Error | null) => void): void;
-	all<T = Record<string, unknown>>(
-		sql: string,
-		callback: (err: Error | null, rows: T[]) => void,
-	): void;
-	close(callback: (err: Error | null) => void): void;
-};
+import { type DuckDBConnection, DuckDBInstance } from "@duckdb/node-api";
 
 export type SyncResult = {
 	manifestsProcessed: number;
@@ -25,12 +16,11 @@ export type SyncResult = {
 };
 
 export class AgentPondDuckDb {
-	private readonly db: duckdb.Database;
-	private connection?: DuckConnection;
+	private instance?: DuckDBInstance;
+	private connection?: DuckDBConnection;
 
 	constructor(readonly dbPath: string) {
 		mkdirSync(dirname(dbPath), { recursive: true });
-		this.db = new duckdb.Database(dbPath);
 	}
 
 	async init(): Promise<void> {
@@ -182,17 +172,13 @@ export class AgentPondDuckDb {
 		if (this.connection) {
 			const connection = this.connection;
 			this.connection = undefined;
-			await new Promise<void>((resolve, reject) => {
-				connection.close((err) =>
-					err && !isAlreadyClosedConnectionError(err) ? reject(err) : resolve(),
-				);
-			});
+			connection.closeSync();
 		}
-		await new Promise<void>((resolve, reject) => {
-			this.db.close((err) =>
-				err && !isAlreadyClosedConnectionError(err) ? reject(err) : resolve(),
-			);
-		});
+		if (this.instance) {
+			const instance = this.instance;
+			this.instance = undefined;
+			instance.closeSync();
+		}
 	}
 
 	private async projectEvent(
@@ -373,28 +359,23 @@ export class AgentPondDuckDb {
 		);
 	}
 
-	private getConnection(): DuckConnection {
-		if (!this.connection)
-			this.connection = this.db.connect() as unknown as DuckConnection;
+	private async getConnection(): Promise<DuckDBConnection> {
+		if (!this.connection) {
+			this.instance = await DuckDBInstance.create(this.dbPath);
+			this.connection = await this.instance.connect();
+		}
 		return this.connection;
 	}
 
 	private async exec(sqlText: string): Promise<void> {
-		await new Promise<void>((resolve, reject) => {
-			this.getConnection().run(sqlText, (err) =>
-				err ? reject(err) : resolve(),
-			);
-		});
+		await (await this.getConnection()).run(sqlText);
 	}
 
 	private async all<T = Record<string, unknown>>(
 		sqlText: string,
 	): Promise<T[]> {
-		return new Promise<T[]>((resolve, reject) => {
-			this.getConnection().all<T>(sqlText, (err, rows) =>
-				err ? reject(err) : resolve(rows),
-			);
-		});
+		const reader = await (await this.getConnection()).runAndReadAll(sqlText);
+		return reader.getRowObjectsJS() as T[];
 	}
 }
 
@@ -472,12 +453,6 @@ function isScoreSource(
 	value: string | undefined,
 ): value is "API" | "EVAL" | "ANNOTATION" {
 	return value === "API" || value === "EVAL" || value === "ANNOTATION";
-}
-
-function isAlreadyClosedConnectionError(error: Error): boolean {
-	return error.message.includes(
-		"Connection was never established or has been closed already",
-	);
 }
 
 function scoreValue(

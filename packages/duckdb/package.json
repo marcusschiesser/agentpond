@@ -7,6 +7,7 @@
 		".": "./src/index.ts"
 	},
 	"dependencies": {
-		"@agentpond/core": "workspace:*"
+		"@agentpond/core": "workspace:*",
+		"@duckdb/node-api": "^1.5.4-r.1"
 	}
 }

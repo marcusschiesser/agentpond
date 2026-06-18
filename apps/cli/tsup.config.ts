@@ -10,5 +10,5 @@ export default defineConfig({
 	sourcemap: true,
 	splitting: false,
 	noExternal: [/^@agentpond\//],
-	external: ["duckdb"],
+	external: ["@duckdb/node-api", "@duckdb/node-bindings"],
 });

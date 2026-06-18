@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/agentpond-logo-gpt-image.png" alt="AgentPond - trace analytics for AI agents" width="720">
+  <img src="https://raw.githubusercontent.com/marcusschiesser/agentpond/main/docs/assets/agentpond-logo-gpt-image.png" alt="AgentPond - trace analytics for AI agents" width="720">
 </p>
 
 AgentPond is a data pond for AI agent traces with a agent-native CLI for local analytics. It accepts Langfuse SDK ingestion and its using the same data format, so you can use it as a drop-in replacement.

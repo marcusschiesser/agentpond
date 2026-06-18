@@ -4,6 +4,17 @@ packages:
   - "packages/*"
 
 allowBuilds:
-  duckdb: true
   esbuild: true
   protobufjs: true
+
+minimumReleaseAgeExclude:
+  - '@duckdb/node-api@1.5.4-r.1'
+  - '@duckdb/node-bindings-darwin-arm64@1.5.4-r.1'
+  - '@duckdb/node-bindings-darwin-x64@1.5.4-r.1'
+  - '@duckdb/node-bindings-linux-arm64-musl@1.5.4-r.1'
+  - '@duckdb/node-bindings-linux-arm64@1.5.4-r.1'
+  - '@duckdb/node-bindings-linux-x64-musl@1.5.4-r.1'
+  - '@duckdb/node-bindings-linux-x64@1.5.4-r.1'
+  - '@duckdb/node-bindings-win32-arm64@1.5.4-r.1'
+  - '@duckdb/node-bindings-win32-x64@1.5.4-r.1'
+  - '@duckdb/node-bindings@1.5.4-r.1'
