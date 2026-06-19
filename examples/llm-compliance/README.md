@@ -9,7 +9,7 @@ The workflow:
 - loads a concise incident-summary document from [`incident-summary.md`](./incident-summary.md)
 - checks one graded rule with `gpt-5.5`
 - parses a structured object with `compliance_score` from `0` to `10` and `reasoning`
-- records a trace with a workflow span, a document-loading span, and one captured LLM generation
+- records one trace with two root observations: a document-loading span and one captured LLM generation
 - uses the Langfuse OpenAI integration to capture the LLM generation automatically
 
 The compliance rule is intentionally graded instead of binary:

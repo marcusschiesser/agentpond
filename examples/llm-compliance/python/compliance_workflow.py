@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from langfuse import get_client, observe, propagate_attributes
+from langfuse import get_client, propagate_attributes
 from langfuse.openai import OpenAI
 from pydantic import BaseModel, Field
 
@@ -40,9 +40,20 @@ def require_env():
         )
 
 
-@observe(name="load incident summary", as_type="span")
-def load_incident_summary():
-    return DOCUMENT_PATH.read_text(encoding="utf-8")
+def load_incident_summary(langfuse, trace_id):
+    load_span = langfuse.start_observation(
+        trace_context={"trace_id": trace_id},
+        name="load incident summary",
+        as_type="span",
+        input={
+            "document_type": "incident-summary",
+            "path": str(DOCUMENT_PATH),
+        },
+    )
+    document = DOCUMENT_PATH.read_text(encoding="utf-8")
+    load_span.update(output={"document": document})
+    load_span.end()
+    return document
 
 
 def compliance_messages(document):
@@ -62,7 +73,7 @@ def compliance_messages(document):
     ]
 
 
-def check_document(document):
+def check_document(trace_id, document):
     openai_client = OpenAI()
     messages = compliance_messages(document)
     completion = openai_client.chat.completions.parse(
@@ -74,16 +85,14 @@ def check_document(document):
             "structured_output": "ComplianceResult",
             "compliance_rule": COMPLIANCE_RULE,
         },
+        trace_id=trace_id,
     )
     return completion.choices[0].message.parsed
 
 
-@observe(
-    name="incident summary compliance workflow",
-    as_type="span",
-    capture_input=False,
-)
 def run_workflow():
+    langfuse = get_client()
+    trace_id = langfuse.create_trace_id()
     with propagate_attributes(
         trace_name="incident summary compliance workflow",
         session_id="llm-compliance-example",
@@ -94,10 +103,9 @@ def run_workflow():
             "compliance_rule": COMPLIANCE_RULE,
         },
     ):
-        document = load_incident_summary()
-        langfuse = get_client()
-        result = check_document(document)
-        return langfuse.get_current_trace_id(), result
+        document = load_incident_summary(langfuse, trace_id)
+        result = check_document(trace_id, document)
+    return trace_id, result
 
 
 def require_trace_id(trace_id):
