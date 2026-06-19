@@ -77,18 +77,15 @@ Start the local MinIO object store and AgentPond ingestion service:
 docker compose up --build
 ```
 
-### Configure the CLI
+### Configuration
 
-Configure AgentPond to use the local MinIO instance:
+Load the configuration for the services started by `docker compose up` by adding the credentials in `.env.example` to your shell:
 
 ```sh
-export AGENTPOND_S3_ENDPOINT=http://localhost:9000
-export AGENTPOND_S3_BUCKET=agentpond
-export AWS_ACCESS_KEY_ID=minio
-export AWS_SECRET_ACCESS_KEY=minio123
+set -a
+. ./.env.example
+set +a
 ```
-
-> The CLI accesses S3-compatible object storage directly. The credentials above are for local development only.
 
 ### Create and query a trace
 
@@ -120,21 +117,33 @@ agentpond sql "select id, name, session_id from traces"
 For the complete command reference, see [CLI usage](./docs/cli.md).
 
 
-## Send traces from a Langfuse SDK
+## Use AgentPond in your project
 
-AgentPond implements Langfuse-compatible ingestion endpoints. To send traces to the local service, configure your Langfuse SDK with:
-
-```sh
-export LANGFUSE_BASE_URL=http://localhost:3030
-export LANGFUSE_PUBLIC_KEY=pk-agentpond
-export LANGFUSE_SECRET_KEY=sk-agentpond
-```
+AgentPond implements Langfuse-compatible ingestion endpoints. To send traces to AgentPond, configure the environment variables `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`. By using the values defined in `.env.example`, you're pointing to the local AgentPond deployment started in the last section. 
 
 You can then use the normal Langfuse SDK integration for your language or framework.
 
 See the [Langfuse SDK overview](https://langfuse.com/docs/observability/sdk/overview) for SDK installation and instrumentation instructions.
 
-### Example projects
+### Add coding agent
+
+After sending traces to AgentPond, you need to give your coding agent the skill to access AgentPond:
+
+```sh
+npx skills add marcusschiesser/agentpond
+```
+
+This command installs a skill to use the AgentPond CLI, understand its DuckDB schema for advanced queries, and provides trace-analysis guidance to help improve your agents.
+
+### Use your infrastructure
+
+Deploy the ingestion service together with an S3-compatible store in your infrastructure. [docker-compose.yml](./docker-compose.yml) provides a template for local deployment.
+
+For production deployments, replace all example credentials, use TLS, and give the ingestion service and CLI only the object-storage permissions they require.
+
+> Coming soon: templates for your favorite Cloud provider: AWS, Google Cloud and Azure.
+
+## Example projects
 
 The repository contains matching Python and TypeScript examples. Each example emits:
 
@@ -158,64 +167,6 @@ pnpm --dir examples/typescript start
 
 Each example prints the generated trace ID and the corresponding `agentpond` commands for inspecting its trace, observations, and annotation score.
 
-## Use AgentPond in your project
-
-### Use Langfuse SDK
-
-Install the latest Langfuse SDK for your language and configure it to point to your AgentPond ingestion service:
-
-```sh
-export LANGFUSE_BASE_URL=https://your-agentpond-ingestion.example.com
-export LANGFUSE_PUBLIC_KEY=your-public-key
-export LANGFUSE_SECRET_KEY=your-secret-key
-```
-
-Deploy the ingestion service together with a S3-compatibe store in your infrastructure - [docker-compose.yml](./docker-compose.yml) provides a template for local deployment. 
-
-For production deployments, replace all example credentials, use TLS, and give the ingestion service and CLI only the object-storage permissions they require.
-
-> Coming soon: templates for your favorite Cloud provider: AWS, Google Cloud and Azure.
-
-### Add Coding Agent 
-
-AgentPond includes a skill giving a coding agent the capability to use the CLI, understand the DuckDB schema, install tracing, and guidance for trace analysis. Install it with the open `skills` CLI:
-
-```sh
-npx skills add marcusschiesser/agentpond 
-```
-
-## Configuration
-
-The ingestion service and CLI use the following environment variables:
-
-```sh
-# Project
-AGENTPOND_PROJECT_ID=default-project
-
-# Ingestion authentication
-LANGFUSE_PUBLIC_KEY=pk-agentpond
-LANGFUSE_SECRET_KEY=sk-agentpond
-
-# Object storage
-AGENTPOND_S3_BUCKET=agentpond
-AGENTPOND_S3_PREFIX=
-AGENTPOND_S3_ENDPOINT=http://localhost:9000
-AGENTPOND_S3_FORCE_PATH_STYLE=true
-
-# AWS or S3-compatible credentials
-AWS_ACCESS_KEY_ID=minio
-AWS_SECRET_ACCESS_KEY=minio123
-AWS_REGION=us-east-1
-
-# Local analytical cache
-AGENTPOND_DB=~/.agentpond/cache.duckdb
-```
-
-`AWS_REGION` defaults to `us-east-1`.
-
-When `--s3-endpoint` and `AGENTPOND_S3_ENDPOINT` are both omitted, AgentPond uses the standard AWS S3 endpoint for the configured region.
-
-For local MinIO or another S3-compatible service, set `AGENTPOND_S3_ENDPOINT` or pass `--s3-endpoint` to the CLI.
 
 ## Development
 
