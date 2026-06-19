@@ -1,4 +1,6 @@
 node_modules
+.pnpm-store
+.venv
 dist
 apps/cli/README.md
 *.duckdb

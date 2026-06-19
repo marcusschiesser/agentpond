@@ -1,0 +1,44 @@
+# LLM compliance workflow
+
+This scenario demonstrates a small agent workflow that calls an LLM, parses a structured result, and records the workflow in Langfuse.
+
+Run commands in this README from the repository root.
+
+The workflow:
+
+- loads a concise incident-summary document from [`incident-summary.md`](./incident-summary.md)
+- checks one graded rule with `gpt-5.5`
+- parses a structured object with `compliance_score` from `0` to `10` and `reasoning`
+- records a trace with a workflow span, a document-loading span, and one captured LLM generation
+- uses the Langfuse OpenAI integration to capture the LLM generation automatically
+
+The compliance rule is intentionally graded instead of binary:
+
+> The incident summary should be actionable for follow-up by clearly covering observed issue, evidence, user impact, mitigation status, and next action.
+
+## Prerequisites
+
+Start AgentPond and load the local Langfuse-compatible credentials:
+
+```sh
+docker compose up --build
+set -a
+. ./.env.example
+set +a
+```
+
+Set an OpenAI API key:
+
+```sh
+export OPENAI_API_KEY=...
+```
+
+## Run
+
+Run the Python example with `uv`:
+
+```sh
+uv run --project examples/llm-compliance/python python examples/llm-compliance/python/compliance_workflow.py
+```
+
+The script prints the structured compliance result, generated trace ID, and `agentpond` commands for inspecting the trace and observations.

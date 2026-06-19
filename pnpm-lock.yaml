@@ -76,7 +76,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
-  examples/typescript:
+  examples/basic-traces/typescript:
     dependencies:
       '@langfuse/client':
         specifier: ^5.4.1

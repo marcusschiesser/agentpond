@@ -145,27 +145,12 @@ For production deployments, replace all example credentials, use TLS, and give t
 
 ## Example projects
 
-The repository contains matching Python and TypeScript examples. Each example emits:
+The repository contains scenario-based examples under [examples](./examples/README.md):
 
-- one trace
-- one generation observation with usage and cost data
-- one human annotation score
+- [Basic traces](./examples/basic-traces/README.md): fixture-based Python and TypeScript examples that emit traces, observations, and annotation scores without calling an LLM.
+- [LLM compliance workflow](./examples/llm-compliance/README.md): a Python `uv` example that calls OpenAI, parses a structured compliance score, and records the workflow in Langfuse.
 
-The examples use fixture data and do not call an LLM, so no model-provider API key is required.
-
-Run the Python example with `uv`:
-
-```sh
-uv run --project examples/python python examples/python/send_traces.py
-```
-
-Run the TypeScript example:
-
-```sh
-pnpm --dir examples/typescript start
-```
-
-Each example prints the generated trace ID and the corresponding `agentpond` commands for inspecting its trace, observations, and annotation score.
+Each scenario README includes prerequisites and run commands.
 
 
 ## Development

@@ -1,6 +1,6 @@
 packages:
   - "apps/*"
-  - "examples/typescript"
+  - "examples/basic-traces/typescript"
   - "packages/*"
 
 allowBuilds:
