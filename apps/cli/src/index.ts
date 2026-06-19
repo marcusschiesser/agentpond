@@ -198,7 +198,10 @@ async function runReadCommand(
 	if (resource === "observations" && action === "list") {
 		const traceId = requiredFlag(parsed, "traceId");
 		return db.query(
-			`SELECT * FROM observations WHERE trace_id = ${sql(traceId)} ORDER BY start_time ASC LIMIT ${limit(parsed)}`,
+			// Keep this query chronological and cheap. A full parent-before-child tree
+			// order is nicer for same-timestamp edge cases, but requires recursive
+			// sorting for every list call.
+			`SELECT * FROM observations WHERE trace_id = ${sql(traceId)} ORDER BY start_time ASC, id ASC LIMIT ${limit(parsed)}`,
 		);
 	}
 	if (resource === "sessions" && action === "list") {

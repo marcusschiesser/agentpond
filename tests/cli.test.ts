@@ -191,6 +191,76 @@ test("CLI trace and observation reads expose provided usage and cost fields as J
 	}
 });
 
+test("CLI observation list has stable order for identical start times", async () => {
+	const store = new MemoryObjectStore();
+	const dbPath = join(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
+		"cache.duckdb",
+	);
+	const config = testConfig(dbPath);
+	await writeEventsAndSyncCache(config, store, [
+		{
+			id: "trace-event-1",
+			timestamp: "2026-06-19T07:54:54.798Z",
+			type: eventTypes.TRACE_CREATE,
+			body: {
+				id: "trace-ordered",
+				name: "Trace Ordered",
+				startTime: "2026-06-19T07:54:54.798Z",
+			},
+		},
+		{
+			id: "later-id-event",
+			timestamp: "2026-06-19T07:54:54.798Z",
+			type: eventTypes.SPAN_CREATE,
+			body: {
+				id: "b-span",
+				traceId: "trace-ordered",
+				name: "B Span",
+				startTime: "2026-06-19T07:54:54.798Z",
+			},
+		},
+		{
+			id: "earlier-id-event",
+			timestamp: "2026-06-19T07:54:54.798Z",
+			type: eventTypes.SPAN_CREATE,
+			body: {
+				id: "a-span",
+				traceId: "trace-ordered",
+				name: "A Span",
+				startTime: "2026-06-19T07:54:54.798Z",
+			},
+		},
+	]);
+
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"--db",
+				dbPath,
+				"observations",
+				"list",
+				"--traceId",
+				"trace-ordered",
+				"--json",
+			]),
+		);
+		const observations = JSON.parse(output) as Array<{ id: string }>;
+
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(
+			observations.map((observation) => observation.id),
+			["a-span", "b-span"],
+		);
+	} finally {
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI read commands report missing required score filters", async () => {
 	const dbPath = join(
 		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
