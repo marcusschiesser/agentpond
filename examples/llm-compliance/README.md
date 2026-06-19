@@ -42,3 +42,9 @@ uv run --project examples/llm-compliance/python python examples/llm-compliance/p
 ```
 
 The script prints the structured compliance result, generated trace ID, and `agentpond` commands for inspecting the trace and observations.
+
+It also prints a follow-up command for adding the expected trace score. You can run that command directly, or call the score script with any trace ID:
+
+```sh
+uv run --project examples/llm-compliance/python python examples/llm-compliance/python/add_expected_score.py <trace-id>
+```

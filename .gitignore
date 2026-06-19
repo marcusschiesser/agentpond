@@ -1,6 +1,7 @@
 node_modules
 .pnpm-store
 .venv
+__pycache__
 dist
 apps/cli/README.md
 *.duckdb

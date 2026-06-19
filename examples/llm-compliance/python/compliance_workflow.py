@@ -125,6 +125,9 @@ def print_summary(trace_id, result):
     print("agentpond sync")
     print(f"agentpond traces get {trace_id}")
     print(f"agentpond observations list --traceId {trace_id}")
+    print("")
+    print("Add the expected score:")
+    print(f"uv run --project examples/llm-compliance/python python examples/llm-compliance/python/add_expected_score.py {trace_id}")
 
 
 def main():
