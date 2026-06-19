@@ -119,6 +119,7 @@ agentpond sql "select id, name, session_id from traces"
 
 For the complete command reference, see [CLI usage](./docs/cli.md).
 
+
 ## Send traces from a Langfuse SDK
 
 AgentPond implements Langfuse-compatible ingestion endpoints. To send traces to the local service, configure your Langfuse SDK with:
@@ -159,7 +160,9 @@ Each example prints the generated trace ID and the corresponding `agentpond` com
 
 ## Use AgentPond in your project
 
-Install the latest Langfuse SDK for your language and configure it to point to your AgentPond deployment:
+### Use Langfuse SDK
+
+Install the latest Langfuse SDK for your language and configure it to point to your AgentPond ingestion service:
 
 ```sh
 export LANGFUSE_BASE_URL=https://your-agentpond-ingestion.example.com
@@ -167,9 +170,19 @@ export LANGFUSE_PUBLIC_KEY=your-public-key
 export LANGFUSE_SECRET_KEY=your-secret-key
 ```
 
-Deploy the [ingestion service](./docker-compose.yml) in your infrastructure and configure it to use your S3-compatible object store.
+Deploy the ingestion service together with a S3-compatibe store in your infrastructure - [docker-compose.yml](./docker-compose.yml) provides a template for local deployment. 
 
 For production deployments, replace all example credentials, use TLS, and give the ingestion service and CLI only the object-storage permissions they require.
+
+> Coming soon: templates for your favorite Cloud provider: AWS, Google Cloud and Azure.
+
+### Add Coding Agent 
+
+AgentPond includes a skill giving a coding agent the capability to use the CLI, understand the DuckDB schema, install tracing, and guidance for trace analysis. Install it with the open `skills` CLI:
+
+```sh
+npx skills add marcusschiesser/agentpond 
+```
 
 ## Configuration
 
