@@ -11,6 +11,10 @@ export function logStep(message: string): void {
 	console.error(`[perf] ${message}`);
 }
 
+export function logSeparator(label: string): void {
+	console.error(`\n[perf] ===== ${label} =====`);
+}
+
 export function createLoadProgressLogger(): (progress: LoadProgress) => void {
 	const state: ThrottleState = { lastLoggedAt: 0 };
 	return (progress) => {

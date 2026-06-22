@@ -11,14 +11,15 @@ import {
 	parseArgs,
 	runIdFromPrefix,
 } from "./args.js";
-import { generateLoad } from "./load.js";
+import { expectedSpanCount, generateLoad } from "./load.js";
 import {
 	createLoadProgressLogger,
 	createSyncProgressLogger,
+	logSeparator,
 	logStep,
 } from "./progress.js";
 import { collectStorageStats } from "./storage-stats.js";
-import { countTraces, formatSyncTiming, roundMs, timeSync } from "./sync.js";
+import { countTraces, formatDuration, timeSync } from "./sync.js";
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
 	const args = parseArgs(argv);
@@ -37,26 +38,31 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 	configureLangfuseEnv(address, args);
 	logStep(`started in-process ingestion server at ${address}`);
 
+	const expectedSpans = expectedSpanCount(args.traces);
+	configureOtelQueue(expectedSpans);
+	logStep(`configured OpenTelemetry span queue for ${expectedSpans} spans`);
+
+	const spanProcessor = new LangfuseSpanProcessor();
 	const sdk = new NodeSDK({
-		spanProcessors: [new LangfuseSpanProcessor()],
+		spanProcessors: [spanProcessor],
 	});
 	const db = new AgentPondDuckDb(args.dbPath);
 
 	let generatedTraces = 0;
 	const ingestionStarted = performance.now();
 	try {
+		logSeparator("Tracing");
 		sdk.start();
 		generatedTraces = await generateLoad(
 			args.traces,
 			createLoadProgressLogger(),
+			async () => spanProcessor.forceFlush(),
 		);
-		logStep("flushing OpenTelemetry spans");
 		await sdk.shutdown();
 		logStep(
-			`finished ingestion in ${roundMs(performance.now() - ingestionStarted)}ms`,
+			`tracing finished in ${formatDuration(performance.now() - ingestionStarted)}`,
 		);
 
-		const ingestionDurationMs = performance.now() - ingestionStarted;
 		logStep("collecting S3 manifest and object size stats");
 		const storage = await collectStorageStats(
 			store,
@@ -66,19 +72,31 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 		logStep(
 			`storage contains ${storage.manifestCount} manifests and ${storage.objectCount} objects`,
 		);
-		logStep("starting initial DuckDB sync");
+		logSeparator("Initial Sync");
 		const firstSync = await timeSync(
 			db,
 			store,
 			args,
 			createSyncProgressLogger("initial"),
 		);
-		logStep("starting no-op DuckDB sync");
+		logStep(
+			`initial sync finished in ${formatDuration(firstSync.durationMs)}: ` +
+				`${firstSync.result.manifestsProcessed} manifests, ` +
+				`${firstSync.result.objectsProcessed} objects, ` +
+				`${firstSync.result.eventsProcessed} events`,
+		);
+		logSeparator("No-op Sync");
 		const secondSync = await timeSync(
 			db,
 			store,
 			args,
 			createSyncProgressLogger("noop"),
+		);
+		logStep(
+			`no-op sync finished in ${formatDuration(secondSync.durationMs)}: ` +
+				`${secondSync.result.manifestsProcessed} manifests, ` +
+				`${secondSync.result.objectsProcessed} objects, ` +
+				`${secondSync.result.eventsProcessed} events`,
 		);
 		const traceCount = await countTraces(db);
 
@@ -100,34 +118,22 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 				`DuckDB contains ${traceCount} traces, expected ${args.traces}`,
 			);
 		}
-
-		printResult({
-			runId: runIdFromPrefix(args.prefix),
-			requestedTraceCount: args.traces,
-			generatedTraceCount: generatedTraces,
-			s3Prefix: args.prefix,
-			dbPath: args.dbPath,
-			...storage,
-			timings: {
-				ingestionGenerateAndSendMs: roundMs(ingestionDurationMs),
-				initialSync: formatSyncTiming(firstSync),
-				noopSync: formatSyncTiming(secondSync),
-			},
-		});
+		logStep(
+			`completed run ${runIdFromPrefix(args.prefix)}: ${traceCount} traces synced to ${args.dbPath}`,
+		);
 	} finally {
 		await db.close();
 		await server.close();
 	}
 }
 
-function printResult(value: unknown): void {
-	console.log(
-		JSON.stringify(
-			value,
-			(_key, item) => (typeof item === "bigint" ? item.toString() : item),
-			2,
-		),
+function configureOtelQueue(expectedSpans: number): void {
+	const configured = Number.parseInt(
+		process.env.OTEL_BSP_MAX_QUEUE_SIZE ?? "",
+		10,
 	);
+	if (Number.isFinite(configured) && configured >= expectedSpans) return;
+	process.env.OTEL_BSP_MAX_QUEUE_SIZE = String(expectedSpans);
 }
 
 main().catch((error) => {

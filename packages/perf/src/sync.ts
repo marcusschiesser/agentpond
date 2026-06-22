@@ -37,6 +37,15 @@ export function roundMs(value: number): number {
 	return Math.round(value * 100) / 100;
 }
 
+export function formatDuration(value: number): string {
+	if (value < 1000) return `${roundMs(value)}ms`;
+	const seconds = value / 1000;
+	if (seconds < 60) return `${Math.round(seconds * 100) / 100}s`;
+	const minutes = Math.floor(seconds / 60);
+	const remainingSeconds = Math.round((seconds - minutes * 60) * 100) / 100;
+	return `${minutes}m ${remainingSeconds}s`;
+}
+
 export function formatSyncTiming(timing: SyncTiming) {
 	return {
 		durationMs: roundMs(timing.durationMs),

@@ -11,15 +11,29 @@ export type LoadProgress = {
 	totalTraces: number;
 };
 
+const FLUSH_INTERVAL_TRACES = 500;
+
+export function expectedSpanCount(traceCount: number): number {
+	let spans = 0;
+	for (let i = 0; i < traceCount; i += 1) {
+		spans += 1 + childSpanCount(i);
+	}
+	return spans;
+}
+
 export async function generateLoad(
 	traceCount: number,
 	onProgress?: (progress: LoadProgress) => void,
+	onFlush?: (progress: LoadProgress) => Promise<void>,
 ): Promise<number> {
 	let generated = 0;
 	onProgress?.({ generatedTraces: generated, totalTraces: traceCount });
 	for (let i = 0; i < traceCount; i += 1) {
 		await generateTrace(i);
 		generated += 1;
+		if (generated % FLUSH_INTERVAL_TRACES === 0) {
+			await onFlush?.({ generatedTraces: generated, totalTraces: traceCount });
+		}
 		if (generated === traceCount || generated % 1000 === 0) {
 			onProgress?.({ generatedTraces: generated, totalTraces: traceCount });
 		}
@@ -53,8 +67,7 @@ async function generateTrace(index: number): Promise<void> {
 				},
 			},
 			async () => {
-				const childSpanCount = 2 + (index % 6);
-				for (let child = 0; child < childSpanCount; child += 1) {
+				for (let child = 0; child < childSpanCount(index); child += 1) {
 					await generateChildObservation(index, child);
 				}
 			},
@@ -63,7 +76,7 @@ async function generateTrace(index: number): Promise<void> {
 		root.update({
 			output: {
 				status: "completed",
-				steps: 2 + (index % 6),
+				steps: childSpanCount(index),
 				decision: `decision-${index % 13}`,
 			},
 		});
@@ -142,6 +155,10 @@ function observationType(
 	if (childIndex % 3 === 1) return "generation";
 	if ((traceIndex + childIndex) % 4 === 0) return "tool";
 	return "span";
+}
+
+function childSpanCount(index: number): number {
+	return 2 + (index % 6);
 }
 
 function makeTraceInput(index: number): Record<string, unknown> {
