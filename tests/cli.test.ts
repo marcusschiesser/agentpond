@@ -142,6 +142,44 @@ test("CLI default trace ids are OTEL trace ids", () => {
 	assert.match(createOtelTraceId(), /^[0-9a-f]{32}$/);
 });
 
+test("CLI trace creation preserves nested metadata values", async () => {
+	const dbPath = join(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
+		"cache.duckdb",
+	);
+	const resourceSpans = manualTraceResourceSpans(
+		{
+			flags: {
+				metadata: '{"details":{"tier":"pro"},"tags":["a","b"],"plain":"ok"}',
+			},
+			positionals: [],
+		},
+		"0123456789abcdef0123456789abcdef",
+		"2026-06-14T11:03:19.419Z",
+	);
+	const store = new MemoryObjectStore();
+	await store.putJson(
+		"otel/default-project/2026/06/14/11/03/batch-1.json",
+		resourceSpans,
+	);
+	const db = new AgentPondDuckDb(dbPath);
+	await db.syncFromStore({
+		store,
+		projectId: "default-project",
+		prefix: "",
+	});
+	const traces = await db.query<{ metadata_json: string }>(
+		"SELECT metadata_json FROM traces WHERE id = '0123456789abcdef0123456789abcdef'",
+	);
+	await db.close();
+
+	assert.deepEqual(JSON.parse(traces[0].metadata_json), {
+		details: { tier: "pro" },
+		tags: ["a", "b"],
+		plain: "ok",
+	});
+});
+
 test("CLI-created scores are immediately visible to score list queries", async () => {
 	const store = new MemoryObjectStore();
 	const dbPath = join(
