@@ -30,7 +30,7 @@ npx agentpond --s3-bucket agentpond --s3-endpoint http://localhost:9000 sync
 
 ## Sync
 
-Sync reads accepted event manifests from object storage and projects them into the local DuckDB cache:
+Sync scans UTC object-storage buckets for OTEL trace payloads and non-OTEL score manifests, then projects new data into the local DuckDB cache:
 
 ```bash
 npx agentpond sync

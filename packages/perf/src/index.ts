@@ -63,14 +63,14 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 			`tracing finished in ${formatDuration(performance.now() - ingestionStarted)}`,
 		);
 
-		logStep("collecting S3 manifest and object size stats");
+		logStep("collecting S3 object size stats");
 		const storage = await collectStorageStats(
 			store,
 			args.prefix,
 			args.projectId,
 		);
 		logStep(
-			`storage contains ${storage.manifestCount} manifests and ${storage.objectCount} objects`,
+			`storage contains ${storage.objectCount} OTEL objects and ${storage.manifestCount} non-OTEL manifests`,
 		);
 		logSeparator("Initial Sync");
 		const firstSync = await timeSync(
@@ -81,7 +81,6 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 		);
 		logStep(
 			`initial sync finished in ${formatDuration(firstSync.durationMs)}: ` +
-				`${firstSync.result.manifestsProcessed} manifests, ` +
 				`${firstSync.result.objectsProcessed} objects, ` +
 				`${firstSync.result.eventsProcessed} events`,
 		);
@@ -94,7 +93,6 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 		);
 		logStep(
 			`no-op sync finished in ${formatDuration(secondSync.durationMs)}: ` +
-				`${secondSync.result.manifestsProcessed} manifests, ` +
 				`${secondSync.result.objectsProcessed} objects, ` +
 				`${secondSync.result.eventsProcessed} events`,
 		);
@@ -105,12 +103,12 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 				`Generated ${generatedTraces} traces, expected ${args.traces}`,
 			);
 		}
-		if (firstSync.result.manifestsProcessed === 0) {
-			throw new Error("Initial sync processed zero manifests");
+		if (firstSync.result.objectsProcessed === 0) {
+			throw new Error("Initial sync processed zero objects");
 		}
-		if (secondSync.result.manifestsProcessed !== 0) {
+		if (secondSync.result.objectsProcessed !== 0) {
 			throw new Error(
-				`No-op sync processed ${secondSync.result.manifestsProcessed} manifests`,
+				`No-op sync processed ${secondSync.result.objectsProcessed} objects`,
 			);
 		}
 		if (traceCount !== args.traces) {

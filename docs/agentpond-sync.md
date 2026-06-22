@@ -2,29 +2,39 @@
 
 ## Goal
 
-AgentPond stores raw ingestion events in a remote object storage (e.g. S3) and uses DuckDB as a local query cache. Object storage is the durable source of truth; DuckDB is the materialized analysis layer.
+AgentPond stores raw OTEL payloads and Langfuse-compatible score ingestion events in remote object storage (e.g. S3) and uses DuckDB as a local query cache. Object storage is the durable source of truth; DuckDB is the materialized analysis layer.
 
 ## Write Path
 
-Ingestion validates incoming events before accepting them. Accepted events are grouped by entity, such as trace, observation, score, or event.
+OTEL ingestion validates and decodes trace export requests, then stores raw `resourceSpans` under UTC minute buckets:
 
-Each group is written as a JSON object under the configured object-store prefix and project ID. With `AGENTPOND_S3_PREFIX=archive/` and `AGENTPOND_PROJECT_ID=project-a`, trace objects are written under paths like `archive/project-a/trace/<trace-id>/<event-id>.json`.
+```txt
+<prefix>otel/<project-id>/<yyyy>/<mm>/<dd>/<hh>/<min>/<batch-id>.json
+```
 
-A batch manifest is then written under the same prefix and project ID, in `archive/project-a/manifests/...`, and references all entity objects in the accepted batch.
+Non-OTEL ingestion remains for Langfuse SDK scores. Accepted non-OTEL events are grouped by entity, written under the configured project prefix, and referenced by a UTC minute-bucketed manifest:
+
+```txt
+<prefix><project-id>/score/<score-id>/<event-id>.json
+<prefix><project-id>/manifests/<yyyy>/<mm>/<dd>/<hh>/<min>/<batch-id>.json
+```
 
 ## Sync Flow
 
-`agentpond sync` lists manifests for the configured object-store prefix and project ID.
+`agentpond sync` scans UTC bucket windows for both sources:
 
-For each new manifest, sync reads the referenced event objects, writes every event to `events_raw` table in DuckDB, and projects typed rows into `traces`, `observations`, and `scores` tables.
+- OTEL objects are read directly from `otel/<project-id>/...` and normalized during sync.
+- Non-OTEL manifests are read from `<project-id>/manifests/...`; sync then reads their referenced event objects.
+
+Every normalized event is written to `events_raw` and projected into `traces`, `observations`, and `scores`.
 
 The `sessions` relation is a DuckDB view derived from traces with session IDs.
 
 ## Idempotency
 
-DuckDB tracks imported manifests in `processed_manifests` and imported event objects in `processed_objects`.
+DuckDB tracks imported OTEL objects and non-OTEL event objects in `processed_objects`. Non-OTEL manifests are tracked in `processed_manifests`.
 
-Running sync repeatedly is safe: already processed manifests and objects are skipped.
+DuckDB also stores per-source UTC bucket watermarks. The first sync scans all current-layout source keys; later syncs rescan recent buckets for late writes and skip already processed object or manifest keys.
 
 ## Query Model
 

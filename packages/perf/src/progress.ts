@@ -41,8 +41,7 @@ export function createSyncProgressLogger(
 	return (progress) => {
 		if (progress.phase !== "complete" && !shouldLog(state)) return;
 		logStep(
-			`${label} sync ${progress.phase}: manifests ${progress.manifestsSeen}/${progress.manifestsTotal} ` +
-				`processed=${progress.manifestsProcessed} skipped=${progress.manifestsSkipped}, ` +
+			`${label} sync ${progress.phase}: ` +
 				`objects processed=${progress.objectsProcessed} skipped=${progress.objectsSkipped}, ` +
 				`events=${progress.eventsProcessed}`,
 		);

@@ -1,19 +1,20 @@
 #!/usr/bin/env node
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
-	AcceptedEventWriter,
-	type AgentPondConfig,
-	type BatchManifest,
 	configFromEnv,
 	eventTypes,
 	type IngestionEvent,
 	loadEnvFile,
-	type ObjectStore,
 	S3ObjectStore,
 } from "@agentpond/core";
 import { AgentPondDuckDb } from "@agentpond/duckdb";
+import { manualTraceResourceSpans } from "./otel-trace.js";
+import {
+	writeEventsAndSyncCache,
+	writeOtelAndSyncCache,
+} from "./sync-write.js";
 
 type ParsedArgs = {
 	flags: Record<string, string | boolean>;
@@ -129,51 +130,14 @@ async function createTrace(
 	json: boolean,
 ): Promise<void> {
 	const now = new Date().toISOString();
-	const traceId = stringFlag(parsed, "id") ?? randomUUID();
-	const event: IngestionEvent = {
-		id: randomUUID(),
-		timestamp: now,
-		type: eventTypes.TRACE_CREATE,
-		body: {
-			id: traceId,
-			name: stringFlag(parsed, "name") ?? "manual trace",
-			userId: stringFlag(parsed, "userId"),
-			sessionId: stringFlag(parsed, "sessionId"),
-			metadata: jsonFlag(parsed, "metadata"),
-			input: jsonOrStringFlag(parsed, "input"),
-			output: jsonOrStringFlag(parsed, "output"),
-			startTime: now,
-			environment: "default",
-		},
-	};
-
+	const traceId = stringFlag(parsed, "id") ?? createOtelTraceId();
 	const store = new S3ObjectStore(config.s3);
-	const manifest = await writeEventsAndSyncCache(config, store, [event]);
-	print({ eventId: event.id, traceId, objects: manifest.objects }, json);
-}
-
-export async function writeEventsAndSyncCache(
-	config: Pick<AgentPondConfig, "dbPath" | "projectId" | "s3">,
-	store: ObjectStore,
-	events: IngestionEvent[],
-): Promise<BatchManifest> {
-	const writer = new AcceptedEventWriter({
+	const object = await writeOtelAndSyncCache(
+		config,
 		store,
-		projectId: config.projectId,
-		prefix: config.s3.prefix,
-	});
-	const manifest = await writer.writeAcceptedEvents(events);
-	const db = new AgentPondDuckDb(config.dbPath);
-	try {
-		await db.syncFromStore({
-			store,
-			projectId: config.projectId,
-			prefix: config.s3.prefix,
-		});
-	} finally {
-		await db.close();
-	}
-	return manifest;
+		manualTraceResourceSpans(parsed, traceId, now),
+	);
+	print({ traceId, object }, json);
 }
 
 async function runReadCommand(
@@ -265,29 +229,6 @@ function requiredFlag(parsed: ParsedArgs, name: string): string {
 	return value;
 }
 
-function jsonFlag(
-	parsed: ParsedArgs,
-	name: string,
-): Record<string, unknown> | undefined {
-	const raw = stringFlag(parsed, name);
-	if (!raw) return undefined;
-	const value = JSON.parse(raw) as unknown;
-	if (!value || typeof value !== "object" || Array.isArray(value)) {
-		throw new CliError(`--${name} must be a JSON object`);
-	}
-	return value as Record<string, unknown>;
-}
-
-function jsonOrStringFlag(parsed: ParsedArgs, name: string): unknown {
-	const raw = stringFlag(parsed, name);
-	if (!raw) return undefined;
-	try {
-		return JSON.parse(raw) as unknown;
-	} catch {
-		return raw;
-	}
-}
-
 function limit(parsed: ParsedArgs): number {
 	const raw = stringFlag(parsed, "limit");
 	if (!raw) return 100;
@@ -302,6 +243,10 @@ function parseScoreValue(value: string): string | number | boolean {
 	if (value === "false") return false;
 	const numeric = Number(value);
 	return Number.isNaN(numeric) ? value : numeric;
+}
+
+export function createOtelTraceId(): string {
+	return randomBytes(16).toString("hex");
 }
 
 function sql(value: string): string {

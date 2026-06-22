@@ -556,7 +556,7 @@ test("otel endpoint accepts ingestion version header in underscore format", asyn
 	});
 
 	assert.equal(response.statusCode, 200);
-	assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
+	assert.equal((await store.listKeys("project-a/manifests/")).length, 0);
 	assert.equal((await store.listKeys("otel/project-a/")).length, 1);
 	await server.close();
 });
@@ -597,7 +597,7 @@ test("otel endpoint accepts gzip JSON bodies", async () => {
 	});
 
 	assert.equal(response.statusCode, 200);
-	assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
+	assert.equal((await store.listKeys("project-a/manifests/")).length, 0);
 	assert.equal((await store.listKeys("otel/project-a/")).length, 1);
 	await server.close();
 });
@@ -617,7 +617,7 @@ test("otel endpoint accepts protobuf trace bodies", async () => {
 	});
 
 	assert.equal(response.statusCode, 200);
-	assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
+	assert.equal((await store.listKeys("project-a/manifests/")).length, 0);
 	assert.equal((await store.listKeys("otel/project-a/")).length, 1);
 	assert.equal((await store.listKeys("project-a/trace/")).length, 0);
 	await server.close();

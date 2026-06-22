@@ -129,7 +129,9 @@ async function generateChildObservation(
 		return;
 	}
 
-	const updateSpanLikeObservation = async (span: LangfuseSpan | LangfuseTool) => {
+	const updateSpanLikeObservation = async (
+		span: LangfuseSpan | LangfuseTool,
+	) => {
 		span.update({
 			input: {
 				step: childIndex,

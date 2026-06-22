@@ -50,7 +50,7 @@ By default, AgentPond stores its DuckDB cache at `./.agentpond/cache.duckdb` in 
 
 ## Sync
 
-Sync reads accepted event manifests from object storage and projects them into the local DuckDB cache:
+Sync scans UTC object-storage buckets for OTEL trace payloads and non-OTEL score manifests, then projects new data into the local DuckDB cache:
 
 ```sh
 agentpond sync
@@ -64,7 +64,7 @@ agentpond sync --json
 
 ## Traces
 
-Create a manual trace:
+Create a manual trace. The CLI writes this as a Langfuse-compatible OTEL root span:
 
 ```sh
 agentpond traces create \
@@ -113,7 +113,7 @@ agentpond sessions get <session-id>
 
 ## Scores
 
-Create a score for a trace:
+Create a score for a trace. Scores use the same non-OTEL `score-create` event shape as the Langfuse SDK:
 
 ```sh
 agentpond scores create \

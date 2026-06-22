@@ -14,7 +14,7 @@ This design supports a continuously running production service with asynchronous
 
 ## Main Differences
 
-- AgentPond uses manifest-based pull sync instead of queue-driven workers.
+- AgentPond uses UTC bucket pull sync instead of queue-driven workers. OTEL trace payloads are discovered directly from UTC object buckets; non-OTEL events use time-bucketed manifests for discovery.
 - AgentPond uses local DuckDB instead of requiring a hosted ClickHouse service for analysis.
 - AgentPond keeps the raw event model in object storage, so the analysis layer can evolve independently.
 

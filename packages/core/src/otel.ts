@@ -349,7 +349,8 @@ function langfuseAttributes(attributes: Record<string, unknown>): {
 	const traceMetadata: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(attributes)) {
 		if (key.startsWith("langfuse.trace.metadata.")) {
-			traceMetadata[key.slice("langfuse.trace.metadata.".length)] = value;
+			traceMetadata[key.slice("langfuse.trace.metadata.".length)] =
+				parseJsonMetadataValue(value);
 		}
 	}
 
@@ -366,4 +367,8 @@ function langfuseAttributes(attributes: Record<string, unknown>): {
 		),
 		tracePublic: booleanValue(attributes["langfuse.trace.public"]),
 	};
+}
+
+function parseJsonMetadataValue(value: unknown): unknown {
+	return typeof value === "string" ? parseJsonString(value) : value;
 }

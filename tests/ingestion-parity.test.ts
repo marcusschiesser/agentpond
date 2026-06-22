@@ -120,7 +120,7 @@ test("non-OTEL ingestion stores Langfuse-compatible event payload objects and Ag
 	}
 });
 
-test("OTEL ingestion stores raw Langfuse-compatible resourceSpans and an AgentPond manifest", async () => {
+test("OTEL ingestion stores raw Langfuse-compatible resourceSpans without an AgentPond manifest", async () => {
 	const store = new MemoryObjectStore();
 	const server = buildServer({ config, store });
 	try {
@@ -158,24 +158,16 @@ test("OTEL ingestion stores raw Langfuse-compatible resourceSpans and an AgentPo
 			fixture.otel.expectedObject.value,
 		);
 
-		const manifestKeys = await store.listKeys(
-			`${fixture.prefix}${fixture.projectId}/manifests/`,
-		);
-		assert.equal(manifestKeys.length, 1);
-		const manifest = await store.getJson<BatchManifest>(manifestKeys[0]);
 		assert.deepEqual(
-			manifest.objects.map((object) => ({
-				key: object.key,
-				entityType: object.entityType,
-			})),
-			[{ key: otelKeys[0], entityType: "otel" }],
+			await store.listKeys(`${fixture.prefix}${fixture.projectId}/manifests/`),
+			[],
 		);
 	} finally {
 		await server.close();
 	}
 });
 
-test("protobuf OTEL ingestion stores Langfuse-compatible decoded resourceSpans and an AgentPond manifest", async () => {
+test("protobuf OTEL ingestion stores Langfuse-compatible decoded resourceSpans without an AgentPond manifest", async () => {
 	const store = new MemoryObjectStore();
 	const server = buildServer({ config, store });
 	try {
@@ -201,17 +193,9 @@ test("protobuf OTEL ingestion stores Langfuse-compatible decoded resourceSpans a
 			fixture.otelProtobuf.expectedObject.value,
 		);
 
-		const manifestKeys = await store.listKeys(
-			`${fixture.prefix}${fixture.projectId}/manifests/`,
-		);
-		assert.equal(manifestKeys.length, 1);
-		const manifest = await store.getJson<BatchManifest>(manifestKeys[0]);
 		assert.deepEqual(
-			manifest.objects.map((object) => ({
-				key: object.key,
-				entityType: object.entityType,
-			})),
-			[{ key: otelKeys[0], entityType: "otel" }],
+			await store.listKeys(`${fixture.prefix}${fixture.projectId}/manifests/`),
+			[],
 		);
 	} finally {
 		await server.close();

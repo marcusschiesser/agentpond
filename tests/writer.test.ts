@@ -31,8 +31,33 @@ test("accepted event writer stores entity objects before the manifest", async ()
 	assert.equal(store.writes[0], "prefix/project-a/trace/trace-1/event-1.json");
 	assert.match(
 		store.writes[1],
-		/^prefix\/project-a\/manifests\/\d{4}\/\d{2}\/\d{2}\/\d{2}\/batch-1\.json$/,
+		/^prefix\/project-a\/manifests\/\d{4}\/\d{2}\/\d{2}\/\d{2}\/\d{2}\/batch-1\.json$/,
 	);
+});
+
+test("OTEL writer stores raw resource spans without a manifest", async () => {
+	const store = new MemoryObjectStore();
+	const writer = new AcceptedEventWriter({
+		store,
+		projectId: "project-a",
+		prefix: "prefix/",
+	});
+
+	const object = await writer.writeOtelResourceSpans(
+		[{ scopeSpans: [{ spans: [{ traceId: "trace-1", spanId: "span-1" }] }] }],
+		"batch-1",
+	);
+
+	assert.equal(
+		object?.key,
+		store.writes.find((key) => key.startsWith("prefix/otel/project-a/")),
+	);
+	assert.match(
+		object?.key ?? "",
+		/^prefix\/otel\/project-a\/\d{4}\/\d{2}\/\d{2}\/\d{2}\/\d{2}\/batch-1\.json$/,
+	);
+	assert.equal(object?.spanCount, 1);
+	assert.deepEqual(await store.listKeys("prefix/project-a/manifests/"), []);
 });
 
 test("memory object store lists sorted keys within the requested prefix", async () => {

@@ -198,6 +198,53 @@ test("DuckDB sessions view exposes session rows in stable last seen order", asyn
 	]);
 });
 
+test("DuckDB first sync reads all current-layout OTEL buckets", async () => {
+	const store = new MemoryObjectStore();
+	await store.putJson("otel/project-a/2020/01/02/03/04/old-batch.json", [
+		{
+			scopeSpans: [
+				{
+					spans: [
+						{
+							traceId: "11111111111111111111111111111111",
+							spanId: "2222222222222222",
+							name: "old trace",
+							startTimeUnixNano: "1577934240000000000",
+							endTimeUnixNano: "1577934240000000000",
+							attributes: [
+								{
+									key: "langfuse.observation.type",
+									value: { stringValue: "span" },
+								},
+								{
+									key: "langfuse.trace.name",
+									value: { stringValue: "old trace" },
+								},
+							],
+						},
+					],
+				},
+			],
+		},
+	]);
+
+	const db = createTempDb();
+	const result = await db.syncFromStore({
+		store,
+		projectId: "project-a",
+		prefix: "",
+	});
+	const traces = await db.query<{ id: string; name: string }>(
+		"select id, name from traces",
+	);
+	await db.close();
+
+	assert.equal(result.objectsProcessed, 1);
+	assert.deepEqual(traces, [
+		{ id: "11111111111111111111111111111111", name: "old trace" },
+	]);
+});
+
 test("DuckDB scores support trace and observation filters across value types", async () => {
 	const { db } = await writeAndSync([
 		{
