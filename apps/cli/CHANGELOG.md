@@ -1,5 +1,14 @@
 # agentpond
 
+## 0.1.2
+
+### Patch Changes
+
+- f954296: Make observation list ordering stable when observations share a start time.
+- 09684a2: Default the DuckDB cache to the current repository directory instead of the user's home directory.
+- 6a4681e: Speed up DuckDB sync by batching raw event writes and timestamp-ordered projection, and rename the cache class to AgentPondCache.
+- 8e5de51: Use UTC time-bucket sync for OTEL payloads and non-OTEL score manifests.
+
 ## 0.1.1
 
 ### Patch Changes
