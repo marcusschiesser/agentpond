@@ -107,35 +107,12 @@ export class AcceptedEventWriter {
 	async writeOtelResourceSpans(
 		resourceSpans: unknown[],
 		batchId = randomUUID(),
-	): Promise<BatchManifest | undefined> {
+	): Promise<OtelStorageObject | undefined> {
 		if (resourceSpans.length === 0) return undefined;
 
 		const key = `${this.prefix}otel/${this.options.projectId}/${this.currentTimePath()}/${batchId}.json`;
-		const serialized = JSON.stringify(resourceSpans);
 		await this.options.store.putJson(key, resourceSpans);
-
-		const createdAt = new Date().toISOString();
-		const manifest: BatchManifest = {
-			batchId,
-			projectId: this.options.projectId,
-			createdAt,
-			objects: [
-				{
-					key,
-					entityType: "otel",
-					entityId: batchId,
-					eventIds: [],
-					minTimestamp: createdAt,
-					maxTimestamp: createdAt,
-					sha256: createHash("sha256").update(serialized).digest("hex"),
-				},
-			],
-		};
-		await this.options.store.putJson(
-			this.manifestKey(batchId, createdAt),
-			manifest,
-		);
-		return manifest;
+		return { key, spanCount: countOtelSpans(resourceSpans) };
 	}
 
 	private manifestKey(batchId: string, timestamp: string): string {
@@ -144,20 +121,41 @@ export class AcceptedEventWriter {
 		const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
 		const dd = String(date.getUTCDate()).padStart(2, "0");
 		const hh = String(date.getUTCHours()).padStart(2, "0");
-		return `${this.prefix}${this.options.projectId}/manifests/${yyyy}/${mm}/${dd}/${hh}/${batchId}.json`;
+		const min = String(date.getUTCMinutes()).padStart(2, "0");
+		return `${this.prefix}${this.options.projectId}/manifests/${yyyy}/${mm}/${dd}/${hh}/${min}/${batchId}.json`;
 	}
 
 	private currentTimePath(): string {
+		// Keep the OTEL key shape stable; only the bucket timezone is forced to UTC.
 		const date = new Date();
-		const yyyy = String(date.getFullYear());
-		const mm = String(date.getMonth() + 1).padStart(2, "0");
-		const dd = String(date.getDate()).padStart(2, "0");
-		const hh = String(date.getHours()).padStart(2, "0");
-		const min = String(date.getMinutes()).padStart(2, "0");
+		const yyyy = String(date.getUTCFullYear());
+		const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+		const dd = String(date.getUTCDate()).padStart(2, "0");
+		const hh = String(date.getUTCHours()).padStart(2, "0");
+		const min = String(date.getUTCMinutes()).padStart(2, "0");
 		return `${yyyy}/${mm}/${dd}/${hh}/${min}`;
 	}
 }
 
 export function manifestPrefix(prefix: string, projectId: string): string {
 	return `${prefix}${projectId}/manifests/`;
+}
+
+export function otelPrefix(prefix: string, projectId: string): string {
+	return `${prefix}otel/${projectId}/`;
+}
+
+function countOtelSpans(resourceSpans: unknown[]): number {
+	let count = 0;
+	for (const resourceSpan of resourceSpans) {
+		if (!resourceSpan || typeof resourceSpan !== "object") continue;
+		const scopeSpans = (resourceSpan as Record<string, unknown>).scopeSpans;
+		if (!Array.isArray(scopeSpans)) continue;
+		for (const scopeSpan of scopeSpans) {
+			if (!scopeSpan || typeof scopeSpan !== "object") continue;
+			const spans = (scopeSpan as Record<string, unknown>).spans;
+			if (Array.isArray(spans)) count += spans.length;
+		}
+	}
+	return count;
 }

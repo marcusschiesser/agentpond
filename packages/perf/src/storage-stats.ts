@@ -1,4 +1,4 @@
-import type { BatchManifest, S3ObjectStore } from "@agentpond/core";
+import type { S3ObjectStore } from "@agentpond/core";
 
 export type StorageStats = {
 	objectCount: number;
@@ -19,16 +19,7 @@ export async function collectStorageStats(
 	projectId: string,
 ): Promise<StorageStats> {
 	const manifestKeys = await store.listKeys(`${prefix}${projectId}/manifests/`);
-	const manifests = await Promise.all(
-		manifestKeys.map((key) => store.getJson<BatchManifest>(key)),
-	);
-	const objectKeys = [
-		...new Set(
-			manifests.flatMap((manifest) =>
-				manifest.objects.map((object) => object.key),
-			),
-		),
-	].sort();
+	const objectKeys = await store.listKeys(`${prefix}otel/${projectId}/`);
 	const traceBytes = new Map<string, number>();
 	let totalStoredOtelBytes = 0;
 

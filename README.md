@@ -31,7 +31,7 @@ This gives you durable remote storage without requiring an always-on analytical 
 
 - Langfuse-compatible ingestion endpoints for SDK and OTLP traces
 - S3-compatible raw event storage
-- Manifest-based discovery and incremental synchronization
+- UTC bucket discovery and incremental synchronization
 - Local DuckDB cache containing:
   - `events_raw`
   - `traces`

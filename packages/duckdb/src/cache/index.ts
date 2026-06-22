@@ -3,11 +3,11 @@ import { dirname } from "node:path";
 import {
 	type BatchManifest,
 	type IngestionEvent,
-	manifestPrefix,
 	type ObjectStore,
 	otelResourceSpansToEvents,
 } from "@agentpond/core";
 import { type DuckDBConnection, DuckDBInstance } from "@duckdb/node-api";
+import { createSyncStateStore, SYNC_STATE_SCHEMA_SQL } from "./sync-state.js";
 
 export type SyncResult = {
 	manifestsProcessed: number;
@@ -51,6 +51,7 @@ export class AgentPondDuckDb {
         manifest_key TEXT,
         processed_at TIMESTAMP DEFAULT current_timestamp
       );
+      ${SYNC_STATE_SCHEMA_SQL}
       CREATE TABLE IF NOT EXISTS events_raw (
         event_id TEXT PRIMARY KEY,
         project_id TEXT,
@@ -143,9 +144,16 @@ export class AgentPondDuckDb {
 		let manifestsSeen = 0;
 		let manifestsSkipped = 0;
 		let objectsSkipped = 0;
-		const manifestKeys = await params.store.listKeys(
-			manifestPrefix(params.prefix, params.projectId),
-		);
+		const syncState = createSyncStateStore({
+			store: params.store,
+			prefix: params.prefix,
+			projectId: params.projectId,
+			all: this.all.bind(this),
+			exec: this.exec.bind(this),
+			sql,
+		});
+		const otelKeys = await syncState.listKeysForScanWindow("otel");
+		const manifestKeys = await syncState.listKeysForScanWindow("manifests");
 		const emitProgress = (
 			phase: SyncProgress["phase"],
 			current?: Pick<SyncProgress, "currentManifestKey" | "currentObjectKey">,
@@ -160,7 +168,64 @@ export class AgentPondDuckDb {
 				...current,
 			});
 		};
+		const processObject = async (object: {
+			manifestKey: string | null;
+			objectKey: string;
+			progress?: Pick<SyncProgress, "currentManifestKey">;
+			loadEvents: () => Promise<IngestionEvent[]>;
+			entityIdForEvent: (event: IngestionEvent) => string;
+		}): Promise<"processed" | "skipped"> => {
+			const progress = {
+				...object.progress,
+				currentObjectKey: object.objectKey,
+			};
+			if (await this.exists("processed_objects", object.objectKey)) {
+				emitProgress("object-skipped", progress);
+				return "skipped";
+			}
+
+			const events = await object.loadEvents();
+			for (const event of events) {
+				await this.upsertRawEvent({
+					projectId: params.projectId,
+					manifestKey: object.manifestKey,
+					objectKey: object.objectKey,
+					entityId: object.entityIdForEvent(event),
+					event,
+				});
+				await this.projectEvent(params.projectId, event);
+				result.eventsProcessed += 1;
+				if (result.eventsProcessed % 1000 === 0) {
+					emitProgress("events-processed", progress);
+				}
+			}
+
+			await this.insertKey(
+				"processed_objects",
+				object.objectKey,
+				object.manifestKey ?? undefined,
+			);
+			result.objectsProcessed += 1;
+			emitProgress("object-processed", progress);
+			return "processed";
+		};
 		emitProgress("listed");
+
+		for (const objectKey of otelKeys) {
+			const outcome = await processObject({
+				manifestKey: null,
+				objectKey,
+				loadEvents: async () =>
+					otelResourceSpansToEvents(
+						await params.store.getJson<unknown[]>(objectKey),
+					),
+				entityIdForEvent: (event) =>
+					stringValue((event.body as Record<string, unknown>).id) ?? objectKey,
+			});
+			if (outcome === "skipped") {
+				objectsSkipped += 1;
+			}
+		}
 
 		for (const manifestKey of manifestKeys) {
 			manifestsSeen += 1;
@@ -173,48 +238,17 @@ export class AgentPondDuckDb {
 			}
 			const manifest = await params.store.getJson<BatchManifest>(manifestKey);
 			for (const object of manifest.objects) {
-				if (await this.exists("processed_objects", object.key)) {
-					objectsSkipped += 1;
-					emitProgress("object-skipped", {
-						currentManifestKey: manifestKey,
-						currentObjectKey: object.key,
-					});
-					continue;
-				}
-				const events =
-					object.entityType === "otel"
-						? otelResourceSpansToEvents(
-								await params.store.getJson<unknown[]>(object.key),
-							)
-						: await params.store.getJson<IngestionEvent[]>(object.key);
-				for (const event of events) {
-					const entityId =
-						object.entityType === "otel"
-							? (stringValue((event.body as Record<string, unknown>).id) ??
-								object.entityId)
-							: object.entityId;
-					await this.upsertRawEvent({
-						projectId: manifest.projectId,
-						manifestKey,
-						objectKey: object.key,
-						entityId,
-						event,
-					});
-					await this.projectEvent(manifest.projectId, event);
-					result.eventsProcessed += 1;
-					if (result.eventsProcessed % 1000 === 0) {
-						emitProgress("events-processed", {
-							currentManifestKey: manifestKey,
-							currentObjectKey: object.key,
-						});
-					}
-				}
-				await this.insertKey("processed_objects", object.key, manifestKey);
-				result.objectsProcessed += 1;
-				emitProgress("object-processed", {
-					currentManifestKey: manifestKey,
-					currentObjectKey: object.key,
+				const outcome = await processObject({
+					manifestKey,
+					objectKey: object.key,
+					progress: { currentManifestKey: manifestKey },
+					loadEvents: async () =>
+						params.store.getJson<IngestionEvent[]>(object.key),
+					entityIdForEvent: () => object.entityId,
 				});
+				if (outcome === "skipped") {
+					objectsSkipped += 1;
+				}
 			}
 			await this.insertKey("processed_manifests", manifestKey);
 			result.manifestsProcessed += 1;
@@ -222,6 +256,8 @@ export class AgentPondDuckDb {
 				currentManifestKey: manifestKey,
 			});
 		}
+		await syncState.advanceLastFinalized("otel");
+		await syncState.advanceLastFinalized("manifests");
 		emitProgress("complete");
 
 		return result;
@@ -374,7 +410,7 @@ export class AgentPondDuckDb {
 
 	private async upsertRawEvent(params: {
 		projectId: string;
-		manifestKey: string;
+		manifestKey: string | null;
 		objectKey: string;
 		entityId: string;
 		event: IngestionEvent;

@@ -10,7 +10,9 @@ import {
 	MemoryObjectStore,
 } from "@agentpond/core";
 import { AgentPondDuckDb } from "@agentpond/duckdb";
-import { main, writeEventsAndSyncCache } from "../apps/cli/src/index.js";
+import { createOtelTraceId, main } from "../apps/cli/src/index.js";
+import { manualTraceResourceSpans } from "../apps/cli/src/otel-trace.js";
+import { writeEventsAndSyncCache } from "../apps/cli/src/sync-write.js";
 
 async function captureStdout(fn: () => Promise<void>): Promise<string> {
 	const consoleLog = console.log;
@@ -57,6 +59,88 @@ function testConfig(dbPath: string): AgentPondConfig {
 		},
 	};
 }
+
+test("CLI trace creation builds a Langfuse-compatible OTEL root span", () => {
+	const resourceSpans = manualTraceResourceSpans(
+		{
+			flags: {
+				name: "Manual Trace",
+				userId: "user-1",
+				sessionId: "session-1",
+				input: '{"prompt":"hello"}',
+				output: "done",
+				metadata: '{"plan":"pro","attempt":2}',
+			},
+			positionals: [],
+		},
+		"0123456789abcdef0123456789abcdef",
+		"2026-06-14T11:03:19.419Z",
+	) as Array<{
+		scopeSpans: Array<{
+			spans: Array<{
+				traceId: string;
+				spanId: string;
+				name: string;
+				startTimeUnixNano: string;
+				endTimeUnixNano: string;
+				attributes: Array<{
+					key: string;
+					value: {
+						stringValue?: string;
+						doubleValue?: number;
+						boolValue?: boolean;
+					};
+				}>;
+			}>;
+		}>;
+	}>;
+
+	const span = resourceSpans[0].scopeSpans[0].spans[0];
+	const attributes = new Map(
+		span.attributes.map((attribute) => [attribute.key, attribute.value]),
+	);
+
+	assert.equal(span.traceId, "0123456789abcdef0123456789abcdef");
+	assert.match(span.spanId, /^[0-9a-f]{16}$/);
+	assert.equal(span.name, "Manual Trace");
+	assert.equal(span.startTimeUnixNano, "1781434999419000000");
+	assert.equal(span.endTimeUnixNano, "1781434999419000000");
+	assert.deepEqual(attributes.get("langfuse.observation.type"), {
+		stringValue: "span",
+	});
+	assert.deepEqual(attributes.get("langfuse.trace.name"), {
+		stringValue: "Manual Trace",
+	});
+	assert.deepEqual(attributes.get("langfuse.environment"), {
+		stringValue: "default",
+	});
+	assert.deepEqual(attributes.get("user.id"), { stringValue: "user-1" });
+	assert.deepEqual(attributes.get("session.id"), {
+		stringValue: "session-1",
+	});
+	assert.deepEqual(attributes.get("langfuse.trace.input"), {
+		stringValue: '{"prompt":"hello"}',
+	});
+	assert.deepEqual(attributes.get("langfuse.observation.input"), {
+		stringValue: '{"prompt":"hello"}',
+	});
+	assert.deepEqual(attributes.get("langfuse.trace.output"), {
+		stringValue: "done",
+	});
+	assert.deepEqual(attributes.get("langfuse.observation.output"), {
+		stringValue: "done",
+	});
+	assert.deepEqual(attributes.get("langfuse.trace.metadata.plan"), {
+		stringValue: "pro",
+	});
+	assert.deepEqual(attributes.get("langfuse.trace.metadata.attempt"), {
+		doubleValue: 2,
+	});
+});
+
+test("CLI default trace ids are OTEL trace ids", () => {
+	assert.match(createOtelTraceId(), /^[0-9a-f]{32}$/);
+});
 
 test("CLI-created scores are immediately visible to score list queries", async () => {
 	const store = new MemoryObjectStore();
