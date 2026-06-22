@@ -7,7 +7,7 @@ import {
 import { DuckDbOperations } from "./db-operations.js";
 import { BatchProjection, rawEventRow, stringValue } from "./projection.js";
 import type { SyncStateStore } from "./sync-state.js";
-import { createSyncStateStore, SYNC_STATE_SCHEMA_SQL } from "./sync-state.js";
+import { createSyncStateStore } from "./sync-state.js";
 
 export type SyncResult = {
 	manifestsProcessed: number;
@@ -53,93 +53,7 @@ export class AgentPondCache {
 	}
 
 	async init(): Promise<void> {
-		await this.createSchema();
-	}
-
-	private async createSchema(): Promise<void> {
-		await this.db.exec(`
-      CREATE TABLE IF NOT EXISTS processed_manifests (
-        key TEXT PRIMARY KEY,
-        processed_at TIMESTAMP DEFAULT current_timestamp
-      );
-      CREATE TABLE IF NOT EXISTS processed_objects (
-        key TEXT PRIMARY KEY,
-        manifest_key TEXT,
-        processed_at TIMESTAMP DEFAULT current_timestamp
-      );
-      ${SYNC_STATE_SCHEMA_SQL}
-      CREATE TABLE IF NOT EXISTS events_raw (
-        event_id TEXT PRIMARY KEY,
-        project_id TEXT,
-        manifest_key TEXT,
-        object_key TEXT,
-        event_type TEXT,
-        event_timestamp TIMESTAMP,
-        entity_id TEXT,
-        body_json TEXT,
-        event_json TEXT,
-        trace_id TEXT,
-        observation_id TEXT,
-        score_id TEXT
-      );
-      CREATE TABLE IF NOT EXISTS traces (
-        id TEXT PRIMARY KEY,
-        project_id TEXT,
-        name TEXT,
-        user_id TEXT,
-        session_id TEXT,
-        start_time TIMESTAMP,
-        end_time TIMESTAMP,
-        metadata_json TEXT,
-        input_json TEXT,
-        output_json TEXT,
-        total_cost DOUBLE,
-        updated_at TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS observations (
-        id TEXT PRIMARY KEY,
-        project_id TEXT,
-        trace_id TEXT,
-        parent_observation_id TEXT,
-        type TEXT,
-        name TEXT,
-        start_time TIMESTAMP,
-        end_time TIMESTAMP,
-        metadata_json TEXT,
-        input_json TEXT,
-        output_json TEXT,
-        usage_details_json TEXT,
-        cost_details_json TEXT,
-        total_cost DOUBLE,
-        updated_at TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS scores (
-        id TEXT PRIMARY KEY,
-        project_id TEXT,
-        trace_id TEXT,
-        observation_id TEXT,
-        session_id TEXT,
-        name TEXT,
-        value DOUBLE,
-        string_value TEXT,
-        data_type TEXT,
-        source TEXT,
-        comment TEXT,
-        metadata_json TEXT,
-        timestamp TIMESTAMP,
-        updated_at TIMESTAMP
-      );
-      CREATE OR REPLACE VIEW sessions AS
-        SELECT
-          session_id AS id,
-          project_id,
-          min(start_time) AS first_seen_at,
-          max(coalesce(end_time, start_time)) AS last_seen_at,
-          count(*) AS trace_count
-        FROM traces
-        WHERE session_id IS NOT NULL AND session_id <> ''
-        GROUP BY session_id, project_id;
-    `);
+		await this.db.createSchema();
 	}
 
 	async syncFromStore(params: {
@@ -168,6 +82,14 @@ export class AgentPondCache {
 		});
 		const otelKeys = await syncState.listKeysForScanWindow("otel");
 		const manifestKeys = await syncState.listKeysForScanWindow("manifests");
+		const processedObjectKeys = await this.db.processedKeys(
+			"processed_objects",
+			otelKeys,
+		);
+		const processedManifestKeysSeen = await this.db.processedKeys(
+			"processed_manifests",
+			manifestKeys,
+		);
 		const emitProgress = (
 			phase: SyncProgress["phase"],
 			current?: Pick<SyncProgress, "currentManifestKey" | "currentObjectKey">,
@@ -184,19 +106,18 @@ export class AgentPondCache {
 		};
 		const processObject = async (
 			object: PendingObject,
+			loadedEvents?: IngestionEvent[],
 		): Promise<"processed" | "skipped"> => {
 			const progress = {
 				...object.progress,
 				currentObjectKey: object.objectKey,
 			};
-			if (
-				await this.db.processedKeyExists("processed_objects", object.objectKey)
-			) {
+			if (processedObjectKeys.has(object.objectKey)) {
 				emitProgress("object-skipped", progress);
 				return "skipped";
 			}
 
-			const events = await object.loadEvents();
+			const events = loadedEvents ?? (await object.loadEvents());
 			for (const event of events) {
 				const row = rawEventRow({
 					projectId: params.projectId,
@@ -216,23 +137,33 @@ export class AgentPondCache {
 				objectKey: object.objectKey,
 				manifestKey: object.manifestKey,
 			});
+			processedObjectKeys.add(object.objectKey);
 			result.objectsProcessed += 1;
 			emitProgress("object-processed", progress);
 			return "processed";
 		};
 		emitProgress("listed");
 
-		for (const objectKey of otelKeys) {
-			const outcome = await processObject({
-				manifestKey: null,
-				objectKey,
-				loadEvents: async () =>
-					otelResourceSpansToEvents(
-						await params.store.getJson<unknown[]>(objectKey),
-					),
-				entityIdForEvent: (event) =>
-					stringValue((event.body as Record<string, unknown>).id) ?? objectKey,
-			});
+		const otelObjects: PendingObject[] = otelKeys.map((objectKey) => ({
+			manifestKey: null,
+			objectKey,
+			loadEvents: async () =>
+				otelResourceSpansToEvents(
+					await params.store.getJson<unknown[]>(objectKey),
+				),
+			entityIdForEvent: (event) =>
+				stringValue((event.body as Record<string, unknown>).id) ?? objectKey,
+		}));
+		const loadedOtelObjects = await Promise.all(
+			otelObjects.map(async (object) => ({
+				object,
+				events: processedObjectKeys.has(object.objectKey)
+					? undefined
+					: await object.loadEvents(),
+			})),
+		);
+		for (const loaded of loadedOtelObjects) {
+			const outcome = await processObject(loaded.object, loaded.events);
 			if (outcome === "skipped") {
 				objectsSkipped += 1;
 			}
@@ -240,9 +171,7 @@ export class AgentPondCache {
 
 		for (const manifestKey of manifestKeys) {
 			manifestsSeen += 1;
-			if (
-				await this.db.processedKeyExists("processed_manifests", manifestKey)
-			) {
+			if (processedManifestKeysSeen.has(manifestKey)) {
 				manifestsSkipped += 1;
 				emitProgress("manifest-skipped", {
 					currentManifestKey: manifestKey,
@@ -250,6 +179,13 @@ export class AgentPondCache {
 				continue;
 			}
 			const manifest = await params.store.getJson<BatchManifest>(manifestKey);
+			const processedManifestObjectKeys = await this.db.processedKeys(
+				"processed_objects",
+				manifest.objects.map((object) => object.key),
+			);
+			for (const objectKey of processedManifestObjectKeys) {
+				processedObjectKeys.add(objectKey);
+			}
 			for (const object of manifest.objects) {
 				const outcome = await processObject({
 					manifestKey,
@@ -309,16 +245,8 @@ export class AgentPondCache {
 		await this.db.exec("BEGIN TRANSACTION");
 		try {
 			await params.projection.commit(params.projectId);
-			for (const object of params.processedObjects) {
-				await this.db.insertProcessedKey(
-					"processed_objects",
-					object.objectKey,
-					object.manifestKey ?? undefined,
-				);
-			}
-			for (const manifestKey of params.processedManifestKeys) {
-				await this.db.insertProcessedKey("processed_manifests", manifestKey);
-			}
+			await this.db.insertProcessedObjects(params.processedObjects);
+			await this.db.insertProcessedManifests(params.processedManifestKeys);
 			await params.syncState.advanceLastFinalized("otel");
 			await params.syncState.advanceLastFinalized("manifests");
 			await this.db.exec("COMMIT");

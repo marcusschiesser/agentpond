@@ -1,7 +1,13 @@
 import type { IngestionEvent } from "@agentpond/core";
-import { type DuckDbOperations, sql } from "./db-operations.js";
+import {
+	type DuckDbOperations,
+	type EventsRawAppendRow,
+	type ObservationAppendRow,
+	type ScoreAppendRow,
+	sql,
+	type TraceAppendRow,
+} from "./db-operations.js";
 
-const INSERT_CHUNK_SIZE = 500;
 const FILTER_CHUNK_SIZE = 500;
 
 export type RawEventRow = {
@@ -48,78 +54,87 @@ export class BatchProjection {
 	}
 
 	async commit(projectId: string): Promise<void> {
-		await this.upsertRawEvents();
-		await this.projectRawEvents(projectId);
+		const rawWasEmpty = await this.upsertRawEvents();
+		await this.projectRawEvents(projectId, rawWasEmpty);
 	}
 
-	private async upsertRawEvents(): Promise<void> {
-		for (const chunk of chunks(this.rawRows, INSERT_CHUNK_SIZE)) {
-			await this.db.exec(
-				`DELETE FROM events_raw WHERE event_id IN (${chunk.map((row) => sql(row.eventId)).join(", ")})`,
-			);
-			await this.db.exec(`
-        INSERT INTO events_raw (
-          event_id,
-          project_id,
-          manifest_key,
-          object_key,
-          event_type,
-          event_timestamp,
-          entity_id,
-          body_json,
-          event_json,
-          trace_id,
-          observation_id,
-          score_id
-        ) VALUES ${chunk.map(rawEventSqlValues).join(", ")}
-      `);
+	private async upsertRawEvents(): Promise<boolean> {
+		if (this.rawRows.length === 0) return false;
+		const rawWasEmpty = !(await this.db.tableHasRows("events_raw"));
+		if (!rawWasEmpty) {
+			for (const chunk of chunks(this.rawRows, FILTER_CHUNK_SIZE)) {
+				await this.db.exec(
+					`DELETE FROM events_raw WHERE event_id IN (${chunk.map((row) => sql(row.eventId)).join(", ")})`,
+				);
+			}
 		}
+		await this.db.appendEventsRaw(this.rawRows.map(eventsRawAppendRow));
+		return rawWasEmpty;
 	}
 
-	private async projectRawEvents(projectId: string): Promise<void> {
+	private async projectRawEvents(
+		projectId: string,
+		rawWasEmpty: boolean,
+	): Promise<void> {
 		const work = this.work;
-		for (const traceId of await this.projectedObservationTraceIds(
-			work.observationIds,
-		)) {
-			work.costTraceIds.add(traceId);
+		if (!rawWasEmpty) {
+			for (const traceId of await this.projectedObservationTraceIds(
+				work.observationIds,
+			)) {
+				work.costTraceIds.add(traceId);
+			}
 		}
-		const traceRows = await this.latestRawRowsByKey(
-			projectId,
-			"trace_id",
-			work.traceIds,
-			"event_type = 'trace-create'",
-		);
-		const observationRows = await this.latestRawRowsByKey(
-			projectId,
-			"observation_id",
-			work.observationIds,
-			"event_type <> 'trace-create' AND event_type <> 'score-create'",
-		);
-		const scoreRows = await this.latestRawRowsByKey(
-			projectId,
-			"score_id",
-			work.scoreIds,
-			"event_type = 'score-create'",
-		);
+		const traceRows = rawWasEmpty
+			? latestBatchRowsByKey(
+					this.rawRows,
+					"traceId",
+					work.traceIds,
+					(row) => row.eventType === "trace-create",
+				)
+			: await this.latestRawRowsByKey(
+					projectId,
+					"trace_id",
+					work.traceIds,
+					"event_type = 'trace-create'",
+				);
+		const observationRows = rawWasEmpty
+			? latestBatchRowsByKey(
+					this.rawRows,
+					"observationId",
+					work.observationIds,
+					(row) =>
+						row.eventType !== "trace-create" &&
+						row.eventType !== "score-create",
+				)
+			: await this.latestRawRowsByKey(
+					projectId,
+					"observation_id",
+					work.observationIds,
+					"event_type <> 'trace-create' AND event_type <> 'score-create'",
+				);
+		const scoreRows = rawWasEmpty
+			? latestBatchRowsByKey(
+					this.rawRows,
+					"scoreId",
+					work.scoreIds,
+					(row) => row.eventType === "score-create",
+				)
+			: await this.latestRawRowsByKey(
+					projectId,
+					"score_id",
+					work.scoreIds,
+					"event_type = 'score-create'",
+				);
 		for (const row of observationRows) {
 			if (row.traceId) work.costTraceIds.add(row.traceId);
 		}
-
-		await this.rebuildTraces(
-			projectId,
-			[...work.traceIds],
-			traceRows.map((row) => row.event),
-		);
+		await this.rebuildTraces(projectId, [...work.traceIds], traceRows);
 		await this.rebuildObservations(
 			projectId,
 			[...work.observationIds],
-			observationRows.map((row) => row.event),
+			observationRows,
 		);
-		await this.rebuildScores(
-			projectId,
-			[...work.scoreIds],
-			scoreRows.map((row) => row.event),
-		);
+		await this.rebuildScores(projectId, [...work.scoreIds], scoreRows);
 		await this.refreshTraceTotalCosts([...work.costTraceIds]);
 	}
 
@@ -209,77 +224,36 @@ export class BatchProjection {
 	private async rebuildTraces(
 		projectId: string,
 		traceIds: string[],
-		events: IngestionEvent[],
+		rawRows: RawEventRow[],
 	): Promise<void> {
 		await this.deleteByIds("traces", traceIds);
-		const values = events
-			.map((event) => traceSqlValues(projectId, event))
-			.filter((value) => value !== undefined);
-		for (const chunk of chunks(values, INSERT_CHUNK_SIZE)) {
-			if (chunk.length === 0) continue;
-			await this.db.exec(`
-        INSERT INTO traces (
-          id,
-          project_id,
-          name,
-          user_id,
-          session_id,
-          start_time,
-          end_time,
-          metadata_json,
-          input_json,
-          output_json,
-          total_cost,
-          updated_at
-        ) VALUES ${chunk.join(", ")}
-      `);
-		}
+		const rows = rawRows
+			.map((row) => buildTraceAppendRow(projectId, row.event))
+			.filter((row) => row !== undefined);
+		await this.db.appendTraces(rows);
 	}
 
 	private async rebuildObservations(
 		projectId: string,
 		observationIds: string[],
-		events: IngestionEvent[],
+		rawRows: RawEventRow[],
 	): Promise<void> {
 		await this.deleteByIds("observations", observationIds);
-		const values = events
-			.map((event) => observationSqlValues(projectId, event))
-			.filter((value) => value !== undefined);
-		for (const chunk of chunks(values, INSERT_CHUNK_SIZE)) {
-			if (chunk.length === 0) continue;
-			await this.db.exec(`
-        INSERT INTO observations (
-          id,
-          project_id,
-          trace_id,
-          parent_observation_id,
-          type,
-          name,
-          start_time,
-          end_time,
-          metadata_json,
-          input_json,
-          output_json,
-          usage_details_json,
-          cost_details_json,
-          total_cost,
-          updated_at
-        ) VALUES ${chunk.join(", ")}
-      `);
-		}
+		const rows = rawRows
+			.map((row) => buildObservationAppendRow(projectId, row.event))
+			.filter((row) => row !== undefined);
+		await this.db.appendObservations(rows);
 	}
 
 	private async rebuildScores(
 		projectId: string,
 		scoreIds: string[],
-		events: IngestionEvent[],
+		rawRows: RawEventRow[],
 	): Promise<void> {
 		await this.deleteByIds("scores", scoreIds);
-		const values = events.map((event) => scoreSqlValues(projectId, event));
-		for (const chunk of chunks(values, INSERT_CHUNK_SIZE)) {
-			if (chunk.length === 0) continue;
-			await this.db.exec(`INSERT INTO scores VALUES ${chunk.join(", ")}`);
-		}
+		await this.db.appendScores(
+			rawRows.map((row) => buildScoreAppendRow(projectId, row.event)),
+		);
 	}
 
 	private async deleteByIds(
@@ -326,6 +300,7 @@ export function rawEventRow(params: {
 	event: IngestionEvent;
 }): RawEventRow {
 	const keys = projectionKeys(params.event);
+	const bodyJson = JSON.stringify(params.event.body);
 	return {
 		eventId: params.event.id,
 		projectId: params.projectId,
@@ -337,10 +312,14 @@ export function rawEventRow(params: {
 		traceId: keys.traceId,
 		observationId: keys.observationId,
 		scoreId: keys.scoreId,
-		bodyJson: JSON.stringify(params.event.body),
-		eventJson: JSON.stringify(params.event),
+		bodyJson,
+		eventJson: ingestionEventJson(params.event, bodyJson),
 		event: params.event,
 	};
+}
+
+function ingestionEventJson(event: IngestionEvent, bodyJson: string): string {
+	return `{"id":${JSON.stringify(event.id)},"timestamp":${JSON.stringify(event.timestamp)},"type":${JSON.stringify(event.type)},"body":${bodyJson}}`;
 }
 
 function projectionKeys(event: IngestionEvent): {
@@ -383,75 +362,110 @@ function addProjectionWork(work: ProjectionWork, row: RawEventRow): void {
 	if (row.observationId) work.observationIds.add(row.observationId);
 }
 
-function rawEventSqlValues(row: RawEventRow): string {
-	return `(
-    ${sql(row.eventId)},
-    ${sql(row.projectId)},
-    ${sql(row.manifestKey)},
-    ${sql(row.objectKey)},
-    ${sql(row.eventType)},
-    ${sql(row.eventTimestamp)},
-    ${sql(row.entityId)},
-    ${sql(row.bodyJson)},
-    ${sql(row.eventJson)},
-    ${sql(row.traceId)},
-    ${sql(row.observationId)},
-    ${sql(row.scoreId)}
-  )`;
+function latestBatchRowsByKey(
+	rows: RawEventRow[],
+	key: "traceId" | "observationId" | "scoreId",
+	keys: Set<string>,
+	filter: (row: RawEventRow) => boolean,
+): RawEventRow[] {
+	const latest = new Map<string, RawEventRow>();
+	for (const row of rows) {
+		const value = row[key];
+		if (!value || !keys.has(value) || !filter(row)) continue;
+		const current = latest.get(value);
+		if (!current || compareRawRows(row, current) > 0) {
+			latest.set(value, row);
+		}
+	}
+	return [...latest.values()];
 }
 
-function traceSqlValues(
+function compareRawRows(left: RawEventRow, right: RawEventRow): number {
+	const leftTimestamp = left.eventTimestamp ?? "";
+	const rightTimestamp = right.eventTimestamp ?? "";
+	if (leftTimestamp > rightTimestamp) return 1;
+	if (leftTimestamp < rightTimestamp) return -1;
+	if (left.eventId > right.eventId) return 1;
+	if (left.eventId < right.eventId) return -1;
+	return 0;
+}
+
+function eventsRawAppendRow(row: RawEventRow): EventsRawAppendRow {
+	return {
+		eventId: row.eventId,
+		projectId: row.projectId,
+		manifestKey: row.manifestKey,
+		objectKey: row.objectKey,
+		eventType: row.eventType,
+		eventTimestamp: row.eventTimestamp,
+		entityId: row.entityId,
+		bodyJson: row.bodyJson,
+		eventJson: row.eventJson,
+		traceId: row.traceId,
+		observationId: row.observationId,
+		scoreId: row.scoreId,
+	};
+}
+
+function buildTraceAppendRow(
 	projectId: string,
 	event: IngestionEvent,
-): string | undefined {
+): TraceAppendRow | undefined {
 	const body = event.body as Record<string, unknown>;
 	const id = stringValue(body.id ?? body.traceId);
 	if (!id) return undefined;
-	return `(
-    ${sql(id)},
-    ${sql(projectId)},
-    ${sql(stringValue(body.name))},
-    ${sql(stringValue(body.userId))},
-    ${sql(stringValue(body.sessionId))},
-    ${sql(timestampValue(body.startTime ?? body.createdAt ?? event.timestamp))},
-    ${sql(timestampValue(body.endTime))},
-    ${sql(jsonString(body.metadata))},
-    ${sql(jsonString(body.input))},
-    ${sql(jsonString(body.output))},
-    NULL,
-    ${sql(timestampValue(event.timestamp))}
-  )`;
+	return {
+		id,
+		projectId,
+		name: stringValue(body.name),
+		userId: stringValue(body.userId),
+		sessionId: stringValue(body.sessionId),
+		startTime: timestampValue(
+			body.startTime ?? body.createdAt ?? event.timestamp,
+		),
+		endTime: timestampValue(body.endTime),
+		metadataJson: jsonString(body.metadata),
+		inputJson: jsonString(body.input),
+		outputJson: jsonString(body.output),
+		totalCost: undefined,
+		updatedAt: timestampValue(event.timestamp),
+	};
 }
 
-function observationSqlValues(
+function buildObservationAppendRow(
 	projectId: string,
 	event: IngestionEvent,
-): string | undefined {
+): ObservationAppendRow | undefined {
 	const body = event.body as Record<string, unknown>;
 	const id = stringValue(body.id) ?? event.id;
 	const costDetails = objectValue(body.costDetails);
 	const totalCost =
 		numericValue(body.totalCost) ?? costDetailsTotal(costDetails);
-	return `(
-    ${sql(id)},
-    ${sql(projectId)},
-    ${sql(stringValue(body.traceId))},
-    ${sql(stringValue(body.parentObservationId))},
-    ${sql(event.type)},
-    ${sql(stringValue(body.name))},
-    ${sql(timestampValue(body.startTime ?? body.createdAt ?? event.timestamp))},
-    ${sql(timestampValue(body.endTime))},
-    ${sql(jsonString(body.metadata))},
-    ${sql(jsonString(body.input))},
-    ${sql(jsonString(body.output))},
-    ${sql(jsonString(body.usageDetails))},
-    ${sql(jsonString(costDetails))},
-    ${totalCost === undefined ? "NULL" : String(totalCost)},
-    ${sql(timestampValue(event.timestamp))}
-  )`;
+	return {
+		id,
+		projectId,
+		traceId: stringValue(body.traceId),
+		parentObservationId: stringValue(body.parentObservationId),
+		type: event.type,
+		name: stringValue(body.name),
+		startTime: timestampValue(
+			body.startTime ?? body.createdAt ?? event.timestamp,
+		),
+		endTime: timestampValue(body.endTime),
+		metadataJson: jsonString(body.metadata),
+		inputJson: jsonString(body.input),
+		outputJson: jsonString(body.output),
+		usageDetailsJson: jsonString(body.usageDetails),
+		costDetailsJson: jsonString(costDetails),
+		totalCost,
+		updatedAt: timestampValue(event.timestamp),
+	};
 }
 
-function scoreSqlValues(projectId: string, event: IngestionEvent): string {
+function buildScoreAppendRow(
+	projectId: string,
+	event: IngestionEvent,
+): ScoreAppendRow {
 	const body = event.body as Record<string, unknown>;
 	const id = stringValue(body.id) ?? event.id;
 	const {
@@ -459,22 +473,22 @@ function scoreSqlValues(projectId: string, event: IngestionEvent): string {
 		stringValue: scoreStringValue,
 		dataType,
 	} = scoreValue(body.value, stringValue(body.dataType));
-	return `(
-    ${sql(id)},
-    ${sql(projectId)},
-    ${sql(stringValue(body.traceId))},
-    ${sql(stringValue(body.observationId))},
-    ${sql(stringValue(body.sessionId))},
-    ${sql(stringValue(body.name))},
-    ${numberValue === null ? "NULL" : String(numberValue)},
-    ${sql(scoreStringValue)},
-    ${sql(dataType)},
-    ${sql(scoreSource(body))},
-    ${sql(stringValue(body.comment))},
-    ${sql(jsonString(body.metadata))},
-    ${sql(timestampValue(body.createdAt ?? event.timestamp))},
-    ${sql(timestampValue(event.timestamp))}
-  )`;
+	return {
+		id,
+		projectId,
+		traceId: stringValue(body.traceId),
+		observationId: stringValue(body.observationId),
+		sessionId: stringValue(body.sessionId),
+		name: stringValue(body.name),
+		value: numberValue,
+		stringValue: scoreStringValue,
+		dataType,
+		source: scoreSource(body),
+		comment: stringValue(body.comment),
+		metadataJson: jsonString(body.metadata),
+		timestamp: timestampValue(body.createdAt ?? event.timestamp),
+		updatedAt: timestampValue(event.timestamp),
+	};
 }
 
 function chunks<T>(values: T[], size: number): T[][] {

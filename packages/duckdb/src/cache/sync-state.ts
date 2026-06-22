@@ -8,14 +8,6 @@ import type { DuckDbOperations } from "./db-operations.js";
 
 export type SyncStateSource = "otel" | "manifests";
 
-export const SYNC_STATE_SCHEMA_SQL = `
-  CREATE TABLE IF NOT EXISTS sync_state (
-    source TEXT PRIMARY KEY,
-    last_finalized_bucket TEXT,
-    updated_at TIMESTAMP DEFAULT current_timestamp
-  );
-`;
-
 export type SyncStateStore = {
 	getLastFinalized(source: SyncStateSource): Promise<Date | undefined>;
 	setLastFinalized(source: SyncStateSource, bucket: Date): Promise<void>;

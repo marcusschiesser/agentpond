@@ -185,7 +185,6 @@ export function otelResourceSpansToEvents(
 				const attributes = attributesToRecord(
 					getArray(span, "attributes") ?? [],
 				);
-				const langfuse = langfuseAttributes(attributes);
 				const name = stringField(span, "name") ?? "otel-span";
 				const observationType = stringValue(
 					attributes["langfuse.observation.type"],
@@ -228,6 +227,7 @@ export function otelResourceSpansToEvents(
 				events.push(observationEvent);
 
 				if (!parentSpanId) {
+					const langfuse = langfuseAttributes(attributes);
 					events.push({
 						id: randomUUID(),
 						timestamp,
@@ -258,7 +258,7 @@ export function otelResourceSpansToEvents(
 		}
 	}
 
-	return events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+	return events;
 }
 
 function observationTypeToEventType(
