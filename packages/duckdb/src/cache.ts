@@ -15,6 +15,23 @@ export type SyncResult = {
 	eventsProcessed: number;
 };
 
+export type SyncProgress = SyncResult & {
+	manifestsTotal: number;
+	manifestsSeen: number;
+	manifestsSkipped: number;
+	objectsSkipped: number;
+	phase:
+		| "listed"
+		| "manifest-skipped"
+		| "manifest-processed"
+		| "object-skipped"
+		| "object-processed"
+		| "events-processed"
+		| "complete";
+	currentManifestKey?: string;
+	currentObjectKey?: string;
+};
+
 export class AgentPondDuckDb {
 	private instance?: DuckDBInstance;
 	private connection?: DuckDBConnection;
@@ -115,6 +132,7 @@ export class AgentPondDuckDb {
 		store: ObjectStore;
 		projectId: string;
 		prefix: string;
+		onProgress?: (progress: SyncProgress) => void;
 	}): Promise<SyncResult> {
 		await this.init();
 		const result: SyncResult = {
@@ -122,15 +140,47 @@ export class AgentPondDuckDb {
 			objectsProcessed: 0,
 			eventsProcessed: 0,
 		};
+		let manifestsSeen = 0;
+		let manifestsSkipped = 0;
+		let objectsSkipped = 0;
 		const manifestKeys = await params.store.listKeys(
 			manifestPrefix(params.prefix, params.projectId),
 		);
+		const emitProgress = (
+			phase: SyncProgress["phase"],
+			current?: Pick<SyncProgress, "currentManifestKey" | "currentObjectKey">,
+		) => {
+			params.onProgress?.({
+				...result,
+				manifestsTotal: manifestKeys.length,
+				manifestsSeen,
+				manifestsSkipped,
+				objectsSkipped,
+				phase,
+				...current,
+			});
+		};
+		emitProgress("listed");
 
 		for (const manifestKey of manifestKeys) {
-			if (await this.exists("processed_manifests", manifestKey)) continue;
+			manifestsSeen += 1;
+			if (await this.exists("processed_manifests", manifestKey)) {
+				manifestsSkipped += 1;
+				emitProgress("manifest-skipped", {
+					currentManifestKey: manifestKey,
+				});
+				continue;
+			}
 			const manifest = await params.store.getJson<BatchManifest>(manifestKey);
 			for (const object of manifest.objects) {
-				if (await this.exists("processed_objects", object.key)) continue;
+				if (await this.exists("processed_objects", object.key)) {
+					objectsSkipped += 1;
+					emitProgress("object-skipped", {
+						currentManifestKey: manifestKey,
+						currentObjectKey: object.key,
+					});
+					continue;
+				}
 				const events =
 					object.entityType === "otel"
 						? otelResourceSpansToEvents(
@@ -152,13 +202,27 @@ export class AgentPondDuckDb {
 					});
 					await this.projectEvent(manifest.projectId, event);
 					result.eventsProcessed += 1;
+					if (result.eventsProcessed % 1000 === 0) {
+						emitProgress("events-processed", {
+							currentManifestKey: manifestKey,
+							currentObjectKey: object.key,
+						});
+					}
 				}
 				await this.insertKey("processed_objects", object.key, manifestKey);
 				result.objectsProcessed += 1;
+				emitProgress("object-processed", {
+					currentManifestKey: manifestKey,
+					currentObjectKey: object.key,
+				});
 			}
 			await this.insertKey("processed_manifests", manifestKey);
 			result.manifestsProcessed += 1;
+			emitProgress("manifest-processed", {
+				currentManifestKey: manifestKey,
+			});
 		}
+		emitProgress("complete");
 
 		return result;
 	}

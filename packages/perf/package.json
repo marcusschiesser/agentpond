@@ -1,0 +1,21 @@
+{
+	"name": "@agentpond/perf",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"sync": "tsx src/index.ts"
+	},
+	"dependencies": {
+		"@agentpond/core": "workspace:*",
+		"@agentpond/duckdb": "workspace:*",
+		"@langfuse/otel": "^5.4.1",
+		"@langfuse/tracing": "^5.4.1",
+		"@opentelemetry/sdk-node": "^0.208.0"
+	},
+	"devDependencies": {
+		"@types/node": "^24.10.1",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3"
+	}
+}

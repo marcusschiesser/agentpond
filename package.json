@@ -21,7 +21,8 @@
 		"version-packages": "changeset version",
 		"release": "changeset publish",
 		"ingest": "tsx apps/ingest/src/index.ts",
-		"cli": "tsx apps/cli/src/index.ts"
+		"cli": "tsx apps/cli/src/index.ts",
+		"perf:sync": "pnpm --filter @agentpond/perf sync"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.936.0",

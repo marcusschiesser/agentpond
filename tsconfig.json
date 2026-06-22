@@ -3,6 +3,7 @@
 	"references": [
 		{ "path": "./packages/core" },
 		{ "path": "./packages/duckdb" },
+		{ "path": "./packages/perf" },
 		{ "path": "./apps/ingest" },
 		{ "path": "./apps/cli" }
 	],
