@@ -1,5 +1,7 @@
 import {
 	getActiveTraceId,
+	type LangfuseSpan,
+	type LangfuseTool,
 	propagateAttributes,
 	startActiveObservation,
 } from "@langfuse/tracing";
@@ -91,13 +93,14 @@ async function generateChildObservation(
 ): Promise<void> {
 	const type = observationType(traceIndex, childIndex);
 	const name = `${type} step ${childIndex}`;
-	await startActiveObservation(
-		name,
-		async (span) => {
-			if (type === "generation") {
+
+	if (type === "generation") {
+		await startActiveObservation(
+			name,
+			async (generation) => {
 				const inputTokens = 120 + ((traceIndex + childIndex) % 700);
 				const outputTokens = 40 + ((traceIndex * 3 + childIndex) % 260);
-				span.update({
+				generation.update({
 					model: `gpt-perf-${(traceIndex + childIndex) % 4}`,
 					input: makeMessages(traceIndex, childIndex),
 					output: {
@@ -120,32 +123,43 @@ async function generateChildObservation(
 						total: roundCost(inputTokens * 0.0000015 + outputTokens * 0.000006),
 					},
 				});
-				return;
-			}
+			},
+			{ asType: "generation" },
+		);
+		return;
+	}
 
-			span.update({
-				input: {
-					step: childIndex,
-					payload: sizedText("step input", traceIndex, childIndex),
-				},
-				output: {
-					ok: true,
-					items: Array.from({ length: 1 + (childIndex % 4) }, (_, offset) => ({
-						id: `item-${traceIndex}-${childIndex}-${offset}`,
-						score: Number(((traceIndex + offset) % 100) / 100).toFixed(2),
-					})),
-				},
-				metadata: {
-					component: type,
-					retry_count: traceIndex % 5 === 0 ? 1 : 0,
-					latency_bucket: ["fast", "normal", "slow"][
-						(traceIndex + childIndex) % 3
-					],
-				},
-			});
-		},
-		{ asType: type },
-	);
+	const updateSpanLikeObservation = async (span: LangfuseSpan | LangfuseTool) => {
+		span.update({
+			input: {
+				step: childIndex,
+				payload: sizedText("step input", traceIndex, childIndex),
+			},
+			output: {
+				ok: true,
+				items: Array.from({ length: 1 + (childIndex % 4) }, (_, offset) => ({
+					id: `item-${traceIndex}-${childIndex}-${offset}`,
+					score: Number(((traceIndex + offset) % 100) / 100).toFixed(2),
+				})),
+			},
+			metadata: {
+				component: type,
+				retry_count: traceIndex % 5 === 0 ? 1 : 0,
+				latency_bucket: ["fast", "normal", "slow"][
+					(traceIndex + childIndex) % 3
+				],
+			},
+		});
+	};
+
+	if (type === "tool") {
+		await startActiveObservation(name, updateSpanLikeObservation, {
+			asType: "tool",
+		});
+		return;
+	}
+
+	await startActiveObservation(name, updateSpanLikeObservation);
 }
 
 function observationType(
