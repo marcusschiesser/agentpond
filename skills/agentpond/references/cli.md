@@ -15,14 +15,16 @@ export AGENTPOND_S3_FORCE_PATH_STYLE=true
 export AWS_ACCESS_KEY_ID=minio
 export AWS_SECRET_ACCESS_KEY=minio123
 export AWS_REGION=us-east-1
-export AGENTPOND_DB=~/.agentpond/cache.duckdb
+export AGENTPOND_DB=./.agentpond/cache.duckdb
 ```
+
+If `AGENTPOND_DB` is not set, AgentPond stores its DuckDB cache at `./.agentpond/cache.duckdb` in the current working directory.
 
 The CLI also accepts common settings as flags:
 
 ```bash
 npx agentpond --env .env sync
-npx agentpond --db ~/.agentpond/cache.duckdb sync
+npx agentpond --db ./.agentpond/cache.duckdb sync
 npx agentpond --s3-bucket agentpond --s3-endpoint http://localhost:9000 sync
 ```
 
