@@ -1,14 +1,14 @@
 import type { S3ObjectStore } from "@agentpond/core";
-import type { AgentPondDuckDb, SyncProgress } from "@agentpond/duckdb";
+import type { AgentPondCache, SyncProgress } from "@agentpond/duckdb";
 import type { PerfArgs } from "./args.js";
 
 export type SyncTiming = {
 	durationMs: number;
-	result: Awaited<ReturnType<AgentPondDuckDb["syncFromStore"]>>;
+	result: Awaited<ReturnType<AgentPondCache["syncFromStore"]>>;
 };
 
 export async function timeSync(
-	db: AgentPondDuckDb,
+	db: AgentPondCache,
 	store: S3ObjectStore,
 	args: PerfArgs,
 	onProgress?: (progress: SyncProgress) => void,
@@ -26,7 +26,7 @@ export async function timeSync(
 	};
 }
 
-export async function countTraces(db: AgentPondDuckDb): Promise<number> {
+export async function countTraces(db: AgentPondCache): Promise<number> {
 	const rows = await db.query<{ count: bigint | number }>(
 		"select count(*) as count from traces",
 	);

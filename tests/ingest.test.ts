@@ -10,7 +10,7 @@ import {
 	MemoryObjectStore,
 	otelBodyToEvents,
 } from "@agentpond/core";
-import { AgentPondDuckDb } from "@agentpond/duckdb";
+import { AgentPondCache } from "@agentpond/duckdb";
 import protobuf from "protobufjs";
 import { buildServer } from "../apps/ingest/src/server.js";
 
@@ -219,7 +219,7 @@ test("otel generation costs project end-to-end into DuckDB", async () => {
 	);
 
 	assert.equal(response.statusCode, 200);
-	const db = new AgentPondDuckDb(
+	const db = new AgentPondCache(
 		join(mkdtempSync(join(tmpdir(), "agentpond-ingest-")), "cache.duckdb"),
 	);
 	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
@@ -371,7 +371,7 @@ test("otel maps multiple spans in one trace with parent and aggregate cost", asy
 	);
 
 	assert.equal(response.statusCode, 200);
-	const db = new AgentPondDuckDb(
+	const db = new AgentPondCache(
 		join(mkdtempSync(join(tmpdir(), "agentpond-ingest-")), "cache.duckdb"),
 	);
 	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
@@ -481,7 +481,7 @@ test("otel handles id and timestamp edge cases", async () => {
 	await server.close();
 
 	assert.equal(protobufResponse.statusCode, 200);
-	const db = new AgentPondDuckDb(
+	const db = new AgentPondCache(
 		join(mkdtempSync(join(tmpdir(), "agentpond-ingest-")), "cache.duckdb"),
 	);
 	await db.syncFromStore({

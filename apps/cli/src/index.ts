@@ -9,7 +9,7 @@ import {
 	loadEnvFile,
 	S3ObjectStore,
 } from "@agentpond/core";
-import { AgentPondDuckDb } from "@agentpond/duckdb";
+import { AgentPondCache } from "@agentpond/duckdb";
 import { manualTraceResourceSpans } from "./otel-trace.js";
 import {
 	writeEventsAndSyncCache,
@@ -39,7 +39,7 @@ export async function main(argv = process.argv): Promise<void> {
 	try {
 		if (!resource || parsed.flags.help || parsed.flags.h) return printHelp();
 		if (resource === "sync") {
-			const db = new AgentPondDuckDb(config.dbPath);
+			const db = new AgentPondCache(config.dbPath);
 			const result = await db.syncFromStore({
 				store: new S3ObjectStore(config.s3),
 				projectId: config.projectId,
@@ -51,7 +51,7 @@ export async function main(argv = process.argv): Promise<void> {
 		if (resource === "sql") {
 			const query = rest.length > 0 ? [action, ...rest].join(" ") : action;
 			if (!query) throw new CliError("Missing SQL query");
-			const db = new AgentPondDuckDb(config.dbPath);
+			const db = new AgentPondCache(config.dbPath);
 			const rows = await db.query(query);
 			await db.close();
 			return print(rows, json);
@@ -63,7 +63,7 @@ export async function main(argv = process.argv): Promise<void> {
 			return createTrace(parsed, config, json);
 		}
 
-		const db = new AgentPondDuckDb(config.dbPath);
+		const db = new AgentPondCache(config.dbPath);
 		const rows = await runReadCommand(db, resource, action, rest, parsed);
 		await db.close();
 		return print(rows, json);
@@ -141,7 +141,7 @@ async function createTrace(
 }
 
 async function runReadCommand(
-	db: AgentPondDuckDb,
+	db: AgentPondCache,
 	resource: string,
 	action: string | undefined,
 	rest: string[],

@@ -9,7 +9,7 @@ import {
 	type IngestionEvent,
 	MemoryObjectStore,
 } from "@agentpond/core";
-import { AgentPondDuckDb } from "@agentpond/duckdb";
+import { AgentPondCache } from "@agentpond/duckdb";
 import { createOtelTraceId, main } from "../apps/cli/src/index.js";
 import { manualTraceResourceSpans } from "../apps/cli/src/otel-trace.js";
 import { writeEventsAndSyncCache } from "../apps/cli/src/sync-write.js";
@@ -162,7 +162,7 @@ test("CLI trace creation preserves nested metadata values", async () => {
 		"otel/default-project/2026/06/14/11/03/batch-1.json",
 		resourceSpans,
 	);
-	const db = new AgentPondDuckDb(dbPath);
+	const db = new AgentPondCache(dbPath);
 	await db.syncFromStore({
 		store,
 		projectId: "default-project",
@@ -203,7 +203,7 @@ test("CLI-created scores are immediately visible to score list queries", async (
 
 	await writeEventsAndSyncCache(config, store, [event]);
 
-	const db = new AgentPondDuckDb(dbPath);
+	const db = new AgentPondCache(dbPath);
 	const rows = await db.query<{
 		id: string;
 		trace_id: string;
@@ -479,7 +479,7 @@ test("CLI --json returns parseable JSON for empty result sets", async () => {
 		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
 		"cache.duckdb",
 	);
-	const db = new AgentPondDuckDb(dbPath);
+	const db = new AgentPondCache(dbPath);
 	await db.close();
 
 	const originalExitCode = process.exitCode;

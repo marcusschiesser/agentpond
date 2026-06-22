@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { S3ObjectStore } from "@agentpond/core";
-import { AgentPondDuckDb } from "@agentpond/duckdb";
+import { AgentPondCache } from "@agentpond/duckdb";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { buildServer } from "../../../apps/ingest/src/server.js";
@@ -46,7 +46,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 	const sdk = new NodeSDK({
 		spanProcessors: [spanProcessor],
 	});
-	const db = new AgentPondDuckDb(args.dbPath);
+	const db = new AgentPondCache(args.dbPath);
 
 	let generatedTraces = 0;
 	const ingestionStarted = performance.now();

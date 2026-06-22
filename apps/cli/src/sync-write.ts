@@ -5,7 +5,7 @@ import {
 	type IngestionEvent,
 	type ObjectStore,
 } from "@agentpond/core";
-import { AgentPondDuckDb } from "@agentpond/duckdb";
+import { AgentPondCache } from "@agentpond/duckdb";
 
 export async function writeOtelAndSyncCache(
 	config: Pick<AgentPondConfig, "dbPath" | "projectId" | "s3">,
@@ -18,7 +18,7 @@ export async function writeOtelAndSyncCache(
 		prefix: config.s3.prefix,
 	});
 	const object = await writer.writeOtelResourceSpans(resourceSpans);
-	const db = new AgentPondDuckDb(config.dbPath);
+	const db = new AgentPondCache(config.dbPath);
 	try {
 		await db.syncFromStore({
 			store,
@@ -42,7 +42,7 @@ export async function writeEventsAndSyncCache(
 		prefix: config.s3.prefix,
 	});
 	const manifest = await writer.writeAcceptedEvents(events);
-	const db = new AgentPondDuckDb(config.dbPath);
+	const db = new AgentPondCache(config.dbPath);
 	try {
 		await db.syncFromStore({
 			store,

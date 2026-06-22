@@ -9,17 +9,17 @@ import {
 	type IngestionEvent,
 	MemoryObjectStore,
 } from "@agentpond/core";
-import { AgentPondDuckDb } from "@agentpond/duckdb";
+import { AgentPondCache } from "@agentpond/duckdb";
 
-function createTempDb(): AgentPondDuckDb {
-	return new AgentPondDuckDb(
+function createTempDb(): AgentPondCache {
+	return new AgentPondCache(
 		join(mkdtempSync(join(tmpdir(), "agentpond-")), "cache.duckdb"),
 	);
 }
 
 async function writeAndSync(
 	events: IngestionEvent[],
-): Promise<{ store: MemoryObjectStore; db: AgentPondDuckDb }> {
+): Promise<{ store: MemoryObjectStore; db: AgentPondCache }> {
 	const store = new MemoryObjectStore();
 	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
 	await writer.writeAcceptedEvents(events, "batch-1");
@@ -196,6 +196,291 @@ test("DuckDB sessions view exposes session rows in stable last seen order", asyn
 		{ id: "session-b", trace_count: 1n },
 		{ id: "session-a", trace_count: 1n },
 	]);
+});
+
+test("DuckDB projection keeps newer event when an older event syncs later", async () => {
+	const store = new MemoryObjectStore();
+	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
+	const db = createTempDb();
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "trace-event",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "trace-1", name: "Trace 1" },
+			},
+			{
+				id: "newer-observation-event",
+				timestamp: "2026-06-14T00:00:02.000Z",
+				type: eventTypes.GENERATION_CREATE,
+				body: {
+					id: "observation-1",
+					traceId: "trace-1",
+					name: "newer observation",
+					costDetails: { total: 0.2 },
+				},
+			},
+		],
+		"batch-1",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "older-observation-event",
+				timestamp: "2026-06-14T00:00:01.000Z",
+				type: eventTypes.GENERATION_CREATE,
+				body: {
+					id: "observation-1",
+					traceId: "trace-1",
+					name: "older observation",
+					costDetails: { total: 0.1 },
+				},
+			},
+		],
+		"batch-2",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	const observations = await db.query<{ name: string; total_cost: number }>(
+		"select name, total_cost from observations where id = 'observation-1'",
+	);
+	const traces = await db.query<{ total_cost: number | null }>(
+		"select total_cost from traces where id = 'trace-1'",
+	);
+	await db.close();
+
+	assert.deepEqual(observations, [
+		{ name: "newer observation", total_cost: 0.2 },
+	]);
+	assert.deepEqual(traces, [{ total_cost: 0.2 }]);
+});
+
+test("DuckDB projection applies newer event synced after an older event", async () => {
+	const store = new MemoryObjectStore();
+	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
+	const db = createTempDb();
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "trace-event",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "trace-1", name: "Trace 1" },
+			},
+			{
+				id: "older-observation-event",
+				timestamp: "2026-06-14T00:00:01.000Z",
+				type: eventTypes.GENERATION_CREATE,
+				body: {
+					id: "observation-1",
+					traceId: "trace-1",
+					name: "older observation",
+					costDetails: { total: 0.1 },
+				},
+			},
+		],
+		"batch-1",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "newer-observation-event",
+				timestamp: "2026-06-14T00:00:02.000Z",
+				type: eventTypes.GENERATION_CREATE,
+				body: {
+					id: "observation-1",
+					traceId: "trace-1",
+					name: "newer observation",
+					costDetails: { total: 0.2 },
+				},
+			},
+		],
+		"batch-2",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	const observations = await db.query<{ name: string; total_cost: number }>(
+		"select name, total_cost from observations where id = 'observation-1'",
+	);
+	const traces = await db.query<{ total_cost: number | null }>(
+		"select total_cost from traces where id = 'trace-1'",
+	);
+	await db.close();
+
+	assert.deepEqual(observations, [
+		{ name: "newer observation", total_cost: 0.2 },
+	]);
+	assert.deepEqual(traces, [{ total_cost: 0.2 }]);
+});
+
+test("DuckDB projection breaks equal timestamps by event id", async () => {
+	const { db } = await writeAndSync([
+		{
+			id: "a-observation-event",
+			timestamp: "2026-06-14T00:00:01.000Z",
+			type: eventTypes.GENERATION_CREATE,
+			body: {
+				id: "observation-1",
+				traceId: "trace-1",
+				name: "event a",
+			},
+		},
+		{
+			id: "b-observation-event",
+			timestamp: "2026-06-14T00:00:01.000Z",
+			type: eventTypes.GENERATION_CREATE,
+			body: {
+				id: "observation-1",
+				traceId: "trace-1",
+				name: "event b",
+			},
+		},
+	]);
+
+	const observations = await db.query<{ name: string }>(
+		"select name from observations where id = 'observation-1'",
+	);
+	await db.close();
+
+	assert.deepEqual(observations, [{ name: "event b" }]);
+});
+
+test("DuckDB projection keeps whole-row replacement semantics for partial updates", async () => {
+	const store = new MemoryObjectStore();
+	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
+	const db = createTempDb();
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "trace-event",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "trace-1", name: "Trace 1" },
+			},
+			{
+				id: "create-observation-event",
+				timestamp: "2026-06-14T00:00:01.000Z",
+				type: eventTypes.GENERATION_CREATE,
+				body: {
+					id: "observation-1",
+					traceId: "trace-1",
+					name: "created observation",
+					input: { prompt: "older input" },
+					costDetails: { total: 0.4 },
+				},
+			},
+		],
+		"batch-1",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "update-observation-event",
+				timestamp: "2026-06-14T00:00:02.000Z",
+				type: eventTypes.GENERATION_UPDATE,
+				body: {
+					id: "observation-1",
+					output: { answer: "newer output" },
+				},
+			},
+		],
+		"batch-2",
+	);
+	const second = await db.syncFromStore({
+		store,
+		projectId: "project-a",
+		prefix: "",
+	});
+
+	const observations = await db.query<{
+		trace_id: string | null;
+		input_json: string | null;
+		output_json: string | null;
+		total_cost: number | null;
+	}>(
+		"select trace_id, input_json, output_json, total_cost from observations where id = 'observation-1'",
+	);
+	const traces = await db.query<{ total_cost: number | null }>(
+		"select total_cost from traces where id = 'trace-1'",
+	);
+	const noop = await db.syncFromStore({
+		store,
+		projectId: "project-a",
+		prefix: "",
+	});
+	await db.close();
+
+	assert.equal(second.eventsProcessed, 1);
+	assert.deepEqual(observations, [
+		{
+			trace_id: null,
+			input_json: null,
+			output_json: JSON.stringify({ answer: "newer output" }),
+			total_cost: null,
+		},
+	]);
+	assert.deepEqual(traces, [{ total_cost: null }]);
+	assert.equal(noop.objectsProcessed, 0);
+	assert.equal(noop.eventsProcessed, 0);
+});
+
+test("DuckDB score projection uses latest timestamp for the same score", async () => {
+	const store = new MemoryObjectStore();
+	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
+	const db = createTempDb();
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "newer-score-event",
+				timestamp: "2026-06-14T00:00:02.000Z",
+				type: eventTypes.SCORE_CREATE,
+				body: {
+					id: "score-1",
+					traceId: "trace-1",
+					name: "quality",
+					value: 0.9,
+				},
+			},
+		],
+		"batch-1",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "older-score-event",
+				timestamp: "2026-06-14T00:00:01.000Z",
+				type: eventTypes.SCORE_CREATE,
+				body: {
+					id: "score-1",
+					traceId: "trace-1",
+					name: "quality",
+					value: 0.1,
+				},
+			},
+		],
+		"batch-2",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	const scores = await db.query<{ value: number }>(
+		"select value from scores where id = 'score-1'",
+	);
+	await db.close();
+
+	assert.deepEqual(scores, [{ value: 0.9 }]);
 });
 
 test("DuckDB first sync reads all current-layout OTEL buckets", async () => {

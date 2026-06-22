@@ -4,6 +4,7 @@ import {
 	currentBucketScanWindow,
 	listKeysForUtcHourBuckets,
 } from "./bucket-scan.js";
+import type { DuckDbOperations } from "./db-operations.js";
 
 export type SyncStateSource = "otel" | "manifests";
 
@@ -26,16 +27,14 @@ export function createSyncStateStore(params: {
 	store: ObjectStore;
 	prefix: string;
 	projectId: string;
-	all<T = Record<string, unknown>>(sqlText: string): Promise<T[]>;
-	exec(sqlText: string): Promise<void>;
-	sql(value: unknown): string;
+	db: DuckDbOperations;
 }): SyncStateStore {
 	const scanWindow = currentBucketScanWindow();
 	return {
 		async getLastFinalized(source) {
 			const key = syncStateKey(source, params.prefix, params.projectId);
-			const rows = await params.all<{ last_finalized_bucket: string }>(
-				`SELECT last_finalized_bucket FROM sync_state WHERE source = ${params.sql(key)} LIMIT 1`,
+			const rows = await params.db.all<{ last_finalized_bucket: string }>(
+				`SELECT last_finalized_bucket FROM sync_state WHERE source = ${params.db.sql(key)} LIMIT 1`,
 			);
 			const raw = rows[0]?.last_finalized_bucket;
 			if (!raw) return undefined;
@@ -45,12 +44,12 @@ export function createSyncStateStore(params: {
 
 		async setLastFinalized(source, bucket) {
 			const key = syncStateKey(source, params.prefix, params.projectId);
-			await params.exec(
-				`DELETE FROM sync_state WHERE source = ${params.sql(key)}`,
+			await params.db.exec(
+				`DELETE FROM sync_state WHERE source = ${params.db.sql(key)}`,
 			);
-			await params.exec(`
+			await params.db.exec(`
         INSERT INTO sync_state (source, last_finalized_bucket, updated_at)
-        VALUES (${params.sql(key)}, ${params.sql(bucket.toISOString())}, current_timestamp)
+        VALUES (${params.db.sql(key)}, ${params.db.sql(bucket.toISOString())}, current_timestamp)
       `);
 		},
 
