@@ -48,3 +48,13 @@ It also prints a follow-up command for adding the expected trace score. You can 
 ```sh
 uv run --project examples/llm-compliance/python python examples/llm-compliance/python/add_expected_score.py <trace-id>
 ```
+
+## Analyze with a coding agent
+
+After sending the workflow trace and adding the expected score, ask a coding agent to inspect the AgentPond traces:
+
+```text
+analyze traces for compliance_workflow.py
+```
+
+Use the trace analysis to compare the model's structured compliance score with the human annotation and improve the workflow prompt or rubric when they drift.
