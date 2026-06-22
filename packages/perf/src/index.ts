@@ -81,7 +81,6 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 		);
 		logStep(
 			`initial sync finished in ${formatDuration(firstSync.durationMs)}: ` +
-				`${firstSync.result.manifestsProcessed} manifests, ` +
 				`${firstSync.result.objectsProcessed} objects, ` +
 				`${firstSync.result.eventsProcessed} events`,
 		);
@@ -94,7 +93,6 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 		);
 		logStep(
 			`no-op sync finished in ${formatDuration(secondSync.durationMs)}: ` +
-				`${secondSync.result.manifestsProcessed} manifests, ` +
 				`${secondSync.result.objectsProcessed} objects, ` +
 				`${secondSync.result.eventsProcessed} events`,
 		);
