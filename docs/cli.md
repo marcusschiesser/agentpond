@@ -31,9 +31,11 @@ The CLI reads the same configuration variables as the ingestion service. You can
 
 ```sh
 agentpond --env .env sync
-agentpond --db ~/.agentpond/cache.duckdb sync
+agentpond --db ./.agentpond/cache.duckdb sync
 agentpond --s3-bucket agentpond --s3-endpoint http://localhost:9000 sync
 ```
+
+By default, AgentPond stores its DuckDB cache at `./.agentpond/cache.duckdb` in the current working directory. Set `AGENTPOND_DB` or pass `--db <path>` to use a shared or custom cache location.
 
 ## Global Flags
 

@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 
 export type S3Config = {
@@ -67,7 +66,7 @@ export function configFromEnv(
 		dbPath:
 			overrides.dbPath ??
 			process.env.AGENTPOND_DB ??
-			join(homedir(), ".agentpond", "cache.duckdb"),
+			join(process.cwd(), ".agentpond", "cache.duckdb"),
 		s3: {
 			bucket:
 				overrides.s3Bucket ??
