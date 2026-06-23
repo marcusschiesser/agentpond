@@ -1,9 +1,14 @@
+import { existsSync } from "node:fs";
 import {
+	configFromEnv,
+	DEV_SERVER_RUNNING_MESSAGE,
 	initAgentPondEnvironment,
+	isDevServerRunning,
 	listAgentPondEnvironments,
 	resolveAgentPondEnvironment,
 	selectAgentPondEnvironment,
 } from "@agentpond/core";
+import { AgentPondCache } from "@agentpond/duckdb";
 import {
 	CliError,
 	type ParsedArgs,
@@ -56,6 +61,34 @@ export async function handleEnvironmentCommand(
 		);
 	}
 	throw new CliError(`Unknown command: env ${action}`);
+}
+
+export function isDevEnvironment(
+	config: ReturnType<typeof configFromEnv>,
+): boolean {
+	return config.environment?.name === "dev";
+}
+
+export function cacheForRead(
+	config: ReturnType<typeof configFromEnv>,
+): AgentPondCache {
+	if (config.environment && isDevServerRunning(config.environment)) {
+		if (!existsSync(config.dbPath)) {
+			throw new CliError(
+				"dev cache is not initialized yet; ingest a trace or stop the dev server",
+			);
+		}
+		return new AgentPondCache(config.dbPath, { accessMode: "readonly" });
+	}
+	return new AgentPondCache(config.dbPath);
+}
+
+export function assertDevServerNotRunning(
+	config: ReturnType<typeof configFromEnv>,
+): void {
+	if (config.environment && isDevServerRunning(config.environment)) {
+		throw new CliError(DEV_SERVER_RUNNING_MESSAGE);
+	}
 }
 
 function printEnvironmentHelp(): void {

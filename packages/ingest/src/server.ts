@@ -1,11 +1,12 @@
 import { gunzipSync } from "node:zlib";
 import {
-	AcceptedEventWriter,
 	type AgentPondConfig,
 	AuthError,
+	type BatchResult,
 	configFromEnv,
 	ingestionBatchSchema,
 	type ObjectStore,
+	ObjectStoreIngestionHandler,
 	otelBodyToResourceSpans,
 	S3ObjectStore,
 	verifyBasicAuth,
@@ -16,12 +17,27 @@ export type BuildServerOptions = {
 	config?: AgentPondConfig;
 	store?: ObjectStore;
 	authMode?: "required" | "disabled";
+	handlers?: IngestionHandlers;
+};
+
+export type IngestionHandlers = {
+	processBatch: (params: {
+		projectId: string;
+		prefix: string;
+		batch: unknown[];
+	}) => Promise<BatchResult>;
+	writeOtelResourceSpans: (params: {
+		projectId: string;
+		prefix: string;
+		resourceSpans: unknown[];
+	}) => Promise<void>;
 };
 
 export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 	const config = options.config ?? configFromEnv();
 	const store = options.store ?? new S3ObjectStore(config.s3);
 	const authMode = options.authMode ?? "required";
+	const handlers = options.handlers ?? new ObjectStoreIngestionHandler(store);
 	const server = Fastify({
 		logger: process.env.NODE_ENV !== "test",
 		bodyLimit: 16 * 1024 * 1024,
@@ -64,12 +80,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 				});
 			}
 
-			const writer = new AcceptedEventWriter({
-				store,
+			const result = await handlers.processBatch({
 				projectId: auth.projectId,
 				prefix: config.s3.prefix,
+				batch: parsed.data.batch,
 			});
-			const result = await writer.processBatch(parsed.data.batch);
 			return reply.status(207).send(result);
 		} catch (error) {
 			return handleRouteError(error, reply);
@@ -105,12 +120,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 			});
 			if (resourceSpans.length === 0) return reply.status(200).send({});
 
-			const writer = new AcceptedEventWriter({
-				store,
+			await handlers.writeOtelResourceSpans({
 				projectId: auth.projectId,
 				prefix: config.s3.prefix,
+				resourceSpans,
 			});
-			await writer.writeOtelResourceSpans(resourceSpans);
 			return reply.status(200).send({});
 		} catch (error) {
 			return handleRouteError(error, reply);

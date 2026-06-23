@@ -7,7 +7,8 @@
 	},
 	"references": [
 		{ "path": "../../packages/core" },
-		{ "path": "../../packages/duckdb" }
+		{ "path": "../../packages/duckdb" },
+		{ "path": "../../packages/ingest" }
 	],
 	"include": ["src/**/*.ts"]
 }

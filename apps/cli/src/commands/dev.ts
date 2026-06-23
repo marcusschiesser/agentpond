@@ -1,9 +1,10 @@
 import {
+	acquireDevServerLock,
 	configFromEnv,
-	FileSystemObjectStore,
 	initAgentPondEnvironment,
 	selectAgentPondEnvironment,
 } from "@agentpond/core";
+import { AgentPondCache, DuckDbIngestionWriter } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/ingest";
 import {
 	CliError,
@@ -19,18 +20,37 @@ export async function startDevServer(parsed: ParsedArgs): Promise<void> {
 	selectAgentPondEnvironment(environment.name);
 	const devConfig = configFromEnv({
 		envName: environment.name,
-		eventStorePath: stringFlag(parsed, "event-store"),
 		storeType: "local",
 	});
 	const devEnvironment = devConfig.environment;
 	if (!devEnvironment)
 		throw new CliError("Missing dev environment configuration");
+	const lock = acquireDevServerLock(devEnvironment);
+	const db = new AgentPondCache(devConfig.dbPath);
 	const server = buildServer({
 		config: devConfig,
-		store: new FileSystemObjectStore(devEnvironment.eventStorePath),
+		handlers: new DuckDbIngestionWriter(db.directIngestion()),
 		authMode: "disabled",
 	});
-	await server.listen({ host, port });
+	const shutdown = async () => {
+		await server.close();
+	};
+	server.addHook("onClose", async () => {
+		await db.close();
+		lock.release();
+	});
+	process.once("SIGINT", shutdown);
+	process.once("SIGTERM", shutdown);
+	try {
+		await db.init();
+		await server.listen({ host, port });
+	} catch (error) {
+		process.off("SIGINT", shutdown);
+		process.off("SIGTERM", shutdown);
+		await db.close();
+		lock.release();
+		throw error;
+	}
 	const baseUrl = `http://${host}:${port}`;
 	console.log(`AgentPond dev server listening at ${baseUrl}`);
 	console.log("");
@@ -40,6 +60,5 @@ export async function startDevServer(parsed: ParsedArgs): Promise<void> {
 	console.log("LANGFUSE_SECRET_KEY=sk-agentpond-dev");
 	console.log("");
 	console.log(`Environment: ${devEnvironment.name}`);
-	console.log(`Event store: ${devEnvironment.eventStorePath}`);
 	console.log(`DuckDB cache: ${devConfig.dbPath}`);
 }

@@ -18,7 +18,12 @@ import {
 	stringFlag,
 } from "./cli-support.js";
 import { startDevServer } from "./commands/dev.js";
-import { handleEnvironmentCommand } from "./commands/environment.js";
+import {
+	assertDevServerNotRunning,
+	cacheForRead,
+	handleEnvironmentCommand,
+	isDevEnvironment,
+} from "./commands/environment.js";
 import { objectStoreForConfig } from "./object-store.js";
 import { manualTraceResourceSpans } from "./otel-trace.js";
 import {
@@ -36,7 +41,7 @@ export async function main(argv = process.argv): Promise<void> {
 			return handleEnvironmentCommand(action, rest, parsed);
 		if (parsed.flags.help || parsed.flags.h) return printHelp();
 		if (resource === "dev") {
-			return startDevServer(parsed);
+			return await startDevServer(parsed);
 		}
 		const config = configFromEnv({
 			envName: stringFlag(parsed, "env"),
@@ -49,6 +54,15 @@ export async function main(argv = process.argv): Promise<void> {
 		const json = Boolean(parsed.flags.json);
 		logImplicitEnvironment(parsed, config, json);
 		if (resource === "sync") {
+			if (isDevEnvironment(config)) {
+				return print(
+					{
+						skipped: true,
+						reason: "dev environment is written directly by agentpond dev",
+					},
+					json,
+				);
+			}
 			const db = new AgentPondCache(config.dbPath);
 			const result = await db.syncFromStore({
 				store: objectStoreForConfig(config),
@@ -61,19 +75,19 @@ export async function main(argv = process.argv): Promise<void> {
 		if (resource === "sql") {
 			const query = rest.length > 0 ? [action, ...rest].join(" ") : action;
 			if (!query) throw new CliError("Missing SQL query");
-			const db = new AgentPondCache(config.dbPath);
+			const db = cacheForRead(config);
 			const rows = await db.query(query);
 			await db.close();
 			return print(rows, json);
 		}
 		if (resource === "scores" && action === "create") {
-			return createScore(parsed, config, json);
+			return await createScore(parsed, config, json);
 		}
 		if (resource === "traces" && action === "create") {
-			return createTrace(parsed, config, json);
+			return await createTrace(parsed, config, json);
 		}
 
-		const db = new AgentPondCache(config.dbPath);
+		const db = cacheForRead(config);
 		const rows = await runReadCommand(db, resource, action, rest, parsed);
 		await db.close();
 		return print(rows, json);
@@ -98,6 +112,7 @@ async function createScore(
 	config: ReturnType<typeof configFromEnv>,
 	json: boolean,
 ): Promise<void> {
+	assertDevServerNotRunning(config);
 	const name = requiredFlag(parsed, "name");
 	const value = requiredFlag(parsed, "value");
 	const source = stringFlag(parsed, "source") ?? "API";
@@ -148,6 +163,7 @@ async function createTrace(
 	config: ReturnType<typeof configFromEnv>,
 	json: boolean,
 ): Promise<void> {
+	assertDevServerNotRunning(config);
 	const now = new Date().toISOString();
 	const traceId = stringFlag(parsed, "id") ?? createOtelTraceId();
 	const store = objectStoreForConfig(config);

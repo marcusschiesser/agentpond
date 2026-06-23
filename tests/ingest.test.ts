@@ -7,11 +7,10 @@ import { gzipSync } from "node:zlib";
 import {
 	type AgentPondConfig,
 	eventTypes,
-	FileSystemObjectStore,
 	MemoryObjectStore,
 	otelBodyToEvents,
 } from "@agentpond/core";
-import { AgentPondCache } from "@agentpond/duckdb";
+import { AgentPondCache, DuckDbIngestionWriter } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/ingest";
 import protobuf from "protobufjs";
 
@@ -191,10 +190,16 @@ test("ingestion endpoint rejects invalid auth without writing objects", async ()
 	}
 });
 
-test("dev ingestion accepts SDK requests without configured auth and syncs filesystem events", async () => {
-	const root = mkdtempSync(join(tmpdir(), "agentpond-dev-events-"));
-	const store = new FileSystemObjectStore(root);
-	const server = buildServer({ config, store, authMode: "disabled" });
+test("dev ingestion accepts SDK requests without auth and writes directly to DuckDB", async () => {
+	const db = new AgentPondCache(
+		join(mkdtempSync(join(tmpdir(), "agentpond-dev-cache-")), "cache.duckdb"),
+	);
+	await db.init();
+	const server = buildServer({
+		config,
+		authMode: "disabled",
+		handlers: new DuckDbIngestionWriter(db.directIngestion()),
+	});
 	try {
 		const response = await server.inject({
 			method: "POST",
@@ -216,20 +221,14 @@ test("dev ingestion accepts SDK requests without configured auth and syncs files
 		});
 
 		assert.equal(response.statusCode, 207);
-		assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
-
-		const db = new AgentPondCache(
-			join(mkdtempSync(join(tmpdir(), "agentpond-dev-cache-")), "cache.duckdb"),
-		);
-		await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
 		const rows = await db.query<{ id: string; name: string }>(
 			"select id, name from traces where id = 'trace-dev-1'",
 		);
-		await db.close();
 
 		assert.deepEqual(rows, [{ id: "trace-dev-1", name: "Dev Trace" }]);
 	} finally {
 		await server.close();
+		await db.close();
 	}
 });
 

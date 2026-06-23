@@ -4,7 +4,8 @@ import {
 	type ObjectStore,
 	otelResourceSpansToEvents,
 } from "@agentpond/core";
-import { DuckDbOperations } from "./db-operations.js";
+import { DuckDbDirectIngestion } from "../ingestion/direct-ingestion.js";
+import { type DuckDbAccessMode, DuckDbOperations } from "./db-operations.js";
 import { BatchProjection, rawEventRow, stringValue } from "./projection.js";
 import type { SyncStateStore } from "./sync-state.js";
 import { createSyncStateStore } from "./sync-state.js";
@@ -52,11 +53,15 @@ const MAX_PENDING_EVENTS_PER_COMMIT = 20_000;
 export class AgentPondCache {
 	private readonly db: DuckDbOperations;
 
-	constructor(readonly dbPath: string) {
-		this.db = new DuckDbOperations(dbPath);
+	constructor(
+		readonly dbPath: string,
+		private readonly options: { accessMode?: DuckDbAccessMode } = {},
+	) {
+		this.db = new DuckDbOperations(dbPath, options.accessMode);
 	}
 
 	async init(): Promise<void> {
+		if (this.options.accessMode === "readonly") return;
 		await this.db.createSchema();
 	}
 
@@ -239,6 +244,10 @@ export class AgentPondCache {
 	async query<T = Record<string, unknown>>(sql: string): Promise<T[]> {
 		await this.init();
 		return this.db.all<T>(sql);
+	}
+
+	directIngestion(): DuckDbDirectIngestion {
+		return new DuckDbDirectIngestion(this.db);
 	}
 
 	async close(): Promise<void> {
