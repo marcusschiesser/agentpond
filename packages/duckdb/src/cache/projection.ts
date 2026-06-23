@@ -48,6 +48,10 @@ export class BatchProjection {
 
 	constructor(private readonly db: DuckDbOperations) {}
 
+	get pendingEventCount(): number {
+		return this.rawRows.length;
+	}
+
 	addRawEvent(row: RawEventRow): void {
 		this.rawRows.push(row);
 		addProjectionWork(this.work, row);

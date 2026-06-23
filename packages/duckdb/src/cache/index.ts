@@ -45,6 +45,10 @@ type ProcessedObject = {
 	manifestKey: string | null;
 };
 
+// Keeps the 100k-trace perf fixture (~650k events) below the default V8 heap
+// limit by flushing raw JSON strings and projection maps about 33 times.
+const MAX_PENDING_EVENTS_PER_COMMIT = 20_000;
+
 export class AgentPondCache {
 	private readonly db: DuckDbOperations;
 
@@ -71,9 +75,9 @@ export class AgentPondCache {
 		let manifestsSeen = 0;
 		let manifestsSkipped = 0;
 		let objectsSkipped = 0;
-		const projection = new BatchProjection(this.db);
-		const processedObjects: ProcessedObject[] = [];
-		const processedManifestKeys: string[] = [];
+		let projection = new BatchProjection(this.db);
+		let processedObjects: ProcessedObject[] = [];
+		let processedManifestKeys: string[] = [];
 		const syncState = createSyncStateStore({
 			store: params.store,
 			prefix: params.prefix,
@@ -106,7 +110,6 @@ export class AgentPondCache {
 		};
 		const processObject = async (
 			object: PendingObject,
-			loadedEvents?: IngestionEvent[],
 		): Promise<"processed" | "skipped"> => {
 			const progress = {
 				...object.progress,
@@ -117,7 +120,7 @@ export class AgentPondCache {
 				return "skipped";
 			}
 
-			const events = loadedEvents ?? (await object.loadEvents());
+			const events = await object.loadEvents();
 			for (const event of events) {
 				const row = rawEventRow({
 					projectId: params.projectId,
@@ -142,6 +145,33 @@ export class AgentPondCache {
 			emitProgress("object-processed", progress);
 			return "processed";
 		};
+		const flushPending = async (): Promise<void> => {
+			await this.commitSyncBatch({
+				projectId: params.projectId,
+				projection,
+				processedObjects,
+				processedManifestKeys,
+				syncState,
+				advanceSyncState: false,
+			});
+			projection = new BatchProjection(this.db);
+			processedObjects = [];
+			processedManifestKeys = [];
+		};
+		const flushFinal = async (): Promise<void> => {
+			await this.commitSyncBatch({
+				projectId: params.projectId,
+				projection,
+				processedObjects,
+				processedManifestKeys,
+				syncState,
+				advanceSyncState: true,
+			});
+		};
+		const flushIfNeeded = async (): Promise<void> => {
+			if (projection.pendingEventCount < MAX_PENDING_EVENTS_PER_COMMIT) return;
+			await flushPending();
+		};
 		emitProgress("listed");
 
 		const otelObjects: PendingObject[] = otelKeys.map((objectKey) => ({
@@ -154,19 +184,12 @@ export class AgentPondCache {
 			entityIdForEvent: (event) =>
 				stringValue((event.body as Record<string, unknown>).id) ?? objectKey,
 		}));
-		const loadedOtelObjects = await Promise.all(
-			otelObjects.map(async (object) => ({
-				object,
-				events: processedObjectKeys.has(object.objectKey)
-					? undefined
-					: await object.loadEvents(),
-			})),
-		);
-		for (const loaded of loadedOtelObjects) {
-			const outcome = await processObject(loaded.object, loaded.events);
+		for (const object of otelObjects) {
+			const outcome = await processObject(object);
 			if (outcome === "skipped") {
 				objectsSkipped += 1;
 			}
+			await flushIfNeeded();
 		}
 
 		for (const manifestKey of manifestKeys) {
@@ -198,20 +221,16 @@ export class AgentPondCache {
 				if (outcome === "skipped") {
 					objectsSkipped += 1;
 				}
+				await flushIfNeeded();
 			}
 			processedManifestKeys.push(manifestKey);
 			result.manifestsProcessed += 1;
 			emitProgress("manifest-processed", {
 				currentManifestKey: manifestKey,
 			});
+			await flushIfNeeded();
 		}
-		await this.commitSyncBatch({
-			projectId: params.projectId,
-			projection,
-			processedObjects,
-			processedManifestKeys,
-			syncState,
-		});
+		await flushFinal();
 		emitProgress("complete");
 
 		return result;
@@ -232,13 +251,17 @@ export class AgentPondCache {
 		processedObjects: ProcessedObject[];
 		processedManifestKeys: string[];
 		syncState: SyncStateStore;
+		advanceSyncState: boolean;
 	}): Promise<void> {
 		if (
 			params.processedObjects.length === 0 &&
-			params.processedManifestKeys.length === 0
+			params.processedManifestKeys.length === 0 &&
+			params.projection.pendingEventCount === 0
 		) {
-			await params.syncState.advanceLastFinalized("otel");
-			await params.syncState.advanceLastFinalized("manifests");
+			if (params.advanceSyncState) {
+				await params.syncState.advanceLastFinalized("otel");
+				await params.syncState.advanceLastFinalized("manifests");
+			}
 			return;
 		}
 
@@ -247,8 +270,10 @@ export class AgentPondCache {
 			await params.projection.commit(params.projectId);
 			await this.db.insertProcessedObjects(params.processedObjects);
 			await this.db.insertProcessedManifests(params.processedManifestKeys);
-			await params.syncState.advanceLastFinalized("otel");
-			await params.syncState.advanceLastFinalized("manifests");
+			if (params.advanceSyncState) {
+				await params.syncState.advanceLastFinalized("otel");
+				await params.syncState.advanceLastFinalized("manifests");
+			}
 			await this.db.exec("COMMIT");
 		} catch (error) {
 			await this.db.exec("ROLLBACK");
