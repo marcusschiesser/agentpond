@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import {
 	configFromEnv,
 	DEV_SERVER_RUNNING_MESSAGE,
@@ -72,7 +73,7 @@ export function isDevEnvironment(
 export function cacheForRead(
 	config: ReturnType<typeof configFromEnv>,
 ): AgentPondCache {
-	if (config.environment && isDevServerRunning(config.environment)) {
+	if (usesRunningDevCache(config)) {
 		if (!existsSync(config.dbPath)) {
 			throw new CliError(
 				"dev cache is not initialized yet; ingest a trace or stop the dev server",
@@ -86,9 +87,19 @@ export function cacheForRead(
 export function assertDevServerNotRunning(
 	config: ReturnType<typeof configFromEnv>,
 ): void {
-	if (config.environment && isDevServerRunning(config.environment)) {
+	if (usesRunningDevCache(config)) {
 		throw new CliError(DEV_SERVER_RUNNING_MESSAGE);
 	}
+}
+
+function usesRunningDevCache(
+	config: ReturnType<typeof configFromEnv>,
+): boolean {
+	return (
+		config.environment !== undefined &&
+		resolve(config.dbPath) === resolve(config.environment.dbPath) &&
+		isDevServerRunning(config.environment)
+	);
 }
 
 function printEnvironmentHelp(): void {

@@ -31,6 +31,7 @@ export async function startDevServer(parsed: ParsedArgs): Promise<void> {
 		config: devConfig,
 		handlers: new DuckDbIngestionWriter(db.directIngestion()),
 		authMode: "disabled",
+		logger: false,
 	});
 	const shutdown = async () => {
 		await server.close();

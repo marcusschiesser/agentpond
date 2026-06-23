@@ -18,6 +18,7 @@ export type BuildServerOptions = {
 	store?: ObjectStore;
 	authMode?: "required" | "disabled";
 	handlers?: IngestionHandlers;
+	logger?: boolean;
 };
 
 export type IngestionHandlers = {
@@ -39,7 +40,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 	const authMode = options.authMode ?? "required";
 	const handlers = options.handlers ?? new ObjectStoreIngestionHandler(store);
 	const server = Fastify({
-		logger: process.env.NODE_ENV !== "test",
+		logger: options.logger ?? process.env.NODE_ENV !== "test",
 		bodyLimit: 16 * 1024 * 1024,
 	});
 
