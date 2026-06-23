@@ -7,12 +7,13 @@ import { gzipSync } from "node:zlib";
 import {
 	type AgentPondConfig,
 	eventTypes,
+	FileSystemObjectStore,
 	MemoryObjectStore,
 	otelBodyToEvents,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
+import { buildServer } from "@agentpond/ingest";
 import protobuf from "protobufjs";
-import { buildServer } from "../apps/ingest/src/server.js";
 
 const config: AgentPondConfig = {
 	projectId: "project-a",
@@ -186,6 +187,48 @@ test("ingestion endpoint rejects invalid auth without writing objects", async ()
 
 		assert.equal(response.statusCode, 401);
 		assert.deepEqual(await store.listKeys("project-a/"), []);
+		await server.close();
+	}
+});
+
+test("dev ingestion accepts SDK requests without configured auth and syncs filesystem events", async () => {
+	const root = mkdtempSync(join(tmpdir(), "agentpond-dev-events-"));
+	const store = new FileSystemObjectStore(root);
+	const server = buildServer({ config, store, authMode: "disabled" });
+	try {
+		const response = await server.inject({
+			method: "POST",
+			url: "/api/public/ingestion",
+			headers: {
+				authorization: `Basic ${Buffer.from("any:thing").toString("base64")}`,
+				"content-type": "application/json",
+			},
+			payload: JSON.stringify({
+				batch: [
+					{
+						id: "event-dev-1",
+						timestamp: "2026-06-14T00:00:00.000Z",
+						type: eventTypes.TRACE_CREATE,
+						body: { id: "trace-dev-1", name: "Dev Trace" },
+					},
+				],
+			}),
+		});
+
+		assert.equal(response.statusCode, 207);
+		assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
+
+		const db = new AgentPondCache(
+			join(mkdtempSync(join(tmpdir(), "agentpond-dev-cache-")), "cache.duckdb"),
+		);
+		await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+		const rows = await db.query<{ id: string; name: string }>(
+			"select id, name from traces where id = 'trace-dev-1'",
+		);
+		await db.close();
+
+		assert.deepEqual(rows, [{ id: "trace-dev-1", name: "Dev Trace" }]);
+	} finally {
 		await server.close();
 	}
 });

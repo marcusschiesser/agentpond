@@ -71,21 +71,13 @@ Install the AgentPond CLI:
 npm install -g agentpond
 ```
 
-Start the local MinIO object store and AgentPond ingestion service:
+Start the local AgentPond dev ingestion server:
 
 ```sh
-docker compose up --build
+agentpond dev
 ```
 
-### Configuration
-
-Load the configuration for the services started by `docker compose up` by adding the credentials in `.env.example` to your shell:
-
-```sh
-set -a
-. ./.env.example
-set +a
-```
+The command selects the `dev` environment, stores events under `./.agentpond/envs/dev/events`, and prints the Langfuse SDK environment variables to use for local traces.
 
 ### Create and query a trace
 
@@ -96,18 +88,12 @@ agentpond traces create \
   --name "checkout support answer" \
   --userId user_42 \
   --sessionId demo-session \
-  --metadata '{"env":"local","feature":"checkout","model":"gpt-5.5-mini"}' \
+  --metadata '{"feature":"checkout","model":"gpt-5.5-mini"}' \
   --input '{"question":"Why was my card declined?"}' \
   --output '{"answer":"The bank declined the authorization. Please try another card or contact your bank."}'
 ```
 
-Synchronize the stored events into the local DuckDB cache:
-
-```sh
-agentpond sync
-```
-
-Inspect the synchronized data:
+Inspect the trace:
 
 ```sh
 agentpond traces list
@@ -119,7 +105,7 @@ For the complete command reference, see [CLI usage](./docs/cli.md).
 
 ## Use AgentPond in your project
 
-AgentPond implements Langfuse-compatible ingestion endpoints. To send traces to AgentPond, configure the environment variables `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`. By using the values defined in `.env.example`, you're pointing to the local AgentPond deployment started in the last section. 
+AgentPond implements Langfuse-compatible ingestion endpoints. To send traces to AgentPond, configure the environment variables `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY` printed by `agentpond dev`.
 
 You can then use the normal Langfuse SDK integration for your language or framework.
 

@@ -6,42 +6,52 @@ import {
 	configFromEnv,
 	eventTypes,
 	type IngestionEvent,
-	loadEnvFile,
-	S3ObjectStore,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
+import {
+	CliError,
+	limit,
+	type ParsedArgs,
+	parseArgs,
+	print,
+	requiredFlag,
+	stringFlag,
+} from "./cli-support.js";
+import { startDevServer } from "./commands/dev.js";
+import { handleEnvironmentCommand } from "./commands/environment.js";
+import { objectStoreForConfig } from "./object-store.js";
 import { manualTraceResourceSpans } from "./otel-trace.js";
 import {
 	writeEventsAndSyncCache,
 	writeOtelAndSyncCache,
 } from "./sync-write.js";
 
-type ParsedArgs = {
-	flags: Record<string, string | boolean>;
-	positionals: string[];
-};
-
 export async function main(argv = process.argv): Promise<void> {
 	const parsed = parseArgs(argv.slice(2));
-	if (parsed.flags.env && typeof parsed.flags.env === "string") {
-		loadEnvFile(parsed.flags.env);
-	}
-
-	const config = configFromEnv({
-		dbPath: stringFlag(parsed, "db"),
-		s3Bucket: stringFlag(parsed, "s3-bucket"),
-		s3Prefix: stringFlag(parsed, "s3-prefix"),
-		s3Endpoint: stringFlag(parsed, "s3-endpoint"),
-	});
-	const json = Boolean(parsed.flags.json);
-	const [resource, action, ...rest] = parsed.positionals;
 
 	try {
-		if (!resource || parsed.flags.help || parsed.flags.h) return printHelp();
+		const [resource, action, ...rest] = parsed.positionals;
+		if (!resource) return printHelp();
+		if (resource === "env")
+			return handleEnvironmentCommand(action, rest, parsed);
+		if (parsed.flags.help || parsed.flags.h) return printHelp();
+		if (resource === "dev") {
+			return startDevServer(parsed);
+		}
+		const config = configFromEnv({
+			envName: stringFlag(parsed, "env"),
+			dbPath: stringFlag(parsed, "db"),
+			eventStorePath: stringFlag(parsed, "event-store"),
+			s3Bucket: stringFlag(parsed, "s3-bucket"),
+			s3Prefix: stringFlag(parsed, "s3-prefix"),
+			s3Endpoint: stringFlag(parsed, "s3-endpoint"),
+		});
+		const json = Boolean(parsed.flags.json);
+		logImplicitEnvironment(parsed, config, json);
 		if (resource === "sync") {
 			const db = new AgentPondCache(config.dbPath);
 			const result = await db.syncFromStore({
-				store: new S3ObjectStore(config.s3),
+				store: objectStoreForConfig(config),
 				projectId: config.projectId,
 				prefix: config.s3.prefix,
 			});
@@ -72,6 +82,15 @@ export async function main(argv = process.argv): Promise<void> {
 		console.error(message);
 		process.exitCode = error instanceof CliError ? 2 : 1;
 	}
+}
+
+function logImplicitEnvironment(
+	parsed: ParsedArgs,
+	config: ReturnType<typeof configFromEnv>,
+	json: boolean,
+): void {
+	if (json || stringFlag(parsed, "env") || !config.environment) return;
+	console.error(`Using AgentPond environment: ${config.environment.name}`);
 }
 
 async function createScore(
@@ -116,7 +135,7 @@ async function createScore(
 		},
 	};
 
-	const store = new S3ObjectStore(config.s3);
+	const store = objectStoreForConfig(config);
 	const manifest = await writeEventsAndSyncCache(config, store, [event]);
 	print(
 		{ eventId: event.id, scoreId: event.body.id, objects: manifest.objects },
@@ -131,7 +150,7 @@ async function createTrace(
 ): Promise<void> {
 	const now = new Date().toISOString();
 	const traceId = stringFlag(parsed, "id") ?? createOtelTraceId();
-	const store = new S3ObjectStore(config.s3);
+	const store = objectStoreForConfig(config);
 	const object = await writeOtelAndSyncCache(
 		config,
 		store,
@@ -195,49 +214,6 @@ async function runReadCommand(
 	throw new CliError(`Unknown command: ${resource} ${action}`);
 }
 
-function parseArgs(args: string[]): ParsedArgs {
-	const flags: ParsedArgs["flags"] = {};
-	const positionals: string[] = [];
-	for (let i = 0; i < args.length; i += 1) {
-		const arg = args[i];
-		if (!arg.startsWith("--")) {
-			positionals.push(arg);
-			continue;
-		}
-		const key = arg.slice(2);
-		if (["json", "help"].includes(key)) {
-			flags[key] = true;
-			continue;
-		}
-		const value = args[i + 1];
-		if (!value || value.startsWith("--"))
-			throw new CliError(`Missing value for --${key}`);
-		flags[key] = value;
-		i += 1;
-	}
-	return { flags, positionals };
-}
-
-function stringFlag(parsed: ParsedArgs, name: string): string | undefined {
-	const value = parsed.flags[name];
-	return typeof value === "string" ? value : undefined;
-}
-
-function requiredFlag(parsed: ParsedArgs, name: string): string {
-	const value = stringFlag(parsed, name);
-	if (!value) throw new CliError(`Missing --${name}`);
-	return value;
-}
-
-function limit(parsed: ParsedArgs): number {
-	const raw = stringFlag(parsed, "limit");
-	if (!raw) return 100;
-	const value = Number.parseInt(raw, 10);
-	if (!Number.isFinite(value) || value < 1 || value > 10000)
-		throw new CliError("--limit must be between 1 and 10000");
-	return value;
-}
-
 function parseScoreValue(value: string): string | number | boolean {
 	if (value === "true") return true;
 	if (value === "false") return false;
@@ -253,28 +229,15 @@ function sql(value: string): string {
 	return `'${value.replaceAll("'", "''")}'`;
 }
 
-function print(value: unknown, json: boolean): void {
-	if (json) {
-		console.log(
-			JSON.stringify(
-				value,
-				(_key, item) => (typeof item === "bigint" ? item.toString() : item),
-				2,
-			),
-		);
-		return;
-	}
-	if (Array.isArray(value)) {
-		console.table(value);
-		return;
-	}
-	console.log(JSON.stringify(value, null, 2));
-}
-
 function printHelp(): void {
 	console.log(`agentpond - local Langfuse-compatible trace analytics
 
 Usage:
+  agentpond dev [--host <host>] [--port <port>]
+  agentpond env current [--json]
+  agentpond env list [--json]
+  agentpond env init <name> [--json]
+  agentpond env use <name> [--json]
   agentpond sync [--json]
   agentpond traces create [--id <trace-id>] [--name <name>] [--userId <user-id>] [--sessionId <session-id>]
   agentpond traces list [--limit n] [--json]
@@ -288,8 +251,9 @@ Usage:
   agentpond sql "select ..." [--json]
 
 Global flags:
-  --env <path>
+  --env <name>
   --db <path>
+  --event-store <path>
   --s3-bucket <bucket>
   --s3-prefix <prefix>
   --s3-endpoint <url>
@@ -299,8 +263,6 @@ Global flags:
 function helpRows(resource: string): Record<string, unknown>[] {
 	return [{ resource, hint: "Run agentpond --help for command usage." }];
 }
-
-class CliError extends Error {}
 
 function isCliEntryPoint(): boolean {
 	if (!process.argv[1]) return false;

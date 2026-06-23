@@ -18,34 +18,68 @@ agentpond --help
 
 ## Configure
 
-For a local MinIO setup started with `docker compose up --build`, configure the CLI with:
+For local development without MinIO, start the built-in dev ingestion server:
 
 ```sh
-export AGENTPOND_S3_ENDPOINT=http://localhost:9000
-export AGENTPOND_S3_BUCKET=agentpond
-export AWS_ACCESS_KEY_ID=minio
-export AWS_SECRET_ACCESS_KEY=minio123
+agentpond dev
 ```
 
-The CLI reads the same configuration variables as the ingestion service. You can also pass common settings as flags:
+The command selects the `dev` environment, listens on `127.0.0.1:4318`, and prints the `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY` values to use with Langfuse SDKs.
+
+For S3-backed environments, store dotenv-compatible settings in `.agentpond/envs/<name>.env`:
 
 ```sh
-agentpond --env .env sync
-agentpond --db ./.agentpond/cache.duckdb sync
+agentpond env init production
+agentpond env use production
+```
+
+The CLI reads the selected environment file, then applies process environment variables and explicit flags. You can select an environment per command:
+
+```sh
+agentpond --env dev sync
+agentpond --env production sync
 agentpond --s3-bucket agentpond --s3-endpoint http://localhost:9000 sync
 ```
 
-By default, AgentPond stores its DuckDB cache at `./.agentpond/cache.duckdb` in the current working directory. Set `AGENTPOND_DB` or pass `--db <path>` to use a shared or custom cache location.
+By default, AgentPond stores one DuckDB cache per environment at `./.agentpond/envs/<name>/cache.duckdb`. The dev event store lives at `./.agentpond/envs/dev/events`.
 
 ## Global Flags
 
 ```txt
---env <path>          Load environment variables from a file
+--env <name>          Use a named AgentPond environment
 --db <path>           Use a specific DuckDB cache path
+--event-store <path>  Use a specific local event-store path
 --s3-bucket <bucket>  Use a specific S3 bucket
 --s3-prefix <prefix>  Use a specific S3 key prefix
 --s3-endpoint <url>   Use a custom S3 endpoint, such as MinIO
 --json                Print machine-readable JSON output
+```
+
+## Environments
+
+```sh
+agentpond env current
+agentpond env list
+agentpond env init staging
+agentpond env use production
+```
+
+Environment files are stored at `.agentpond/envs/<name>.env`. If no environment has been selected yet, AgentPond uses `dev`.
+
+## Dev Server
+
+Start a local Langfuse SDK-compatible ingestion server:
+
+```sh
+agentpond dev
+```
+
+The dev server stores events in `.agentpond/envs/dev/events` and does not enforce credential matching. Langfuse SDKs should still be configured with the dummy keys printed by the command because SDKs expect public and secret keys to be present.
+
+Project dev events into the dev DuckDB cache:
+
+```sh
+agentpond sync --env dev
 ```
 
 ## Sync
@@ -159,6 +193,8 @@ agentpond sql "select * from traces limit 10" --json
 
 ```sh
 agentpond sync
+agentpond dev
+agentpond env current
 agentpond traces create --name "manual trace" --userId user_42 --sessionId session_42
 agentpond traces list
 agentpond traces get <trace-id>

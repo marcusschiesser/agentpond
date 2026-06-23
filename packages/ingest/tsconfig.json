@@ -5,6 +5,6 @@
 		"rootDir": "src",
 		"outDir": "dist"
 	},
-	"references": [{ "path": "../../packages/ingest" }],
+	"references": [{ "path": "../core" }],
 	"include": ["src/**/*.ts"]
 }

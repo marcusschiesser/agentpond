@@ -402,6 +402,48 @@ test("CLI read commands report missing required score filters", async () => {
 	}
 });
 
+test("CLI reports the selected environment when --env is omitted for non-JSON commands", async () => {
+	const dbPath = join(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
+		"cache.duckdb",
+	);
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		const stderr = await captureStderr(() =>
+			captureStdout(() =>
+				main(["node", "agentpond", "--db", dbPath, "traces", "list"]),
+			),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.match(stderr, /Using AgentPond environment: dev/);
+	} finally {
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI does not report implicit environment in JSON output", async () => {
+	const dbPath = join(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
+		"cache.duckdb",
+	);
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		const stderr = await captureStderr(() =>
+			captureStdout(() =>
+				main(["node", "agentpond", "--db", dbPath, "traces", "list", "--json"]),
+			),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(stderr, "");
+	} finally {
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI returns non-zero errors for invalid resources and actions", async () => {
 	const dbPath = join(
 		mkdtempSync(join(tmpdir(), "agentpond-cli-")),

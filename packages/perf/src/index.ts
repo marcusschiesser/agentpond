@@ -1,9 +1,9 @@
 import { performance } from "node:perf_hooks";
 import { S3ObjectStore } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
+import { buildServer } from "@agentpond/ingest";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { NodeSDK } from "@opentelemetry/sdk-node";
-import { buildServer } from "../../../apps/ingest/src/server.js";
 import {
 	assertEmptyPrefix,
 	buildConfig,

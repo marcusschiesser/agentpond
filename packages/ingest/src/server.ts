@@ -15,11 +15,13 @@ import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 export type BuildServerOptions = {
 	config?: AgentPondConfig;
 	store?: ObjectStore;
+	authMode?: "required" | "disabled";
 };
 
 export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 	const config = options.config ?? configFromEnv();
 	const store = options.store ?? new S3ObjectStore(config.s3);
+	const authMode = options.authMode ?? "required";
 	const server = Fastify({
 		logger: process.env.NODE_ENV !== "test",
 		bodyLimit: 16 * 1024 * 1024,
@@ -44,8 +46,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
 	server.post("/api/public/ingestion", async (request, reply) => {
 		try {
-			if (!config.auth) throw new AuthError("Auth is not configured");
-			const auth = verifyBasicAuth(request.headers.authorization, config.auth);
+			const auth = authenticateRequest(
+				request.headers.authorization,
+				config,
+				authMode,
+			);
 			const payload = parseJsonBody(
 				request.body,
 				request.headers["content-encoding"],
@@ -73,8 +78,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
 	server.post("/api/public/otel/v1/traces", async (request, reply) => {
 		try {
-			if (!config.auth) throw new AuthError("Auth is not configured");
-			const auth = verifyBasicAuth(request.headers.authorization, config.auth);
+			const auth = authenticateRequest(
+				request.headers.authorization,
+				config,
+				authMode,
+			);
 			const ingestionVersion = readHeader(
 				request.headers,
 				"x-langfuse-ingestion-version",
@@ -110,6 +118,33 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 	});
 
 	return server;
+}
+
+function authenticateRequest(
+	authorization: string | undefined,
+	config: AgentPondConfig,
+	authMode: "required" | "disabled",
+): { projectId: string; publicKey: string } {
+	if (authMode === "disabled") {
+		return {
+			projectId: config.projectId,
+			publicKey: readBasicAuthPublicKey(authorization) ?? "pk-agentpond-dev",
+		};
+	}
+	if (!config.auth) throw new AuthError("Auth is not configured");
+	return verifyBasicAuth(authorization, config.auth);
+}
+
+function readBasicAuthPublicKey(
+	authorization: string | undefined,
+): string | undefined {
+	if (!authorization?.startsWith("Basic ")) return undefined;
+	const decoded = Buffer.from(
+		authorization.slice("Basic ".length),
+		"base64",
+	).toString("utf8");
+	const separator = decoded.indexOf(":");
+	return separator >= 0 ? decoded.slice(0, separator) : decoded;
 }
 
 function parseJsonBody(body: unknown, contentEncoding: unknown): unknown {

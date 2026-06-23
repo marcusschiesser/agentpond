@@ -7,6 +7,6 @@
 		"dev": "tsx src/index.ts"
 	},
 	"dependencies": {
-		"@agentpond/core": "workspace:*"
+		"@agentpond/ingest": "workspace:*"
 	}
 }

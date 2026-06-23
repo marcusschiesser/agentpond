@@ -52,10 +52,10 @@ export AWS_ACCESS_KEY_ID=minio
 export AWS_SECRET_ACCESS_KEY=minio123
 ```
 
-For a file-based setup:
+For a named environment setup:
 
 ```bash
-npx agentpond --env .env sync
+npx agentpond --env production sync
 ```
 
 Common inspection flow:
@@ -79,9 +79,9 @@ npx agentpond sql "select id, name, session_id, total_cost from traces order by 
 AgentPond ingestion uses Langfuse-compatible endpoints. Applications can use normal Langfuse SDK configuration while pointing at an AgentPond ingestion service:
 
 ```bash
-export LANGFUSE_BASE_URL=http://localhost:3030
-export LANGFUSE_PUBLIC_KEY=pk-agentpond
-export LANGFUSE_SECRET_KEY=sk-agentpond
+export LANGFUSE_BASE_URL=http://127.0.0.1:4318
+export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev
+export LANGFUSE_SECRET_KEY=sk-agentpond-dev
 ```
 
 These variables configure SDK ingestion. They are not credentials for using the AgentPond CLI to query Langfuse Cloud. The AgentPond CLI reads from object storage and the local DuckDB cache.
