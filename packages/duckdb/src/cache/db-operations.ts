@@ -184,13 +184,6 @@ export class DuckDbOperations {
     `);
 	}
 
-	async tableHasRows(table: string): Promise<boolean> {
-		const rows = await this.all<{ has_rows: boolean }>(
-			`SELECT EXISTS (SELECT 1 FROM ${table} LIMIT 1) AS has_rows`,
-		);
-		return Boolean(rows[0]?.has_rows);
-	}
-
 	async processedKeys(
 		table: ProcessedTable,
 		keys: string[],

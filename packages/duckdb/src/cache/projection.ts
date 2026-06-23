@@ -54,77 +54,94 @@ export class BatchProjection {
 	}
 
 	async commit(projectId: string): Promise<void> {
-		const rawWasEmpty = await this.upsertRawEvents();
-		await this.projectRawEvents(projectId, rawWasEmpty);
+		const existingKeys = await this.upsertRawEvents(projectId);
+		await this.projectRawEvents(projectId, existingKeys);
 	}
 
-	private async upsertRawEvents(): Promise<boolean> {
-		if (this.rawRows.length === 0) return false;
-		const rawWasEmpty = !(await this.db.tableHasRows("events_raw"));
-		if (!rawWasEmpty) {
-			for (const chunk of chunks(this.rawRows, FILTER_CHUNK_SIZE)) {
+	private async upsertRawEvents(projectId: string): Promise<ProjectionWork> {
+		if (this.rawRows.length === 0) {
+			return createProjectionWork();
+		}
+		const existingKeys = await this.existingProjectionKeys(projectId);
+		if (this.rawRows.some((row) => row.manifestKey !== null)) {
+			const existingEventIds = await this.existingEventIds();
+			for (const chunk of chunks([...existingEventIds], FILTER_CHUNK_SIZE)) {
 				await this.db.exec(
-					`DELETE FROM events_raw WHERE event_id IN (${chunk.map((row) => sql(row.eventId)).join(", ")})`,
+					`DELETE FROM events_raw WHERE event_id IN (${chunk.map(sql).join(", ")})`,
 				);
 			}
 		}
 		await this.db.appendEventsRaw(this.rawRows.map(eventsRawAppendRow));
-		return rawWasEmpty;
+		return existingKeys;
+	}
+
+	private async existingEventIds(): Promise<Set<string>> {
+		const existingEventIds = new Set<string>();
+		for (const chunk of chunks(this.rawRows, FILTER_CHUNK_SIZE)) {
+			if (chunk.length === 0) continue;
+			const rows = await this.db.all<{ event_id: string }>(`
+        SELECT event_id
+        FROM events_raw
+        WHERE event_id IN (${chunk.map((row) => sql(row.eventId)).join(", ")})
+      `);
+			for (const row of rows) {
+				existingEventIds.add(row.event_id);
+			}
+		}
+		return existingEventIds;
 	}
 
 	private async projectRawEvents(
 		projectId: string,
-		rawWasEmpty: boolean,
+		existingKeys: ProjectionWork,
 	): Promise<void> {
 		const work = this.work;
-		if (!rawWasEmpty) {
-			for (const traceId of await this.projectedObservationTraceIds(
-				work.observationIds,
-			)) {
-				work.costTraceIds.add(traceId);
-			}
+		for (const traceId of existingKeys.costTraceIds) {
+			work.costTraceIds.add(traceId);
 		}
-		const traceRows = rawWasEmpty
-			? latestBatchRowsByKey(
-					this.rawRows,
-					"traceId",
-					work.traceIds,
-					(row) => row.eventType === "trace-create",
-				)
-			: await this.latestRawRowsByKey(
-					projectId,
-					"trace_id",
-					work.traceIds,
-					"event_type = 'trace-create'",
-				);
-		const observationRows = rawWasEmpty
-			? latestBatchRowsByKey(
-					this.rawRows,
-					"observationId",
-					work.observationIds,
-					(row) =>
-						row.eventType !== "trace-create" &&
-						row.eventType !== "score-create",
-				)
-			: await this.latestRawRowsByKey(
-					projectId,
-					"observation_id",
-					work.observationIds,
-					"event_type <> 'trace-create' AND event_type <> 'score-create'",
-				);
-		const scoreRows = rawWasEmpty
-			? latestBatchRowsByKey(
-					this.rawRows,
-					"scoreId",
-					work.scoreIds,
-					(row) => row.eventType === "score-create",
-				)
-			: await this.latestRawRowsByKey(
-					projectId,
-					"score_id",
-					work.scoreIds,
-					"event_type = 'score-create'",
-				);
+		const traceRows = [
+			...latestBatchRowsByKey(
+				this.rawRows,
+				"traceId",
+				withoutExistingKeys(work.traceIds, existingKeys.traceIds),
+				(row) => row.eventType === "trace-create",
+			),
+			...(await this.latestRawRowsByKey(
+				projectId,
+				"trace_id",
+				existingKeys.traceIds,
+				"event_type = 'trace-create'",
+			)),
+		];
+		const observationRows = [
+			...latestBatchRowsByKey(
+				this.rawRows,
+				"observationId",
+				withoutExistingKeys(work.observationIds, existingKeys.observationIds),
+				(row) =>
+					row.eventType !== "trace-create" && row.eventType !== "score-create",
+			),
+			...(await this.latestRawRowsByKey(
+				projectId,
+				"observation_id",
+				existingKeys.observationIds,
+				"event_type <> 'trace-create' AND event_type <> 'score-create'",
+			)),
+		];
+		const scoreRows = [
+			...latestBatchRowsByKey(
+				this.rawRows,
+				"scoreId",
+				withoutExistingKeys(work.scoreIds, existingKeys.scoreIds),
+				(row) => row.eventType === "score-create",
+			),
+			...(await this.latestRawRowsByKey(
+				projectId,
+				"score_id",
+				existingKeys.scoreIds,
+				"event_type = 'score-create'",
+			)),
+		];
 		for (const row of observationRows) {
 			if (row.traceId) work.costTraceIds.add(row.traceId);
 		}
@@ -138,21 +155,67 @@ export class BatchProjection {
 		await this.refreshTraceTotalCosts([...work.costTraceIds]);
 	}
 
-	private async projectedObservationTraceIds(
-		observationIds: Set<string>,
-	): Promise<string[]> {
-		const traceIds = new Set<string>();
-		for (const chunk of chunks([...observationIds], FILTER_CHUNK_SIZE)) {
-			if (chunk.length === 0) continue;
-			const rows = await this.db.all<{ trace_id: string | null }>(
-				`SELECT trace_id FROM observations WHERE id IN (${chunk.map(sql).join(", ")})`,
-			);
-			for (const row of rows) {
-				const traceId = stringValue(row.trace_id);
-				if (traceId) traceIds.add(traceId);
-			}
+	private async existingProjectionKeys(
+		projectId: string,
+	): Promise<ProjectionWork> {
+		const work = createProjectionWork();
+		for (const row of await this.existingProjectedRows<{ id: string | null }>({
+			projectId,
+			table: "traces",
+			keys: this.work.traceIds,
+			columns: ["id"],
+		})) {
+			const id = stringValue(row.id);
+			if (id) work.traceIds.add(id);
 		}
-		return [...traceIds];
+		for (const row of await this.existingProjectedRows<{
+			id: string | null;
+			trace_id: string | null;
+		}>({
+			projectId,
+			table: "observations",
+			keys: this.work.observationIds,
+			columns: ["id", "trace_id"],
+		})) {
+			const id = stringValue(row.id);
+			const traceId = stringValue(row.trace_id);
+			if (id) work.observationIds.add(id);
+			if (traceId) work.costTraceIds.add(traceId);
+		}
+		for (const row of await this.existingProjectedRows<{ id: string | null }>({
+			projectId,
+			table: "scores",
+			keys: this.work.scoreIds,
+			columns: ["id"],
+		})) {
+			const id = stringValue(row.id);
+			if (id) work.scoreIds.add(id);
+		}
+		return work;
+	}
+
+	private async existingProjectedRows<
+		T extends Record<string, unknown>,
+	>(params: {
+		projectId: string;
+		table: "traces" | "observations" | "scores";
+		keys: Set<string>;
+		columns: string[];
+	}): Promise<T[]> {
+		const rows: T[] = [];
+		const columns = params.columns.join(", ");
+		for (const keyChunk of chunks([...params.keys], FILTER_CHUNK_SIZE)) {
+			if (keyChunk.length === 0) continue;
+			rows.push(
+				...(await this.db.all<T>(`
+        SELECT ${columns}
+        FROM ${params.table}
+        WHERE project_id = ${sql(params.projectId)}
+          AND id IN (${keyChunk.map(sql).join(", ")})
+      `)),
+			);
+		}
+		return rows;
 	}
 
 	private async latestRawRowsByKey(
@@ -378,6 +441,18 @@ function latestBatchRowsByKey(
 		}
 	}
 	return [...latest.values()];
+}
+
+function withoutExistingKeys(
+	keys: Set<string>,
+	existingKeys: Set<string>,
+): Set<string> {
+	if (existingKeys.size === 0) return keys;
+	const result = new Set<string>();
+	for (const key of keys) {
+		if (!existingKeys.has(key)) result.add(key);
+	}
+	return result;
 }
 
 function compareRawRows(left: RawEventRow, right: RawEventRow): number {
