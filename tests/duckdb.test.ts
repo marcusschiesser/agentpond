@@ -198,6 +198,57 @@ test("DuckDB sessions view exposes session rows in stable last seen order", asyn
 	]);
 });
 
+test("DuckDB sync rejects duplicate manifest event ids atomically", async () => {
+	const store = new MemoryObjectStore();
+	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
+	const db = createTempDb();
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "duplicate-event",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "trace-1", name: "original trace" },
+			},
+		],
+		"batch-1",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "duplicate-event",
+				timestamp: "2026-06-14T00:00:01.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "trace-2", name: "duplicate trace" },
+			},
+		],
+		"batch-2",
+	);
+
+	await assert.rejects(
+		db.syncFromStore({ store, projectId: "project-a", prefix: "" }),
+		/append|aborted|constraint|primary/i,
+	);
+
+	const rawRows = await db.query<{ count: bigint }>(
+		"select count(*) as count from events_raw",
+	);
+	const traces = await db.query<{ id: string; name: string }>(
+		"select id, name from traces order by id",
+	);
+	const processedManifests = await db.query<{ count: bigint }>(
+		"select count(*) as count from processed_manifests",
+	);
+	await db.close();
+
+	assert.equal(Number(rawRows[0].count), 1);
+	assert.deepEqual(traces, [{ id: "trace-1", name: "original trace" }]);
+	assert.equal(Number(processedManifests[0].count), 1);
+});
+
 test("DuckDB projection keeps newer event when an older event syncs later", async () => {
 	const store = new MemoryObjectStore();
 	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });

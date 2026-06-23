@@ -63,32 +63,8 @@ export class BatchProjection {
 			return createProjectionWork();
 		}
 		const existingKeys = await this.existingProjectionKeys(projectId);
-		if (this.rawRows.some((row) => row.manifestKey !== null)) {
-			const existingEventIds = await this.existingEventIds();
-			for (const chunk of chunks([...existingEventIds], FILTER_CHUNK_SIZE)) {
-				await this.db.exec(
-					`DELETE FROM events_raw WHERE event_id IN (${chunk.map(sql).join(", ")})`,
-				);
-			}
-		}
 		await this.db.appendEventsRaw(this.rawRows.map(eventsRawAppendRow));
 		return existingKeys;
-	}
-
-	private async existingEventIds(): Promise<Set<string>> {
-		const existingEventIds = new Set<string>();
-		for (const chunk of chunks(this.rawRows, FILTER_CHUNK_SIZE)) {
-			if (chunk.length === 0) continue;
-			const rows = await this.db.all<{ event_id: string }>(`
-        SELECT event_id
-        FROM events_raw
-        WHERE event_id IN (${chunk.map((row) => sql(row.eventId)).join(", ")})
-      `);
-			for (const row of rows) {
-				existingEventIds.add(row.event_id);
-			}
-		}
-		return existingEventIds;
 	}
 
 	private async projectRawEvents(
