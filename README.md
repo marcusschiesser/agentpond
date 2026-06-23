@@ -71,14 +71,6 @@ Install the AgentPond CLI:
 npm install -g agentpond
 ```
 
-Start the local AgentPond dev ingestion server:
-
-```sh
-agentpond dev
-```
-
-The command selects the `dev` environment, stores events under `./.agentpond/envs/dev/events`, and prints the Langfuse SDK environment variables to use for local traces.
-
 ### Create and query a trace
 
 Create a test trace directly through the CLI:
@@ -101,7 +93,6 @@ agentpond sql "select id, name, session_id from traces"
 ```
 
 For the complete command reference, see [CLI usage](./docs/cli.md).
-
 
 ## Use AgentPond in your project
 
