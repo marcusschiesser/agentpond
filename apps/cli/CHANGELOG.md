@@ -1,5 +1,12 @@
 # agentpond
 
+## 0.1.3
+
+### Patch Changes
+
+- bfed524: Simplify DuckDB sync projection by using one timestamp-ordered projection path for fresh and non-empty caches.
+- 7f13eb1: Reduce memory usage during large object-store syncs by committing bounded DuckDB projection batches.
+
 ## 0.1.2
 
 ### Patch Changes
