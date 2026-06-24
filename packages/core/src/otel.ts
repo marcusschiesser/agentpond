@@ -226,7 +226,10 @@ export function otelResourceSpansToEvents(
 				} as IngestionEvent;
 				events.push(observationEvent);
 
-				if (!parentSpanId) {
+				const isRootSpan =
+					!parentSpanId ||
+					booleanValue(attributes["langfuse.internal.as_root"]) === true;
+				if (isRootSpan) {
 					const langfuse = langfuseAttributes(attributes);
 					events.push({
 						id: randomUUID(),
