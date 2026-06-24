@@ -5,13 +5,13 @@ import {
 } from "@agentpond/core";
 import type { DuckDbOperations } from "./db-operations.js";
 import { BatchProjection, rawEventRow, stringValue } from "./projection.js";
+import type { SyncStateStore } from "./sync-state.js";
+import { createSyncStateStore } from "./sync-state.js";
 import type {
 	SyncFromStoreParams,
 	SyncProgress,
 	SyncResult,
 } from "./sync-types.js";
-import type { SyncStateStore } from "./sync-state.js";
-import { createSyncStateStore } from "./sync-state.js";
 
 type PendingObject = {
 	manifestKey: string | null;

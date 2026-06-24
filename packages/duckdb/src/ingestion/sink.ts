@@ -1,7 +1,9 @@
 import type { IngestionEvent } from "@agentpond/core";
 import { AgentPondCache } from "../cache/index.js";
-import type { DuckDbDirectIngestion } from "./direct-ingestion.js";
-import type { DirectWriteResult } from "./direct-ingestion.js";
+import type {
+	DirectWriteResult,
+	DuckDbDirectIngestion,
+} from "./direct-ingestion.js";
 
 export class DuckDbIngestionSink {
 	constructor(private readonly dbPath: string) {}

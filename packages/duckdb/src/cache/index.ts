@@ -2,6 +2,7 @@ import { DuckDbDirectIngestion } from "../ingestion/direct-ingestion.js";
 import { type DuckDbAccessMode, DuckDbOperations } from "./db-operations.js";
 import { DuckDbStoreSync } from "./store-sync.js";
 import type { SyncFromStoreParams, SyncResult } from "./sync-types.js";
+
 export type {
 	SyncFromStoreParams,
 	SyncProgress,

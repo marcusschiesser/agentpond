@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
-	configFromEnv,
+	type configFromEnv,
 	DEV_SERVER_RUNNING_MESSAGE,
 	initAgentPondEnvironment,
 	isDevServerRunning,

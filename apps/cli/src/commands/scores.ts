@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import {
-	configFromEnv,
+	type configFromEnv,
 	eventTypes,
 	type IngestionEvent,
 } from "@agentpond/core";
 import {
-	AgentPondCache,
+	type AgentPondCache,
 	DuckDbIngestionSink,
 	ensureDuckDbSchema,
 } from "@agentpond/duckdb";
@@ -17,14 +17,14 @@ import {
 	requiredFlag,
 	stringFlag,
 } from "../cli-support.js";
+import { objectStoreForConfig } from "../object-store.js";
+import { sql } from "../sql.js";
+import { writeEventsAndSyncCache } from "../sync-write.js";
 import {
 	assertDevServerNotRunning,
 	cacheForRead,
 	isDevEnvironment,
 } from "./environment.js";
-import { objectStoreForConfig } from "../object-store.js";
-import { sql } from "../sql.js";
-import { writeEventsAndSyncCache } from "../sync-write.js";
 
 export async function handleScoreCommand(
 	action: string | undefined,

@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { configFromEnv } from "@agentpond/core";
+import type { configFromEnv } from "@agentpond/core";
 import {
-	AgentPondCache,
+	type AgentPondCache,
 	DuckDbIngestionSink,
 	ensureDuckDbSchema,
 } from "@agentpond/duckdb";
@@ -12,15 +12,15 @@ import {
 	print,
 	stringFlag,
 } from "../cli-support.js";
+import { objectStoreForConfig } from "../object-store.js";
+import { manualTraceResourceSpans } from "../otel-trace.js";
+import { sql } from "../sql.js";
+import { writeOtelAndSyncCache } from "../sync-write.js";
 import {
 	assertDevServerNotRunning,
 	cacheForRead,
 	isDevEnvironment,
 } from "./environment.js";
-import { objectStoreForConfig } from "../object-store.js";
-import { manualTraceResourceSpans } from "../otel-trace.js";
-import { sql } from "../sql.js";
-import { writeOtelAndSyncCache } from "../sync-write.js";
 
 export async function handleTraceCommand(
 	action: string | undefined,

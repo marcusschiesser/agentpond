@@ -2,4 +2,4 @@
 "agentpond": minor
 ---
 
-Write `agentpond dev` ingestion directly to the dev DuckDB cache and make dev sync a no-op while blocking competing dev writes.
+Add a local `agentpond dev` ingestion server that writes directly to the dev DuckDB cache, makes dev sync a no-op, and blocks competing dev writes.
