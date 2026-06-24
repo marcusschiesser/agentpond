@@ -21,7 +21,7 @@ function requireLangfuseEnv() {
 	if (missing.length > 0) {
 		throw new Error(
 			`Missing required Langfuse environment variables: ${missing.join(", ")}. ` +
-				'Run eval "$(agentpond dev env)" before running this example.',
+				'Run eval "$(agentpond env get dev)" before running this example.',
 		);
 	}
 }

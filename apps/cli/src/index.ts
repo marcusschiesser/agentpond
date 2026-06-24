@@ -32,7 +32,7 @@ export async function main(argv = process.argv): Promise<void> {
 		const [resource, action, ...rest] = parsed.positionals;
 		if (!resource) return printHelp();
 		if (resource === "env")
-			return handleEnvironmentCommand(action, rest, parsed);
+			return await handleEnvironmentCommand(action, rest, parsed);
 		if (parsed.flags.help || parsed.flags.h) return printHelp();
 		if (resource === "dev") {
 			return await startDevServer(parsed);
@@ -137,6 +137,7 @@ function printHelp(): void {
 Usage:
   agentpond dev [--host <host>] [--port <port>]
   agentpond env current [--json]
+  agentpond env get <name> [--host <host>] [--port <port>]
   agentpond env list [--json]
   agentpond env init <name> [--json]
   agentpond env use <name> [--json]

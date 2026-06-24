@@ -27,7 +27,7 @@ agentpond dev
 Load the local Langfuse-compatible credentials in a second terminal that will run the example:
 
 ```sh
-eval "$(agentpond dev env)"
+eval "$(agentpond env get dev)"
 ```
 
 Set an OpenAI API key:

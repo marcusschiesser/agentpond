@@ -409,9 +409,12 @@ test("CLI reports the selected environment when --env is omitted for non-JSON co
 		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
 		"cache.duckdb",
 	);
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-log-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		process.chdir(root);
 		const db = new AgentPondCache(dbPath);
 		await db.ensureSchema();
 		await db.close();
@@ -425,6 +428,7 @@ test("CLI reports the selected environment when --env is omitted for non-JSON co
 		assert.equal(process.exitCode, undefined);
 		assert.match(stderr, /Using AgentPond environment: dev/);
 	} finally {
+		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });
@@ -629,7 +633,7 @@ test("CLI scores create writes directly to the dev DuckDB", async () => {
 	}
 });
 
-test("CLI dev env prints shell exports for SDK configuration", async () => {
+test("CLI env get dev prints generated shell exports without creating dev env file", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-"));
 	const originalExitCode = process.exitCode;
@@ -637,7 +641,7 @@ test("CLI dev env prints shell exports for SDK configuration", async () => {
 	try {
 		process.chdir(root);
 		const output = await captureStdout(() =>
-			main(["node", "agentpond", "dev", "env"]),
+			main(["node", "agentpond", "env", "get", "dev"]),
 		);
 
 		assert.equal(process.exitCode, undefined);
@@ -650,13 +654,17 @@ test("CLI dev env prints shell exports for SDK configuration", async () => {
 				"",
 			].join("\n"),
 		);
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "dev.env")),
+			false,
+		);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });
 
-test("CLI dev env honors custom host and port", async () => {
+test("CLI env get dev honors custom host and port", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-override-"));
 	const originalExitCode = process.exitCode;
@@ -667,8 +675,9 @@ test("CLI dev env honors custom host and port", async () => {
 			main([
 				"node",
 				"agentpond",
-				"dev",
 				"env",
+				"get",
+				"dev",
 				"--host",
 				"0.0.0.0",
 				"--port",

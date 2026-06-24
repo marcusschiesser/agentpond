@@ -23,6 +23,11 @@ export type ResolveEnvironmentOptions = {
 	cwd?: string;
 };
 
+export type EnvFileEntry = {
+	key: string;
+	value: string;
+};
+
 export function loadEnvFile(filePath: string): void {
 	for (const [key, value] of Object.entries(parseEnvFile(filePath))) {
 		process.env[key] = value;
@@ -31,6 +36,14 @@ export function loadEnvFile(filePath: string): void {
 
 export function parseEnvFile(filePath: string): Record<string, string> {
 	const values: Record<string, string> = {};
+	for (const { key, value } of parseEnvFileEntries(filePath)) {
+		values[key] = value;
+	}
+	return values;
+}
+
+export function parseEnvFileEntries(filePath: string): EnvFileEntry[] {
+	const values: EnvFileEntry[] = [];
 	if (!existsSync(filePath)) return values;
 	const content = readFileSync(filePath, "utf8");
 	for (const line of content.split("\n")) {
@@ -39,6 +52,9 @@ export function parseEnvFile(filePath: string): Record<string, string> {
 		const eqIdx = trimmed.indexOf("=");
 		if (eqIdx === -1) continue;
 		const key = trimmed.slice(0, eqIdx).trim();
+		if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+			throw new Error(`Invalid environment variable name: ${key}`);
+		}
 		let val = trimmed.slice(eqIdx + 1).trim();
 		if (
 			(val.startsWith('"') && val.endsWith('"')) ||
@@ -46,7 +62,7 @@ export function parseEnvFile(filePath: string): Record<string, string> {
 		) {
 			val = val.slice(1, -1);
 		}
-		values[key] = val;
+		values.push({ key, value: val });
 	}
 	return values;
 }
@@ -88,7 +104,7 @@ export function initAgentPondEnvironment(name: string): AgentPondEnvironment {
 	const environment = resolveAgentPondEnvironment({ name });
 	mkdirSync(environment.envDir, { recursive: true });
 	mkdirSync(join(environment.agentpondDir, "envs"), { recursive: true });
-	if (!existsSync(environment.envFilePath)) {
+	if (environment.name !== "dev" && !existsSync(environment.envFilePath)) {
 		writeFileSync(
 			environment.envFilePath,
 			defaultEnvironmentFile(environment.name),

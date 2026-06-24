@@ -21,7 +21,7 @@ agentpond dev
 Load the local Langfuse-compatible credentials in a second terminal that will run the examples:
 
 ```sh
-eval "$(agentpond dev env)"
+eval "$(agentpond env get dev)"
 ```
 
 ## Python

@@ -26,6 +26,12 @@ agentpond dev
 
 The command selects the `dev` environment, listens on `127.0.0.1:4318`, and prints the `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY` values to use with Langfuse SDKs.
 
+You can print the same SDK environment for a shell with:
+
+```sh
+eval "$(agentpond env get dev)"
+```
+
 For S3-backed environments, store dotenv-compatible settings in `.agentpond/envs/<name>.env`:
 
 ```sh
@@ -48,7 +54,6 @@ By default, AgentPond stores one DuckDB cache per environment at `./.agentpond/e
 ```txt
 --env <name>          Use a named AgentPond environment
 --db <path>           Use a specific DuckDB cache path
---event-store <path>  Use a specific local event-store path
 --s3-bucket <bucket>  Use a specific S3 bucket
 --s3-prefix <prefix>  Use a specific S3 key prefix
 --s3-endpoint <url>   Use a custom S3 endpoint, such as MinIO
@@ -59,6 +64,7 @@ By default, AgentPond stores one DuckDB cache per environment at `./.agentpond/e
 
 ```sh
 agentpond env current
+agentpond env get dev
 agentpond env list
 agentpond env init staging
 agentpond env use production
@@ -74,12 +80,10 @@ Start a local Langfuse SDK-compatible ingestion server:
 agentpond dev
 ```
 
-The dev server stores events in `.agentpond/envs/dev/events` and does not enforce credential matching. Langfuse SDKs should still be configured with the dummy keys printed by the command because SDKs expect public and secret keys to be present.
-
-Project dev events into the dev DuckDB cache:
+The dev server writes directly to `.agentpond/envs/dev/cache.duckdb` and does not enforce credential matching. Langfuse SDKs should still be configured with the dummy keys printed by the command because SDKs expect public and secret keys to be present.
 
 ```sh
-agentpond sync --env dev
+eval "$(agentpond env get dev)"
 ```
 
 ## Sync
@@ -195,6 +199,7 @@ agentpond sql "select * from traces limit 10" --json
 agentpond sync
 agentpond dev
 agentpond env current
+agentpond env get dev
 agentpond traces create --name "manual trace" --userId user_42 --sessionId session_42
 agentpond traces list
 agentpond traces get <trace-id>

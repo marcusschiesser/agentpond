@@ -6,6 +6,7 @@ import {
 	initAgentPondEnvironment,
 	isDevServerRunning,
 	listAgentPondEnvironments,
+	parseEnvFileEntries,
 	resolveAgentPondEnvironment,
 	selectAgentPondEnvironment,
 } from "@agentpond/core";
@@ -13,9 +14,11 @@ import { AgentPondCache } from "@agentpond/duckdb";
 import {
 	CliError,
 	type ParsedArgs,
+	parsePort,
 	print,
 	stringFlag,
 } from "../cli-support.js";
+import { devSdkEnvironment } from "../dev-env.js";
 
 export async function handleEnvironmentCommand(
 	action: string | undefined,
@@ -42,6 +45,11 @@ export async function handleEnvironmentCommand(
 		if (parsed.flags.json) return print(environment, true);
 		return print([environment], false);
 	}
+	if (action === "get") {
+		const name = rest[0];
+		if (!name) throw new CliError("Missing environment name");
+		return printEnvironmentExports(name, parsed);
+	}
 	if (action === "use") {
 		const name = rest[0];
 		if (!name) throw new CliError("Missing environment name");
@@ -62,6 +70,34 @@ export async function handleEnvironmentCommand(
 		);
 	}
 	throw new CliError(`Unknown command: env ${action}`);
+}
+
+function printEnvironmentExports(name: string, parsed: ParsedArgs): void {
+	const entries =
+		name === "dev"
+			? devSdkEnvironment(
+					stringFlag(parsed, "host") ?? "127.0.0.1",
+					parsePort(stringFlag(parsed, "port") ?? "4318"),
+				)
+			: readEnvironmentFileExports(name);
+	for (const entry of entries) {
+		console.log(`export ${entry.key}=${shellValue(entry.value)}`);
+	}
+}
+
+function readEnvironmentFileExports(name: string): EnvVar[] {
+	const environment = resolveAgentPondEnvironment({ name });
+	if (!existsSync(environment.envFilePath)) {
+		throw new CliError(
+			`Environment "${environment.name}" is not initialized; run agentpond env init ${environment.name}`,
+		);
+	}
+	return parseEnvFileEntries(environment.envFilePath);
+}
+
+function shellValue(value: string): string {
+	if (/^[A-Za-z0-9_@%+=:,./-]*$/.test(value)) return value;
+	return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 export function isDevEnvironment(
@@ -108,6 +144,7 @@ function printEnvironmentHelp(): void {
 
 Usage:
   agentpond env current [--json]
+  agentpond env get <name> [--host <host>] [--port <port>]
   agentpond env list [--json]
   agentpond env init <name> [--json]
   agentpond env use <name> [--json]

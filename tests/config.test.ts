@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -51,16 +57,9 @@ test("generated environment files document defaults and S3 settings", () => {
 		process.chdir(cwd);
 		const dev = initAgentPondEnvironment("dev");
 		const production = initAgentPondEnvironment("production");
-		const devFile = readFileSync(dev.envFilePath, "utf8");
 		const productionFile = readFileSync(production.envFilePath, "utf8");
 
-		assert.equal(devFile, "");
-		assert.doesNotMatch(devFile, /AGENTPOND_PROJECT_ID=/);
-		assert.doesNotMatch(devFile, /AGENTPOND_STORE=/);
-		assert.doesNotMatch(devFile, /AGENTPOND_S3_BUCKET=/);
-		assert.doesNotMatch(devFile, /LANGFUSE_BASE_URL=/);
-		assert.doesNotMatch(devFile, /LANGFUSE_PUBLIC_KEY=/);
-		assert.doesNotMatch(devFile, /LANGFUSE_SECRET_KEY=/);
+		assert.equal(existsSync(dev.envFilePath), false);
 
 		assert.match(productionFile, /# Storage backend/);
 		assert.match(productionFile, /LANGFUSE_BASE_URL=http:\/\/localhost:4318/);
