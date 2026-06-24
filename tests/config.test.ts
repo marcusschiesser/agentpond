@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -26,7 +26,7 @@ test("config defaults to the dev environment DuckDB cache", () => {
 			join(process.cwd(), ".agentpond", "envs", "dev", "cache.duckdb"),
 		);
 		assert.equal(configFromEnv().environment?.name, "dev");
-		assert.equal(configFromEnv().environment?.storeType, "local");
+		assert.equal(configFromEnv().environment?.storeType, "s3");
 	} finally {
 		process.chdir(originalCwd);
 		if (originalStore === undefined) {
@@ -42,11 +42,27 @@ test("config keeps explicit path override precedence", () => {
 		configFromEnv({ dbPath: "/tmp/agentpond-override.duckdb" }).dbPath,
 		"/tmp/agentpond-override.duckdb",
 	);
-	assert.equal(
-		configFromEnv({ eventStorePath: "/tmp/agentpond-events" }).environment
-			?.eventStorePath,
-		"/tmp/agentpond-events",
-	);
+});
+
+test("dev environment file does not include a store override", () => {
+	const originalCwd = process.cwd();
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
+	try {
+		process.chdir(cwd);
+		const dev = initAgentPondEnvironment("dev");
+		const production = initAgentPondEnvironment("production");
+
+		assert.doesNotMatch(
+			readFileSync(dev.envFilePath, "utf8"),
+			/AGENTPOND_STORE=/,
+		);
+		assert.match(
+			readFileSync(production.envFilePath, "utf8"),
+			/AGENTPOND_STORE=s3/,
+		);
+	} finally {
+		process.chdir(originalCwd);
+	}
 });
 
 test("environment selection and explicit --env names resolve separate caches", () => {

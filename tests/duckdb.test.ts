@@ -251,7 +251,7 @@ test("DuckDB sync rejects duplicate manifest event ids atomically", async () => 
 
 test("direct DuckDB writes skip duplicate event ids", async () => {
 	const db = createTempDb();
-	await db.init();
+	await db.ensureSchema();
 	await db.directIngestion().writeEvents({
 		projectId: "project-a",
 		events: [

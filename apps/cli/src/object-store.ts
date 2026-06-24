@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import {
 	type AgentPondConfig,
 	FileSystemObjectStore,
@@ -7,7 +8,7 @@ import {
 
 export function objectStoreForConfig(config: AgentPondConfig): ObjectStore {
 	if (config.environment?.storeType === "local") {
-		return new FileSystemObjectStore(config.environment.eventStorePath);
+		return new FileSystemObjectStore(join(config.environment.envDir, "events"));
 	}
 	return new S3ObjectStore(config.s3);
 }

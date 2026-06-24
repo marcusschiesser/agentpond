@@ -1,19 +1,20 @@
-import { AcceptedEventWriter, type BatchResult } from "../writer.js";
+import type { IngestionEvent } from "../schemas.js";
+import { AcceptedEventWriter } from "../writer.js";
 import type { ObjectStore } from "./types.js";
 
-export class ObjectStoreIngestionHandler {
+export class ObjectStoreIngestionSink {
 	constructor(private readonly store: ObjectStore) {}
 
-	async processBatch(params: {
+	async writeEvents(params: {
 		projectId: string;
 		prefix: string;
-		batch: unknown[];
-	}): Promise<BatchResult> {
-		return new AcceptedEventWriter({
+		events: IngestionEvent[];
+	}): Promise<void> {
+		await new AcceptedEventWriter({
 			store: this.store,
 			projectId: params.projectId,
 			prefix: params.prefix,
-		}).processBatch(params.batch);
+		}).writeAcceptedEvents(params.events);
 	}
 
 	async writeOtelResourceSpans(params: {

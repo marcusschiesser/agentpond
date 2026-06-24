@@ -34,7 +34,6 @@ export function configFromEnv(
 	overrides: Partial<{
 		envName: string;
 		dbPath: string;
-		eventStorePath: string;
 		storeType: AgentPondStoreType;
 		s3Bucket: string;
 		s3Prefix: string;
@@ -49,8 +48,6 @@ export function configFromEnv(
 		storeTypeFromValue(env("AGENTPOND_STORE")) ??
 		environment.storeType;
 	const dbPath = overrides.dbPath ?? join(environment.envDir, "cache.duckdb");
-	const eventStorePath =
-		overrides.eventStorePath ?? join(environment.envDir, "events");
 	const projectId = env("AGENTPOND_PROJECT_ID") ?? "default-project";
 	const publicKey =
 		env("LANGFUSE_PUBLIC_KEY") ?? env("AGENTPOND_PUBLIC_KEY") ?? "pk-agentpond";
@@ -89,7 +86,6 @@ export function configFromEnv(
 		environment: {
 			...environment,
 			dbPath,
-			eventStorePath,
 			storeType,
 		},
 	};

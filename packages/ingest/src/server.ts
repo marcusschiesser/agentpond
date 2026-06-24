@@ -2,12 +2,13 @@ import { gunzipSync } from "node:zlib";
 import {
 	type AgentPondConfig,
 	AuthError,
-	type BatchResult,
 	configFromEnv,
+	type IngestionEvent,
 	ingestionBatchSchema,
 	type ObjectStore,
-	ObjectStoreIngestionHandler,
+	ObjectStoreIngestionSink,
 	otelBodyToResourceSpans,
+	parseIngestionEvents,
 	S3ObjectStore,
 	verifyBasicAuth,
 } from "@agentpond/core";
@@ -17,16 +18,16 @@ export type BuildServerOptions = {
 	config?: AgentPondConfig;
 	store?: ObjectStore;
 	authMode?: "required" | "disabled";
-	handlers?: IngestionHandlers;
+	sink?: IngestionSink;
 	logger?: boolean;
 };
 
-export type IngestionHandlers = {
-	processBatch: (params: {
+export type IngestionSink = {
+	writeEvents: (params: {
 		projectId: string;
 		prefix: string;
-		batch: unknown[];
-	}) => Promise<BatchResult>;
+		events: IngestionEvent[];
+	}) => Promise<void>;
 	writeOtelResourceSpans: (params: {
 		projectId: string;
 		prefix: string;
@@ -38,7 +39,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 	const config = options.config ?? configFromEnv();
 	const store = options.store ?? new S3ObjectStore(config.s3);
 	const authMode = options.authMode ?? "required";
-	const handlers = options.handlers ?? new ObjectStoreIngestionHandler(store);
+	const sink = options.sink ?? new ObjectStoreIngestionSink(store);
 	const server = Fastify({
 		logger: options.logger ?? process.env.NODE_ENV !== "test",
 		bodyLimit: 16 * 1024 * 1024,
@@ -81,12 +82,18 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 				});
 			}
 
-			const result = await handlers.processBatch({
-				projectId: auth.projectId,
-				prefix: config.s3.prefix,
-				batch: parsed.data.batch,
+			const { events, errors } = parseIngestionEvents(parsed.data.batch);
+			if (events.length > 0) {
+				await sink.writeEvents({
+					projectId: auth.projectId,
+					prefix: config.s3.prefix,
+					events,
+				});
+			}
+			return reply.status(207).send({
+				successes: events.map((event) => ({ id: event.id, status: 201 })),
+				errors,
 			});
-			return reply.status(207).send(result);
 		} catch (error) {
 			return handleRouteError(error, reply);
 		}
@@ -121,7 +128,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 			});
 			if (resourceSpans.length === 0) return reply.status(200).send({});
 
-			await handlers.writeOtelResourceSpans({
+			await sink.writeOtelResourceSpans({
 				projectId: auth.projectId,
 				prefix: config.s3.prefix,
 				resourceSpans,

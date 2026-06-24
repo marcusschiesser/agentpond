@@ -10,7 +10,7 @@ import {
 	MemoryObjectStore,
 	otelBodyToEvents,
 } from "@agentpond/core";
-import { AgentPondCache, DuckDbIngestionWriter } from "@agentpond/duckdb";
+import { AgentPondCache, DuckDbIngestionSink } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/ingest";
 import protobuf from "protobufjs";
 
@@ -194,11 +194,12 @@ test("dev ingestion accepts SDK requests without auth and writes directly to Duc
 	const db = new AgentPondCache(
 		join(mkdtempSync(join(tmpdir(), "agentpond-dev-cache-")), "cache.duckdb"),
 	);
-	await db.init();
+	await db.ensureSchema();
+	await db.close();
 	const server = buildServer({
 		config,
 		authMode: "disabled",
-		handlers: new DuckDbIngestionWriter(db.directIngestion()),
+		sink: new DuckDbIngestionSink(db.dbPath),
 	});
 	try {
 		const response = await server.inject({
@@ -221,14 +222,15 @@ test("dev ingestion accepts SDK requests without auth and writes directly to Duc
 		});
 
 		assert.equal(response.statusCode, 207);
-		const rows = await db.query<{ id: string; name: string }>(
+		const readDb = new AgentPondCache(db.dbPath);
+		const rows = await readDb.query<{ id: string; name: string }>(
 			"select id, name from traces where id = 'trace-dev-1'",
 		);
+		await readDb.close();
 
 		assert.deepEqual(rows, [{ id: "trace-dev-1", name: "Dev Trace" }]);
 	} finally {
 		await server.close();
-		await db.close();
 	}
 });
 

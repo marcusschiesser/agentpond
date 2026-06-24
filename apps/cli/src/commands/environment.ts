@@ -56,7 +56,6 @@ export async function handleEnvironmentCommand(
 				name: environment.name,
 				envFile: environment.envFilePath,
 				dbPath: environment.dbPath,
-				eventStorePath: environment.eventStorePath,
 			},
 			Boolean(parsed.flags.json),
 		);

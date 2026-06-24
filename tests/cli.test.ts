@@ -412,6 +412,10 @@ test("CLI reports the selected environment when --env is omitted for non-JSON co
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		const db = new AgentPondCache(dbPath);
+		await db.ensureSchema();
+		await db.close();
+
 		const stderr = await captureStderr(() =>
 			captureStdout(() =>
 				main(["node", "agentpond", "--db", dbPath, "traces", "list"]),
@@ -433,6 +437,10 @@ test("CLI does not report implicit environment in JSON output", async () => {
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		const db = new AgentPondCache(dbPath);
+		await db.ensureSchema();
+		await db.close();
+
 		const stderr = await captureStderr(() =>
 			captureStdout(() =>
 				main(["node", "agentpond", "--db", dbPath, "traces", "list", "--json"]),
@@ -465,6 +473,127 @@ test("CLI sync is a no-op for the dev environment", async () => {
 			existsSync(join(root, ".agentpond", "envs", "dev", "cache.duckdb")),
 			false,
 		);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI traces create writes directly to the dev DuckDB", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-trace-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"traces",
+				"create",
+				"--env",
+				"dev",
+				"--id",
+				"0123456789abcdef0123456789abcdef",
+				"--name",
+				"Direct Dev Trace",
+				"--json",
+			]),
+		);
+		const result = JSON.parse(output) as {
+			traceId: string;
+			eventsProcessed: number;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.traceId, "0123456789abcdef0123456789abcdef");
+		assert.equal(result.eventsProcessed, 2);
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "dev", "events")),
+			false,
+		);
+
+		const db = new AgentPondCache(
+			join(root, ".agentpond", "envs", "dev", "cache.duckdb"),
+		);
+		const rows = await db.query<{ id: string; name: string }>(
+			"SELECT id, name FROM traces WHERE id = '0123456789abcdef0123456789abcdef'",
+		);
+		await db.close();
+
+		assert.deepEqual(rows, [
+			{
+				id: "0123456789abcdef0123456789abcdef",
+				name: "Direct Dev Trace",
+			},
+		]);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI scores create writes directly to the dev DuckDB", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-score-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"scores",
+				"create",
+				"--env",
+				"dev",
+				"--id",
+				"score-direct",
+				"--name",
+				"quality",
+				"--value",
+				"0.95",
+				"--traceId",
+				"trace-direct",
+				"--json",
+			]),
+		);
+		const result = JSON.parse(output) as {
+			scoreId: string;
+			eventsProcessed: number;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.scoreId, "score-direct");
+		assert.equal(result.eventsProcessed, 1);
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "dev", "events")),
+			false,
+		);
+
+		const db = new AgentPondCache(
+			join(root, ".agentpond", "envs", "dev", "cache.duckdb"),
+		);
+		const rows = await db.query<{
+			id: string;
+			trace_id: string;
+			name: string;
+			value: number;
+		}>(
+			"SELECT id, trace_id, name, value FROM scores WHERE id = 'score-direct'",
+		);
+		await db.close();
+
+		assert.deepEqual(rows, [
+			{
+				id: "score-direct",
+				trace_id: "trace-direct",
+				name: "quality",
+				value: 0.95,
+			},
+		]);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -562,7 +691,7 @@ test("CLI read commands work while the dev server lock is active", async () => {
 		process.chdir(root);
 		const environment = initAgentPondEnvironment("dev");
 		const db = new AgentPondCache(environment.dbPath);
-		await db.init();
+		await db.ensureSchema();
 		await db.directIngestion().writeEvents({
 			projectId: "default-project",
 			events: [
@@ -722,6 +851,7 @@ test("CLI --json returns parseable JSON for empty result sets", async () => {
 		"cache.duckdb",
 	);
 	const db = new AgentPondCache(dbPath);
+	await db.ensureSchema();
 	await db.close();
 
 	const originalExitCode = process.exitCode;

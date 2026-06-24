@@ -1,12 +1,7 @@
 #!/usr/bin/env node
-import { randomBytes, randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import {
-	configFromEnv,
-	eventTypes,
-	type IngestionEvent,
-} from "@agentpond/core";
+import { configFromEnv } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
 import {
 	CliError,
@@ -19,17 +14,16 @@ import {
 } from "./cli-support.js";
 import { startDevServer } from "./commands/dev.js";
 import {
-	assertDevServerNotRunning,
 	cacheForRead,
 	handleEnvironmentCommand,
 	isDevEnvironment,
 } from "./commands/environment.js";
+import { handleScoreCommand } from "./commands/scores.js";
+import { handleTraceCommand } from "./commands/traces.js";
 import { objectStoreForConfig } from "./object-store.js";
-import { manualTraceResourceSpans } from "./otel-trace.js";
-import {
-	writeEventsAndSyncCache,
-	writeOtelAndSyncCache,
-} from "./sync-write.js";
+import { sql } from "./sql.js";
+
+export { createOtelTraceId } from "./commands/traces.js";
 
 export async function main(argv = process.argv): Promise<void> {
 	const parsed = parseArgs(argv.slice(2));
@@ -46,7 +40,6 @@ export async function main(argv = process.argv): Promise<void> {
 		const config = configFromEnv({
 			envName: stringFlag(parsed, "env"),
 			dbPath: stringFlag(parsed, "db"),
-			eventStorePath: stringFlag(parsed, "event-store"),
 			s3Bucket: stringFlag(parsed, "s3-bucket"),
 			s3Prefix: stringFlag(parsed, "s3-prefix"),
 			s3Endpoint: stringFlag(parsed, "s3-endpoint"),
@@ -80,11 +73,11 @@ export async function main(argv = process.argv): Promise<void> {
 			await db.close();
 			return print(rows, json);
 		}
-		if (resource === "scores" && action === "create") {
-			return await createScore(parsed, config, json);
+		if (resource === "traces") {
+			return await handleTraceCommand(action, rest, parsed, config, json);
 		}
-		if (resource === "traces" && action === "create") {
-			return await createTrace(parsed, config, json);
+		if (resource === "scores") {
+			return await handleScoreCommand(action, parsed, config, json);
 		}
 
 		const db = cacheForRead(config);
@@ -107,74 +100,6 @@ function logImplicitEnvironment(
 	console.error(`Using AgentPond environment: ${config.environment.name}`);
 }
 
-async function createScore(
-	parsed: ParsedArgs,
-	config: ReturnType<typeof configFromEnv>,
-	json: boolean,
-): Promise<void> {
-	assertDevServerNotRunning(config);
-	const name = requiredFlag(parsed, "name");
-	const value = requiredFlag(parsed, "value");
-	const source = stringFlag(parsed, "source") ?? "API";
-	if (source === "EVAL") {
-		throw new CliError(
-			"scores create only allows source=API or source=ANNOTATION",
-		);
-	}
-	if (source !== "API" && source !== "ANNOTATION") {
-		throw new CliError("source must be API or ANNOTATION");
-	}
-	const now = new Date().toISOString();
-	const event: IngestionEvent = {
-		id: randomUUID(),
-		timestamp: now,
-		type: eventTypes.SCORE_CREATE,
-		body: {
-			id: stringFlag(parsed, "id") ?? randomUUID(),
-			traceId: stringFlag(parsed, "traceId"),
-			observationId: stringFlag(parsed, "observationId"),
-			sessionId: stringFlag(parsed, "sessionId"),
-			name,
-			value: parseScoreValue(value),
-			dataType: stringFlag(parsed, "dataType") as
-				| "NUMERIC"
-				| "CATEGORICAL"
-				| "BOOLEAN"
-				| "CORRECTION"
-				| "TEXT"
-				| undefined,
-			source,
-			comment: stringFlag(parsed, "comment"),
-			createdAt: now,
-			environment: "default",
-		},
-	};
-
-	const store = objectStoreForConfig(config);
-	const manifest = await writeEventsAndSyncCache(config, store, [event]);
-	print(
-		{ eventId: event.id, scoreId: event.body.id, objects: manifest.objects },
-		json,
-	);
-}
-
-async function createTrace(
-	parsed: ParsedArgs,
-	config: ReturnType<typeof configFromEnv>,
-	json: boolean,
-): Promise<void> {
-	assertDevServerNotRunning(config);
-	const now = new Date().toISOString();
-	const traceId = stringFlag(parsed, "id") ?? createOtelTraceId();
-	const store = objectStoreForConfig(config);
-	const object = await writeOtelAndSyncCache(
-		config,
-		store,
-		manualTraceResourceSpans(parsed, traceId, now),
-	);
-	print({ traceId, object }, json);
-}
-
 async function runReadCommand(
 	db: AgentPondCache,
 	resource: string,
@@ -184,16 +109,6 @@ async function runReadCommand(
 ): Promise<Record<string, unknown>[]> {
 	if (action === "--help" || !action) return helpRows(resource);
 
-	if (resource === "traces" && action === "list") {
-		return db.query(
-			`SELECT * FROM traces ORDER BY start_time DESC LIMIT ${limit(parsed)}`,
-		);
-	}
-	if (resource === "traces" && action === "get") {
-		const id = rest[0];
-		if (!id) throw new CliError("Missing trace id");
-		return db.query(`SELECT * FROM traces WHERE id = ${sql(id)} LIMIT 1`);
-	}
 	if (resource === "observations" && action === "list") {
 		const traceId = requiredFlag(parsed, "traceId");
 		return db.query(
@@ -213,36 +128,7 @@ async function runReadCommand(
 		if (!id) throw new CliError("Missing session id");
 		return db.query(`SELECT * FROM sessions WHERE id = ${sql(id)} LIMIT 1`);
 	}
-	if (resource === "scores" && action === "list") {
-		const traceId = stringFlag(parsed, "traceId");
-		const observationId = stringFlag(parsed, "observationId");
-		if (!traceId && !observationId)
-			throw new CliError("scores list requires --traceId or --observationId");
-		const filters = [
-			traceId ? `trace_id = ${sql(traceId)}` : undefined,
-			observationId ? `observation_id = ${sql(observationId)}` : undefined,
-		].filter(Boolean);
-		return db.query(
-			`SELECT * FROM scores WHERE ${filters.join(" AND ")} ORDER BY timestamp DESC LIMIT ${limit(parsed)}`,
-		);
-	}
-
 	throw new CliError(`Unknown command: ${resource} ${action}`);
-}
-
-function parseScoreValue(value: string): string | number | boolean {
-	if (value === "true") return true;
-	if (value === "false") return false;
-	const numeric = Number(value);
-	return Number.isNaN(numeric) ? value : numeric;
-}
-
-export function createOtelTraceId(): string {
-	return randomBytes(16).toString("hex");
-}
-
-function sql(value: string): string {
-	return `'${value.replaceAll("'", "''")}'`;
 }
 
 function printHelp(): void {
@@ -269,7 +155,6 @@ Usage:
 Global flags:
   --env <name>
   --db <path>
-  --event-store <path>
   --s3-bucket <bucket>
   --s3-prefix <prefix>
   --s3-endpoint <url>

@@ -15,7 +15,6 @@ export type AgentPondEnvironment = {
 	envFilePath: string;
 	envDir: string;
 	dbPath: string;
-	eventStorePath: string;
 	storeType: AgentPondStoreType;
 };
 
@@ -70,8 +69,7 @@ export function resolveAgentPondEnvironment(
 		envFilePath: join(root, "envs", `${name}.env`),
 		envDir,
 		dbPath: join(envDir, "cache.duckdb"),
-		eventStorePath: join(envDir, "events"),
-		storeType: name === "dev" ? "local" : "s3",
+		storeType: "s3",
 	};
 }
 
@@ -134,12 +132,12 @@ function normalizeEnvironmentName(name: string): string {
 }
 
 function defaultEnvironmentFile(name: string): string {
-	const store = name === "dev" ? "local" : "s3";
-	return [
-		`AGENTPOND_STORE=${store}`,
+	const lines = [
 		"AGENTPOND_PROJECT_ID=default-project",
 		"LANGFUSE_PUBLIC_KEY=pk-agentpond",
 		"LANGFUSE_SECRET_KEY=sk-agentpond",
 		"",
-	].join("\n");
+	];
+	if (name !== "dev") lines.unshift("AGENTPOND_STORE=s3");
+	return lines.join("\n");
 }

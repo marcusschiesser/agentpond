@@ -18,18 +18,17 @@ export class AgentPondCache {
 		this.db = new DuckDbOperations(dbPath, options.accessMode);
 	}
 
-	async init(): Promise<void> {
+	async ensureSchema(): Promise<void> {
 		if (this.options.accessMode === "readonly") return;
 		await this.db.createSchema();
 	}
 
 	async syncFromStore(params: SyncFromStoreParams): Promise<SyncResult> {
-		await this.init();
+		await this.ensureSchema();
 		return new DuckDbStoreSync(this.db).syncFromStore(params);
 	}
 
 	async query<T = Record<string, unknown>>(sql: string): Promise<T[]> {
-		await this.init();
 		try {
 			return await this.db.all<T>(sql);
 		} catch (error) {
@@ -51,6 +50,15 @@ export class AgentPondCache {
 
 	async close(): Promise<void> {
 		await this.db.close();
+	}
+}
+
+export async function ensureDuckDbSchema(dbPath: string): Promise<void> {
+	const db = new AgentPondCache(dbPath);
+	try {
+		await db.ensureSchema();
+	} finally {
+		await db.close();
 	}
 }
 
