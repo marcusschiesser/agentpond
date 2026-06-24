@@ -39,10 +39,6 @@ export async function main(argv = process.argv): Promise<void> {
 		}
 		const config = configFromEnv({
 			envName: stringFlag(parsed, "env"),
-			dbPath: stringFlag(parsed, "db"),
-			s3Bucket: stringFlag(parsed, "s3-bucket"),
-			s3Prefix: stringFlag(parsed, "s3-prefix"),
-			s3Endpoint: stringFlag(parsed, "s3-endpoint"),
 		});
 		const json = Boolean(parsed.flags.json);
 		logImplicitEnvironment(parsed, config, json);
@@ -155,10 +151,6 @@ Usage:
 
 Global flags:
   --env <name>
-  --db <path>
-  --s3-bucket <bucket>
-  --s3-prefix <prefix>
-  --s3-endpoint <url>
   --json`);
 }
 

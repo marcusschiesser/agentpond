@@ -33,11 +33,7 @@ export type AgentPondConfig = {
 export function configFromEnv(
 	overrides: Partial<{
 		envName: string;
-		dbPath: string;
 		storeType: AgentPondStoreType;
-		s3Bucket: string;
-		s3Prefix: string;
-		s3Endpoint: string;
 	}> = {},
 ): AgentPondConfig {
 	const environment = resolveAgentPondEnvironment({ name: overrides.envName });
@@ -47,7 +43,7 @@ export function configFromEnv(
 		overrides.storeType ??
 		storeTypeFromValue(env("AGENTPOND_STORE")) ??
 		environment.storeType;
-	const dbPath = overrides.dbPath ?? join(environment.envDir, "cache.duckdb");
+	const dbPath = join(environment.envDir, "cache.duckdb");
 	const projectId = env("AGENTPOND_PROJECT_ID") ?? "default-project";
 	const publicKey = env("LANGFUSE_PUBLIC_KEY") ?? "pk-agentpond";
 	const secretKey = env("LANGFUSE_SECRET_KEY") ?? "sk-agentpond";
@@ -56,18 +52,9 @@ export function configFromEnv(
 		projectId,
 		dbPath,
 		s3: {
-			bucket:
-				overrides.s3Bucket ??
-				env("AGENTPOND_S3_BUCKET") ??
-				env("S3_BUCKET") ??
-				"agentpond",
-			prefix: normalizePrefix(
-				overrides.s3Prefix ?? env("AGENTPOND_S3_PREFIX") ?? "",
-			),
-			endpoint:
-				overrides.s3Endpoint ??
-				nonEmpty(env("AGENTPOND_S3_ENDPOINT")) ??
-				nonEmpty(env("S3_ENDPOINT")),
+			bucket: env("AGENTPOND_S3_BUCKET") ?? "agentpond",
+			prefix: normalizePrefix(env("AGENTPOND_S3_PREFIX") ?? ""),
+			endpoint: nonEmpty(env("AGENTPOND_S3_ENDPOINT")),
 			region: env("AWS_REGION") ?? env("AGENTPOND_S3_REGION") ?? "us-east-1",
 			accessKeyId:
 				nonEmpty(env("AWS_ACCESS_KEY_ID")) ??

@@ -43,13 +43,6 @@ test("config defaults to the dev environment DuckDB cache", () => {
 	}
 });
 
-test("config keeps explicit path override precedence", () => {
-	assert.equal(
-		configFromEnv({ dbPath: "/tmp/agentpond-override.duckdb" }).dbPath,
-		"/tmp/agentpond-override.duckdb",
-	);
-});
-
 test("generated environment files document defaults and S3 settings", () => {
 	const originalCwd = process.cwd();
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
@@ -118,7 +111,7 @@ test("environment selection and explicit --env names resolve separate caches", (
 	}
 });
 
-test("environment file values are loaded below process env and flags", () => {
+test("environment file values are loaded below process env", () => {
 	const originalCwd = process.cwd();
 	const originalProject = process.env.AGENTPOND_PROJECT_ID;
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
@@ -147,11 +140,8 @@ test("environment file values are loaded below process env and flags", () => {
 			"process-project",
 		);
 		assert.equal(
-			configFromEnv({
-				envName: "production",
-				dbPath: "/tmp/override.duckdb",
-			}).dbPath,
-			"/tmp/override.duckdb",
+			configFromEnv({ envName: "production" }).dbPath,
+			join(process.cwd(), ".agentpond", "envs", "production", "cache.duckdb"),
 		);
 	} finally {
 		process.chdir(originalCwd);
