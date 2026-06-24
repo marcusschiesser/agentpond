@@ -36,10 +36,11 @@ export async function handleEnvironmentCommand(
 		return print(rows, Boolean(parsed.flags.json));
 	}
 	if (action === "current") {
-		return print(
-			resolveAgentPondEnvironment({ name: stringFlag(parsed, "env") }),
-			Boolean(parsed.flags.json),
-		);
+		const environment = resolveAgentPondEnvironment({
+			name: stringFlag(parsed, "env"),
+		});
+		if (parsed.flags.json) return print(environment, true);
+		return print([environment], false);
 	}
 	if (action === "use") {
 		const name = rest[0];

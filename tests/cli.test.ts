@@ -454,6 +454,35 @@ test("CLI does not report implicit environment in JSON output", async () => {
 	}
 });
 
+test("CLI env current defaults to table output and keeps JSON behind --json", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-current-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const tableOutput = await captureStdout(() =>
+			main(["node", "agentpond", "env", "current"]),
+		);
+		assert.equal(process.exitCode, undefined);
+		assert.match(tableOutput, /^\[/);
+		assert.match(tableOutput, /"name":"dev"/);
+
+		const jsonOutput = await captureStdout(() =>
+			main(["node", "agentpond", "env", "current", "--json"]),
+		);
+		const environment = JSON.parse(jsonOutput) as {
+			name: string;
+			dbPath: string;
+		};
+		assert.equal(environment.name, "dev");
+		assert.match(environment.dbPath, /\.agentpond\/envs\/dev\/cache\.duckdb$/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI sync is a no-op for the dev environment", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-sync-"));
