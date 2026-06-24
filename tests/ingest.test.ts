@@ -399,7 +399,6 @@ test("otel parented span with as_root creates a queryable trace", async () => {
 				endTimeUnixNano: "1781395201000000000",
 				attributes: [
 					attr("langfuse.internal.as_root", true),
-					attr("langfuse.internal.is_app_root", true),
 					attr("langfuse.trace.name", "app root trace"),
 					attr("langfuse.trace.metadata.workflow", "compliance"),
 				],
@@ -435,6 +434,62 @@ test("otel parented span with as_root creates a queryable trace", async () => {
 	assert.deepEqual(observations, [
 		{
 			id: "span-as-root",
+			parent_observation_id: "external-parent",
+		},
+	]);
+});
+
+test("otel parented span with is_app_root creates a queryable trace", async () => {
+	const store = new MemoryObjectStore();
+	const response = await postOtelJson(
+		store,
+		otelPayload([
+			{
+				traceId: "trace-is-app-root",
+				spanId: "span-is-app-root",
+				parentSpanId: "external-parent",
+				name: "parented app root",
+				startTimeUnixNano: "1781395200000000000",
+				endTimeUnixNano: "1781395201000000000",
+				attributes: [
+					attr("langfuse.internal.is_app_root", true),
+					attr("langfuse.trace.name", "app root trace"),
+					attr("langfuse.trace.metadata.workflow", "compliance"),
+				],
+			},
+		]),
+	);
+
+	assert.equal(response.statusCode, 200);
+	const db = new AgentPondCache(
+		join(mkdtempSync(join(tmpdir(), "agentpond-ingest-")), "cache.duckdb"),
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+	const traces = await db.query<{
+		id: string;
+		name: string;
+		metadata_json: string | null;
+	}>(
+		"select id, name, metadata_json from traces where id = 'trace-is-app-root'",
+	);
+	const observations = await db.query<{
+		id: string;
+		parent_observation_id: string | null;
+	}>(
+		"select id, parent_observation_id from observations where trace_id = 'trace-is-app-root'",
+	);
+	await db.close();
+
+	assert.deepEqual(traces, [
+		{
+			id: "trace-is-app-root",
+			name: "app root trace",
+			metadata_json: JSON.stringify({ workflow: "compliance" }),
+		},
+	]);
+	assert.deepEqual(observations, [
+		{
+			id: "span-is-app-root",
 			parent_observation_id: "external-parent",
 		},
 	]);

@@ -228,7 +228,8 @@ export function otelResourceSpansToEvents(
 
 				const isRootSpan =
 					!parentSpanId ||
-					booleanValue(attributes["langfuse.internal.as_root"]) === true;
+					booleanValue(attributes["langfuse.internal.as_root"]) === true ||
+					booleanValue(attributes["langfuse.internal.is_app_root"]) === true;
 				if (isRootSpan) {
 					const langfuse = langfuseAttributes(attributes);
 					events.push({
