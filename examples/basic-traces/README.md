@@ -12,13 +12,16 @@ Each example sends:
 
 ## Prerequisites
 
-Start AgentPond and load the local Langfuse-compatible credentials:
+Start AgentPond in one terminal:
 
 ```sh
-docker compose up --build
-set -a
-. ./.env.example
-set +a
+agentpond dev
+```
+
+Load the local Langfuse-compatible credentials in a second terminal that will run the examples:
+
+```sh
+eval "$(agentpond dev env)"
 ```
 
 ## Python

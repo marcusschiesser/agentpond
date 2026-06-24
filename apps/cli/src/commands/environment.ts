@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
 	configFromEnv,
 	DEV_SERVER_RUNNING_MESSAGE,
@@ -97,7 +97,8 @@ function usesRunningDevCache(
 ): boolean {
 	return (
 		config.environment !== undefined &&
-		resolve(config.dbPath) === resolve(config.environment.dbPath) &&
+		resolve(config.dbPath) ===
+			resolve(join(config.environment.envDir, "cache.duckdb")) &&
 		isDevServerRunning(config.environment)
 	);
 }

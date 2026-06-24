@@ -63,7 +63,6 @@ AgentPond is intended for projects whose main requirement is private, durable tr
 You need:
 
 - Node.js and npm
-- Docker with Docker Compose
 
 Install the AgentPond CLI:
 

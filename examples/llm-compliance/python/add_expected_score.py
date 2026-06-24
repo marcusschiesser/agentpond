@@ -17,7 +17,7 @@ def require_langfuse_env():
     if missing:
         raise RuntimeError(
             f"Missing required Langfuse environment variables: {', '.join(missing)}. "
-            "Set LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY, and LANGFUSE_SECRET_KEY before running this example."
+            'Run eval "$(agentpond dev env)" before running this example.'
         )
 
 

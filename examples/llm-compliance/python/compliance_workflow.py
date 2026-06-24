@@ -36,7 +36,7 @@ def require_env():
     if missing:
         raise RuntimeError(
             f"Missing required environment variables: {', '.join(missing)}. "
-            "Set OPENAI_API_KEY, LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY, and LANGFUSE_SECRET_KEY before running this example."
+            'Set OPENAI_API_KEY and run eval "$(agentpond dev env)" before running this example.'
         )
 
 

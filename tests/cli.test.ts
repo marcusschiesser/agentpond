@@ -471,6 +471,53 @@ test("CLI sync is a no-op for the dev environment", async () => {
 	}
 });
 
+test("CLI dev env prints shell exports for SDK configuration", async () => {
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "dev", "env"]),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(
+			output,
+			[
+				"export LANGFUSE_BASE_URL=http://127.0.0.1:4318",
+				"export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev",
+				"export LANGFUSE_SECRET_KEY=sk-agentpond-dev",
+				"",
+			].join("\n"),
+		);
+	} finally {
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI dev env honors custom host and port", async () => {
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"dev",
+				"env",
+				"--host",
+				"0.0.0.0",
+				"--port",
+				"9999",
+			]),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.match(output, /export LANGFUSE_BASE_URL=http:\/\/0\.0\.0\.0:9999/);
+	} finally {
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI dev write commands fail while the dev server lock is active", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-lock-"));
