@@ -30,7 +30,19 @@ export class AgentPondCache {
 
 	async query<T = Record<string, unknown>>(sql: string): Promise<T[]> {
 		await this.init();
-		return this.db.all<T>(sql);
+		try {
+			return await this.db.all<T>(sql);
+		} catch (error) {
+			if (
+				this.options.accessMode === "readonly" &&
+				isDuckDbLockConflict(error)
+			) {
+				throw new Error(
+					"DuckDB is currently locked by the dev server while it is writing; retry the read command.",
+				);
+			}
+			throw error;
+		}
 	}
 
 	directIngestion(): DuckDbDirectIngestion {
@@ -40,4 +52,12 @@ export class AgentPondCache {
 	async close(): Promise<void> {
 		await this.db.close();
 	}
+}
+
+function isDuckDbLockConflict(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : String(error);
+	return (
+		message.includes("Could not set lock") ||
+		message.includes("Conflicting lock")
+	);
 }

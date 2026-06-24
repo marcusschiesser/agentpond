@@ -2,7 +2,10 @@ import { type BatchResult, parseIngestionEvents } from "@agentpond/core";
 import type { DuckDbDirectIngestion } from "./direct-ingestion.js";
 
 export class DuckDbIngestionWriter {
-	constructor(private readonly ingestion: DuckDbDirectIngestion) {}
+	constructor(
+		private readonly ingestion: DuckDbDirectIngestion,
+		private readonly afterWrite?: () => Promise<void>,
+	) {}
 
 	async processBatch(params: {
 		projectId: string;
@@ -11,11 +14,15 @@ export class DuckDbIngestionWriter {
 	}): Promise<BatchResult> {
 		const { events, errors } = parseIngestionEvents(params.batch);
 		if (events.length > 0) {
-			await this.ingestion.writeEvents({
-				projectId: params.projectId,
-				events,
-				source: "dev-ingestion",
-			});
+			try {
+				await this.ingestion.writeEvents({
+					projectId: params.projectId,
+					events,
+					source: "dev-ingestion",
+				});
+			} finally {
+				await this.afterWrite?.();
+			}
 		}
 		return {
 			successes: events.map((event) => ({ id: event.id, status: 201 })),
@@ -28,10 +35,14 @@ export class DuckDbIngestionWriter {
 		prefix: string;
 		resourceSpans: unknown[];
 	}): Promise<void> {
-		await this.ingestion.writeOtelResourceSpans({
-			projectId: params.projectId,
-			resourceSpans: params.resourceSpans,
-			source: "dev-otel",
-		});
+		try {
+			await this.ingestion.writeOtelResourceSpans({
+				projectId: params.projectId,
+				resourceSpans: params.resourceSpans,
+				source: "dev-otel",
+			});
+		} finally {
+			await this.afterWrite?.();
+		}
 	}
 }

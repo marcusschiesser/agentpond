@@ -35,7 +35,7 @@ export async function startDevServer(parsed: ParsedArgs): Promise<void> {
 	const db = new AgentPondCache(devConfig.dbPath);
 	const server = buildServer({
 		config: devConfig,
-		handlers: new DuckDbIngestionWriter(db.directIngestion()),
+		handlers: new DuckDbIngestionWriter(db.directIngestion(), () => db.close()),
 		authMode: "disabled",
 		logger: false,
 	});
@@ -50,6 +50,7 @@ export async function startDevServer(parsed: ParsedArgs): Promise<void> {
 	process.once("SIGTERM", shutdown);
 	try {
 		await db.init();
+		await db.close();
 		await server.listen({ host, port });
 	} catch (error) {
 		process.off("SIGINT", shutdown);

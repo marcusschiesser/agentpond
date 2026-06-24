@@ -553,6 +553,97 @@ test("CLI dev write commands fail while the dev server lock is active", async ()
 	}
 });
 
+test("CLI read commands work while the dev server lock is active", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-read-lock-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const environment = initAgentPondEnvironment("dev");
+		const db = new AgentPondCache(environment.dbPath);
+		await db.init();
+		await db.directIngestion().writeEvents({
+			projectId: "default-project",
+			events: [
+				{
+					id: "trace-read-event",
+					timestamp: "2026-06-14T00:00:00.000Z",
+					type: eventTypes.TRACE_CREATE,
+					body: {
+						id: "trace-read",
+						name: "Readable Trace",
+						sessionId: "session-read",
+					},
+				},
+				{
+					id: "observation-read-event",
+					timestamp: "2026-06-14T00:00:01.000Z",
+					type: eventTypes.GENERATION_CREATE,
+					body: {
+						id: "observation-read",
+						traceId: "trace-read",
+						name: "Readable Observation",
+					},
+				},
+				{
+					id: "score-read-event",
+					timestamp: "2026-06-14T00:00:02.000Z",
+					type: eventTypes.SCORE_CREATE,
+					body: {
+						id: "score-read",
+						traceId: "trace-read",
+						name: "readability",
+						value: 1,
+					},
+				},
+			],
+			source: "test-read-lock",
+		});
+		await db.close();
+		const lock = acquireDevServerLock(environment);
+		try {
+			const runJson = async (args: string[]) => {
+				process.exitCode = undefined;
+				const output = await captureStdout(() =>
+					main(["node", "agentpond", ...args, "--json"]),
+				);
+				assert.equal(process.exitCode, undefined);
+				return JSON.parse(output) as Array<Record<string, unknown>>;
+			};
+
+			assert.equal(
+				(await runJson(["traces", "get", "trace-read"]))[0].id,
+				"trace-read",
+			);
+			assert.equal((await runJson(["traces", "list"]))[0].id, "trace-read");
+			assert.equal(
+				(await runJson(["observations", "list", "--traceId", "trace-read"]))[0]
+					.id,
+				"observation-read",
+			);
+			assert.equal((await runJson(["sessions", "list"]))[0].id, "session-read");
+			assert.equal(
+				(await runJson(["sessions", "get", "session-read"]))[0].id,
+				"session-read",
+			);
+			assert.equal(
+				(await runJson(["scores", "list", "--traceId", "trace-read"]))[0].id,
+				"score-read",
+			);
+			assert.equal(
+				(await runJson(["sql", "SELECT id FROM traces"]))[0].id,
+				"trace-read",
+			);
+		} finally {
+			lock.release();
+		}
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI returns non-zero errors for invalid resources and actions", async () => {
 	const dbPath = join(
 		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
