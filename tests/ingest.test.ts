@@ -385,6 +385,195 @@ test("otel trace fields come from trace attributes", async () => {
 	assert.deepEqual(traceEvent.body.metadata, { team: "success" });
 });
 
+test("otel first parented span creates a shallow queryable trace", async () => {
+	const store = new MemoryObjectStore();
+	const response = await postOtelJson(
+		store,
+		otelPayload([
+			{
+				traceId: "trace-shallow",
+				spanId: "span-shallow",
+				parentSpanId: "external-parent",
+				name: "first parented span",
+				startTimeUnixNano: "1781395200000000000",
+				endTimeUnixNano: "1781395201000000000",
+			},
+		]),
+	);
+
+	assert.equal(response.statusCode, 200);
+	const db = new AgentPondCache(
+		join(mkdtempSync(join(tmpdir(), "agentpond-ingest-")), "cache.duckdb"),
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+	const traces = await db.query<{
+		id: string;
+		name: string | null;
+		metadata_json: string | null;
+	}>("select id, name, metadata_json from traces where id = 'trace-shallow'");
+	const observations = await db.query<{
+		id: string;
+		parent_observation_id: string | null;
+	}>(
+		"select id, parent_observation_id from observations where trace_id = 'trace-shallow'",
+	);
+	await db.close();
+
+	assert.deepEqual(traces, [
+		{
+			id: "trace-shallow",
+			name: null,
+			metadata_json: null,
+		},
+	]);
+	assert.deepEqual(observations, [
+		{
+			id: "span-shallow",
+			parent_observation_id: "external-parent",
+		},
+	]);
+});
+
+test("otel repeated parented spans create one shallow trace event", async () => {
+	const events = await convertOtelJson(
+		otelPayload([
+			{
+				traceId: "trace-repeated-child",
+				spanId: "span-child-1",
+				parentSpanId: "external-parent",
+				name: "child one",
+				startTimeUnixNano: "1781395200000000000",
+			},
+			{
+				traceId: "trace-repeated-child",
+				spanId: "span-child-2",
+				parentSpanId: "external-parent",
+				name: "child two",
+				startTimeUnixNano: "1781395201000000000",
+			},
+		]),
+	);
+
+	const traceEvents = events.filter(
+		(event) => event.type === eventTypes.TRACE_CREATE,
+	);
+	assert.equal(traceEvents.length, 1);
+	assert.equal(traceEvents[0]?.body.id, "trace-repeated-child");
+	assert.equal(traceEvents[0]?.body.name, undefined);
+	assert.equal(traceEvents[0]?.body.timestamp, "2026-06-14T00:00:00.000Z");
+	assert.equal(traceEvents[0]?.body.startTime, undefined);
+	assert.equal(
+		events.filter((event) => event.type === eventTypes.SPAN_CREATE).length,
+		2,
+	);
+});
+
+test("otel parented span with compatibility trace attributes creates a trace update", async () => {
+	const events = await convertOtelJson(
+		otelPayload([
+			{
+				traceId: "trace-compat-fields",
+				spanId: "span-compat-fields",
+				parentSpanId: "external-parent",
+				name: "compat child",
+				startTimeUnixNano: "1781395200000000000",
+				attributes: [
+					attr("langfuse.user.id", "compat-user"),
+					attr("langfuse.session.id", "compat-session"),
+					attr("ai.telemetry.metadata.tags", "alpha,beta"),
+				],
+			},
+		]),
+	);
+
+	const traceEvent = events.find(
+		(event) => event.type === eventTypes.TRACE_CREATE,
+	);
+	assert.ok(traceEvent);
+	assert.equal(traceEvent.body.id, "trace-compat-fields");
+	assert.equal(traceEvent.body.name, undefined);
+	assert.equal(traceEvent.body.userId, "compat-user");
+	assert.equal(traceEvent.body.sessionId, "compat-session");
+	assert.deepEqual(traceEvent.body.tags, ["alpha", "beta"]);
+});
+
+test("otel parented span with trace attributes creates a queryable trace", async () => {
+	const store = new MemoryObjectStore();
+	const response = await postOtelJson(
+		store,
+		otelPayload([
+			{
+				traceId: "trace-parented-fields",
+				spanId: "span-parented-fields",
+				parentSpanId: "external-parent",
+				name: "parented child",
+				startTimeUnixNano: "1781395200000000000",
+				endTimeUnixNano: "1781395201000000000",
+				attributes: [
+					attr("langfuse.trace.name", "trace from child attrs"),
+					attr("langfuse.trace.metadata.workflow", "compliance"),
+					attr("user.id", "user-1"),
+					attr("session.id", "session-1"),
+				],
+			},
+		]),
+	);
+
+	assert.equal(response.statusCode, 200);
+	const db = new AgentPondCache(
+		join(mkdtempSync(join(tmpdir(), "agentpond-ingest-")), "cache.duckdb"),
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+	const traces = await db.query<{
+		id: string;
+		name: string;
+		user_id: string;
+		session_id: string;
+		metadata_json: string | null;
+	}>(
+		"select id, name, user_id, session_id, metadata_json from traces where id = 'trace-parented-fields'",
+	);
+	await db.close();
+
+	assert.deepEqual(traces, [
+		{
+			id: "trace-parented-fields",
+			name: "trace from child attrs",
+			user_id: "user-1",
+			session_id: "session-1",
+			metadata_json: JSON.stringify({ workflow: "compliance" }),
+		},
+	]);
+});
+
+test("otel filters shallow trace when a full trace exists in the same batch", async () => {
+	const events = await convertOtelJson(
+		otelPayload([
+			{
+				traceId: "trace-full-wins",
+				spanId: "span-child-first",
+				parentSpanId: "external-parent",
+				name: "child first",
+				startTimeUnixNano: "1781395200000000000",
+			},
+			{
+				traceId: "trace-full-wins",
+				spanId: "span-root-second",
+				name: "root second",
+				startTimeUnixNano: "1781395201000000000",
+				attributes: [attr("langfuse.trace.name", "full trace")],
+			},
+		]),
+	);
+
+	const traceEvents = events.filter(
+		(event) => event.type === eventTypes.TRACE_CREATE,
+	);
+	assert.equal(traceEvents.length, 1);
+	assert.equal(traceEvents[0]?.body.id, "trace-full-wins");
+	assert.equal(traceEvents[0]?.body.name, "full trace");
+});
+
 test("otel parented span with as_root creates a queryable trace", async () => {
 	const store = new MemoryObjectStore();
 	const response = await postOtelJson(

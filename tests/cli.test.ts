@@ -497,7 +497,7 @@ test("CLI sync is a no-op for the dev environment", async () => {
 
 		assert.equal(process.exitCode, undefined);
 		assert.equal(result.skipped, true);
-		assert.match(result.reason, /written directly by agentpond dev/);
+		assert.match(result.reason, /sync is not needed for agentpond dev/);
 		assert.equal(
 			existsSync(join(root, ".agentpond", "envs", "dev", "cache.duckdb")),
 			false,
