@@ -44,21 +44,54 @@ test("config keeps explicit path override precedence", () => {
 	);
 });
 
-test("dev environment file does not include a store override", () => {
+test("generated environment files document defaults and S3 settings", () => {
 	const originalCwd = process.cwd();
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
 	try {
 		process.chdir(cwd);
 		const dev = initAgentPondEnvironment("dev");
 		const production = initAgentPondEnvironment("production");
+		const devFile = readFileSync(dev.envFilePath, "utf8");
+		const productionFile = readFileSync(production.envFilePath, "utf8");
 
-		assert.doesNotMatch(
-			readFileSync(dev.envFilePath, "utf8"),
-			/AGENTPOND_STORE=/,
+		assert.equal(devFile, "");
+		assert.doesNotMatch(devFile, /AGENTPOND_PROJECT_ID=/);
+		assert.doesNotMatch(devFile, /AGENTPOND_STORE=/);
+		assert.doesNotMatch(devFile, /AGENTPOND_S3_BUCKET=/);
+		assert.doesNotMatch(devFile, /LANGFUSE_BASE_URL=/);
+		assert.doesNotMatch(devFile, /LANGFUSE_PUBLIC_KEY=/);
+		assert.doesNotMatch(devFile, /LANGFUSE_SECRET_KEY=/);
+
+		assert.match(productionFile, /# Storage backend/);
+		assert.match(productionFile, /LANGFUSE_BASE_URL=http:\/\/localhost:4318/);
+		assert.match(productionFile, /AGENTPOND_STORE=s3/);
+		assert.match(productionFile, /# S3 bucket/);
+		assert.match(productionFile, /AGENTPOND_S3_BUCKET=agentpond/);
+		assert.match(productionFile, /AGENTPOND_S3_PREFIX=/);
+		assert.match(
+			productionFile,
+			/Local MinIO endpoint from docker-compose\.yml/,
 		);
 		assert.match(
-			readFileSync(production.envFilePath, "utf8"),
-			/AGENTPOND_STORE=s3/,
+			productionFile,
+			/AGENTPOND_S3_ENDPOINT=http:\/\/localhost:9000/,
+		);
+		assert.match(productionFile, /AGENTPOND_S3_REGION=us-east-1/);
+		assert.match(productionFile, /AGENTPOND_S3_ACCESS_KEY_ID=minio/);
+		assert.match(productionFile, /AGENTPOND_S3_SECRET_ACCESS_KEY=minio123/);
+		assert.match(productionFile, /Use true for MinIO/);
+		assert.match(productionFile, /AGENTPOND_S3_FORCE_PATH_STYLE=true/);
+		assert.equal(
+			configFromEnv({ envName: "production" }).s3.endpoint,
+			"http://localhost:9000",
+		);
+		assert.equal(
+			configFromEnv({ envName: "production" }).s3.accessKeyId,
+			"minio",
+		);
+		assert.equal(
+			configFromEnv({ envName: "production" }).s3.secretAccessKey,
+			"minio123",
 		);
 	} finally {
 		process.chdir(originalCwd);

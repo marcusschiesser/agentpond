@@ -49,10 +49,8 @@ export function configFromEnv(
 		environment.storeType;
 	const dbPath = overrides.dbPath ?? join(environment.envDir, "cache.duckdb");
 	const projectId = env("AGENTPOND_PROJECT_ID") ?? "default-project";
-	const publicKey =
-		env("LANGFUSE_PUBLIC_KEY") ?? env("AGENTPOND_PUBLIC_KEY") ?? "pk-agentpond";
-	const secretKey =
-		env("LANGFUSE_SECRET_KEY") ?? env("AGENTPOND_SECRET_KEY") ?? "sk-agentpond";
+	const publicKey = env("LANGFUSE_PUBLIC_KEY") ?? "pk-agentpond";
+	const secretKey = env("LANGFUSE_SECRET_KEY") ?? "sk-agentpond";
 
 	return {
 		projectId,
@@ -68,13 +66,15 @@ export function configFromEnv(
 			),
 			endpoint:
 				overrides.s3Endpoint ??
-				env("AGENTPOND_S3_ENDPOINT") ??
-				env("S3_ENDPOINT"),
+				nonEmpty(env("AGENTPOND_S3_ENDPOINT")) ??
+				nonEmpty(env("S3_ENDPOINT")),
 			region: env("AWS_REGION") ?? env("AGENTPOND_S3_REGION") ?? "us-east-1",
 			accessKeyId:
-				env("AWS_ACCESS_KEY_ID") ?? env("AGENTPOND_S3_ACCESS_KEY_ID"),
+				nonEmpty(env("AWS_ACCESS_KEY_ID")) ??
+				nonEmpty(env("AGENTPOND_S3_ACCESS_KEY_ID")),
 			secretAccessKey:
-				env("AWS_SECRET_ACCESS_KEY") ?? env("AGENTPOND_S3_SECRET_ACCESS_KEY"),
+				nonEmpty(env("AWS_SECRET_ACCESS_KEY")) ??
+				nonEmpty(env("AGENTPOND_S3_SECRET_ACCESS_KEY")),
 			forcePathStyle:
 				(env("AGENTPOND_S3_FORCE_PATH_STYLE") ?? "true") !== "false",
 		},
@@ -100,6 +100,10 @@ function envValue(
 	fileEnv: Record<string, string>,
 ): (name: string) => string | undefined {
 	return (name) => process.env[name] ?? fileEnv[name];
+}
+
+function nonEmpty(value: string | undefined): string | undefined {
+	return value === undefined || value === "" ? undefined : value;
 }
 
 function storeTypeFromValue(

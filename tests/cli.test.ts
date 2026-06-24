@@ -630,9 +630,12 @@ test("CLI scores create writes directly to the dev DuckDB", async () => {
 });
 
 test("CLI dev env prints shell exports for SDK configuration", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		process.chdir(root);
 		const output = await captureStdout(() =>
 			main(["node", "agentpond", "dev", "env"]),
 		);
@@ -648,14 +651,18 @@ test("CLI dev env prints shell exports for SDK configuration", async () => {
 			].join("\n"),
 		);
 	} finally {
+		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });
 
 test("CLI dev env honors custom host and port", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-override-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		process.chdir(root);
 		const output = await captureStdout(() =>
 			main([
 				"node",
@@ -671,7 +678,9 @@ test("CLI dev env honors custom host and port", async () => {
 
 		assert.equal(process.exitCode, undefined);
 		assert.match(output, /export LANGFUSE_BASE_URL=http:\/\/0\.0\.0\.0:9999/);
+		assert.match(output, /export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev/);
 	} finally {
+		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });

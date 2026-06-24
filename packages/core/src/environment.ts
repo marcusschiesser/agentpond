@@ -132,12 +132,40 @@ function normalizeEnvironmentName(name: string): string {
 }
 
 function defaultEnvironmentFile(name: string): string {
+	const isDev = name === "dev";
+	if (isDev) return "";
 	const lines = [
+		"# Project id used to share the same object store across different projects.",
 		"AGENTPOND_PROJECT_ID=default-project",
+		"",
+		"# Langfuse-compatible base URL used by SDKs.",
+		"LANGFUSE_BASE_URL=http://localhost:4318",
+		"",
+		"# Langfuse-compatible public key accepted by the ingestion server.",
 		"LANGFUSE_PUBLIC_KEY=pk-agentpond",
+		"# Langfuse-compatible secret key accepted by the ingestion server.",
 		"LANGFUSE_SECRET_KEY=sk-agentpond",
 		"",
 	];
-	if (name !== "dev") lines.unshift("AGENTPOND_STORE=s3");
+	lines.unshift(
+		"# Storage backend for this environment. S3-backed environments sync from object storage.",
+		"AGENTPOND_STORE=s3",
+		"",
+		"# S3 bucket containing AgentPond ingestion objects.",
+		"AGENTPOND_S3_BUCKET=agentpond",
+		"# Optional key prefix inside the S3 bucket.",
+		"AGENTPOND_S3_PREFIX=",
+		"# Local MinIO endpoint from docker-compose.yml. Leave empty for Amazon S3.",
+		"AGENTPOND_S3_ENDPOINT=http://localhost:9000",
+		"# AWS/S3 region used by the object-store client.",
+		"AGENTPOND_S3_REGION=us-east-1",
+		"# Local MinIO access key from docker-compose.yml. Leave empty to use the AWS SDK credential chain.",
+		"AGENTPOND_S3_ACCESS_KEY_ID=minio",
+		"# Local MinIO secret key from docker-compose.yml. Leave empty to use the AWS SDK credential chain.",
+		"AGENTPOND_S3_SECRET_ACCESS_KEY=minio123",
+		"# Use true for MinIO. Use false for Amazon S3 virtual-hosted buckets.",
+		"AGENTPOND_S3_FORCE_PATH_STYLE=true",
+		"",
+	);
 	return lines.join("\n");
 }
