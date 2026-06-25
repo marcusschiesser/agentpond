@@ -6,6 +6,14 @@
   <strong>Store agent traces remotely. Analyze them locally. Keep control of the data.</strong>
 </p>
 
+<p align="center">
+  <a href="https://github.com/marcusschiesser/agentpond/actions/workflows/ci.yml"><img src="https://github.com/marcusschiesser/agentpond/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://www.npmjs.com/package/agentpond"><img src="https://img.shields.io/npm/v/agentpond.svg" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/agentpond"><img src="https://img.shields.io/npm/dm/agentpond.svg" alt="npm downloads"></a>
+  <a href="https://github.com/marcusschiesser/agentpond/blob/main/LICENSE"><img src="https://img.shields.io/github/license/marcusschiesser/agentpond.svg" alt="MIT license"></a>
+  <a href="https://www.npmjs.com/package/agentpond"><img src="https://img.shields.io/node/v/agentpond.svg" alt="Node.js version"></a>
+</p>
+
 AgentPond is a lightweight, self-hosted trace backend and CLI for AI agents. It accepts traces from Langfuse SDKs and OTLP, stores raw events in S3-compatible object storage, and syncs them into a local DuckDB cache for fast analysis.
 
 It is designed for AI projects that want to:
