@@ -1,47 +1,60 @@
 #!/usr/bin/env node
-import { randomBytes, randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import {
-	configFromEnv,
-	eventTypes,
-	type IngestionEvent,
-	loadEnvFile,
-	S3ObjectStore,
-} from "@agentpond/core";
+import { configFromEnv } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
-import { manualTraceResourceSpans } from "./otel-trace.js";
 import {
-	writeEventsAndSyncCache,
-	writeOtelAndSyncCache,
-} from "./sync-write.js";
+	CliError,
+	limit,
+	type ParsedArgs,
+	parseArgs,
+	print,
+	requiredFlag,
+	stringFlag,
+} from "./cli-support.js";
+import { startDevServer } from "./commands/dev.js";
+import {
+	cacheForRead,
+	handleEnvironmentCommand,
+	isDevEnvironment,
+} from "./commands/environment.js";
+import { handleScoreCommand } from "./commands/scores.js";
+import { handleTraceCommand } from "./commands/traces.js";
+import { objectStoreForConfig } from "./object-store.js";
+import { sql } from "./sql.js";
 
-type ParsedArgs = {
-	flags: Record<string, string | boolean>;
-	positionals: string[];
-};
+export { createOtelTraceId } from "./commands/traces.js";
 
 export async function main(argv = process.argv): Promise<void> {
 	const parsed = parseArgs(argv.slice(2));
-	if (parsed.flags.env && typeof parsed.flags.env === "string") {
-		loadEnvFile(parsed.flags.env);
-	}
-
-	const config = configFromEnv({
-		dbPath: stringFlag(parsed, "db"),
-		s3Bucket: stringFlag(parsed, "s3-bucket"),
-		s3Prefix: stringFlag(parsed, "s3-prefix"),
-		s3Endpoint: stringFlag(parsed, "s3-endpoint"),
-	});
-	const json = Boolean(parsed.flags.json);
-	const [resource, action, ...rest] = parsed.positionals;
 
 	try {
-		if (!resource || parsed.flags.help || parsed.flags.h) return printHelp();
+		const [resource, action, ...rest] = parsed.positionals;
+		if (!resource) return printHelp();
+		if (resource === "env")
+			return await handleEnvironmentCommand(action, rest, parsed);
+		if (parsed.flags.help || parsed.flags.h) return printHelp();
+		if (resource === "dev") {
+			return await startDevServer(parsed);
+		}
+		const config = configFromEnv({
+			envName: stringFlag(parsed, "env"),
+		});
+		const json = Boolean(parsed.flags.json);
+		logImplicitEnvironment(parsed, config, json);
 		if (resource === "sync") {
+			if (isDevEnvironment(config)) {
+				return print(
+					{
+						skipped: true,
+						reason: "calling agentpond sync is not needed for agentpond dev",
+					},
+					json,
+				);
+			}
 			const db = new AgentPondCache(config.dbPath);
 			const result = await db.syncFromStore({
-				store: new S3ObjectStore(config.s3),
+				store: objectStoreForConfig(config),
 				projectId: config.projectId,
 				prefix: config.s3.prefix,
 			});
@@ -51,19 +64,19 @@ export async function main(argv = process.argv): Promise<void> {
 		if (resource === "sql") {
 			const query = rest.length > 0 ? [action, ...rest].join(" ") : action;
 			if (!query) throw new CliError("Missing SQL query");
-			const db = new AgentPondCache(config.dbPath);
+			const db = cacheForRead(config);
 			const rows = await db.query(query);
 			await db.close();
 			return print(rows, json);
 		}
-		if (resource === "scores" && action === "create") {
-			return createScore(parsed, config, json);
+		if (resource === "traces") {
+			return await handleTraceCommand(action, rest, parsed, config, json);
 		}
-		if (resource === "traces" && action === "create") {
-			return createTrace(parsed, config, json);
+		if (resource === "scores") {
+			return await handleScoreCommand(action, parsed, config, json);
 		}
 
-		const db = new AgentPondCache(config.dbPath);
+		const db = cacheForRead(config);
 		const rows = await runReadCommand(db, resource, action, rest, parsed);
 		await db.close();
 		return print(rows, json);
@@ -74,70 +87,13 @@ export async function main(argv = process.argv): Promise<void> {
 	}
 }
 
-async function createScore(
+function logImplicitEnvironment(
 	parsed: ParsedArgs,
 	config: ReturnType<typeof configFromEnv>,
 	json: boolean,
-): Promise<void> {
-	const name = requiredFlag(parsed, "name");
-	const value = requiredFlag(parsed, "value");
-	const source = stringFlag(parsed, "source") ?? "API";
-	if (source === "EVAL") {
-		throw new CliError(
-			"scores create only allows source=API or source=ANNOTATION",
-		);
-	}
-	if (source !== "API" && source !== "ANNOTATION") {
-		throw new CliError("source must be API or ANNOTATION");
-	}
-	const now = new Date().toISOString();
-	const event: IngestionEvent = {
-		id: randomUUID(),
-		timestamp: now,
-		type: eventTypes.SCORE_CREATE,
-		body: {
-			id: stringFlag(parsed, "id") ?? randomUUID(),
-			traceId: stringFlag(parsed, "traceId"),
-			observationId: stringFlag(parsed, "observationId"),
-			sessionId: stringFlag(parsed, "sessionId"),
-			name,
-			value: parseScoreValue(value),
-			dataType: stringFlag(parsed, "dataType") as
-				| "NUMERIC"
-				| "CATEGORICAL"
-				| "BOOLEAN"
-				| "CORRECTION"
-				| "TEXT"
-				| undefined,
-			source,
-			comment: stringFlag(parsed, "comment"),
-			createdAt: now,
-			environment: "default",
-		},
-	};
-
-	const store = new S3ObjectStore(config.s3);
-	const manifest = await writeEventsAndSyncCache(config, store, [event]);
-	print(
-		{ eventId: event.id, scoreId: event.body.id, objects: manifest.objects },
-		json,
-	);
-}
-
-async function createTrace(
-	parsed: ParsedArgs,
-	config: ReturnType<typeof configFromEnv>,
-	json: boolean,
-): Promise<void> {
-	const now = new Date().toISOString();
-	const traceId = stringFlag(parsed, "id") ?? createOtelTraceId();
-	const store = new S3ObjectStore(config.s3);
-	const object = await writeOtelAndSyncCache(
-		config,
-		store,
-		manualTraceResourceSpans(parsed, traceId, now),
-	);
-	print({ traceId, object }, json);
+): void {
+	if (json || stringFlag(parsed, "env") || !config.environment) return;
+	console.error(`Using AgentPond environment: ${config.environment.name}`);
 }
 
 async function runReadCommand(
@@ -149,16 +105,6 @@ async function runReadCommand(
 ): Promise<Record<string, unknown>[]> {
 	if (action === "--help" || !action) return helpRows(resource);
 
-	if (resource === "traces" && action === "list") {
-		return db.query(
-			`SELECT * FROM traces ORDER BY start_time DESC LIMIT ${limit(parsed)}`,
-		);
-	}
-	if (resource === "traces" && action === "get") {
-		const id = rest[0];
-		if (!id) throw new CliError("Missing trace id");
-		return db.query(`SELECT * FROM traces WHERE id = ${sql(id)} LIMIT 1`);
-	}
 	if (resource === "observations" && action === "list") {
 		const traceId = requiredFlag(parsed, "traceId");
 		return db.query(
@@ -178,103 +124,19 @@ async function runReadCommand(
 		if (!id) throw new CliError("Missing session id");
 		return db.query(`SELECT * FROM sessions WHERE id = ${sql(id)} LIMIT 1`);
 	}
-	if (resource === "scores" && action === "list") {
-		const traceId = stringFlag(parsed, "traceId");
-		const observationId = stringFlag(parsed, "observationId");
-		if (!traceId && !observationId)
-			throw new CliError("scores list requires --traceId or --observationId");
-		const filters = [
-			traceId ? `trace_id = ${sql(traceId)}` : undefined,
-			observationId ? `observation_id = ${sql(observationId)}` : undefined,
-		].filter(Boolean);
-		return db.query(
-			`SELECT * FROM scores WHERE ${filters.join(" AND ")} ORDER BY timestamp DESC LIMIT ${limit(parsed)}`,
-		);
-	}
-
 	throw new CliError(`Unknown command: ${resource} ${action}`);
-}
-
-function parseArgs(args: string[]): ParsedArgs {
-	const flags: ParsedArgs["flags"] = {};
-	const positionals: string[] = [];
-	for (let i = 0; i < args.length; i += 1) {
-		const arg = args[i];
-		if (!arg.startsWith("--")) {
-			positionals.push(arg);
-			continue;
-		}
-		const key = arg.slice(2);
-		if (["json", "help"].includes(key)) {
-			flags[key] = true;
-			continue;
-		}
-		const value = args[i + 1];
-		if (!value || value.startsWith("--"))
-			throw new CliError(`Missing value for --${key}`);
-		flags[key] = value;
-		i += 1;
-	}
-	return { flags, positionals };
-}
-
-function stringFlag(parsed: ParsedArgs, name: string): string | undefined {
-	const value = parsed.flags[name];
-	return typeof value === "string" ? value : undefined;
-}
-
-function requiredFlag(parsed: ParsedArgs, name: string): string {
-	const value = stringFlag(parsed, name);
-	if (!value) throw new CliError(`Missing --${name}`);
-	return value;
-}
-
-function limit(parsed: ParsedArgs): number {
-	const raw = stringFlag(parsed, "limit");
-	if (!raw) return 100;
-	const value = Number.parseInt(raw, 10);
-	if (!Number.isFinite(value) || value < 1 || value > 10000)
-		throw new CliError("--limit must be between 1 and 10000");
-	return value;
-}
-
-function parseScoreValue(value: string): string | number | boolean {
-	if (value === "true") return true;
-	if (value === "false") return false;
-	const numeric = Number(value);
-	return Number.isNaN(numeric) ? value : numeric;
-}
-
-export function createOtelTraceId(): string {
-	return randomBytes(16).toString("hex");
-}
-
-function sql(value: string): string {
-	return `'${value.replaceAll("'", "''")}'`;
-}
-
-function print(value: unknown, json: boolean): void {
-	if (json) {
-		console.log(
-			JSON.stringify(
-				value,
-				(_key, item) => (typeof item === "bigint" ? item.toString() : item),
-				2,
-			),
-		);
-		return;
-	}
-	if (Array.isArray(value)) {
-		console.table(value);
-		return;
-	}
-	console.log(JSON.stringify(value, null, 2));
 }
 
 function printHelp(): void {
 	console.log(`agentpond - local Langfuse-compatible trace analytics
 
 Usage:
+  agentpond dev [--host <host>] [--port <port>]
+  agentpond env current [--json]
+  agentpond env get <name> [--host <host>] [--port <port>]
+  agentpond env list [--json]
+  agentpond env init <name> [--json]
+  agentpond env use <name> [--json]
   agentpond sync [--json]
   agentpond traces create [--id <trace-id>] [--name <name>] [--userId <user-id>] [--sessionId <session-id>]
   agentpond traces list [--limit n] [--json]
@@ -288,19 +150,13 @@ Usage:
   agentpond sql "select ..." [--json]
 
 Global flags:
-  --env <path>
-  --db <path>
-  --s3-bucket <bucket>
-  --s3-prefix <prefix>
-  --s3-endpoint <url>
+  --env <name>
   --json`);
 }
 
 function helpRows(resource: string): Record<string, unknown>[] {
 	return [{ resource, hint: "Run agentpond --help for command usage." }];
 }
-
-class CliError extends Error {}
 
 function isCliEntryPoint(): boolean {
 	if (!process.argv[1]) return false;

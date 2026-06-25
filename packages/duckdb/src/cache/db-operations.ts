@@ -8,6 +8,8 @@ import {
 
 type ProcessedTable = "processed_manifests" | "processed_objects";
 
+export type DuckDbAccessMode = "readwrite" | "readonly";
+
 export type EventsRawAppendRow = {
 	eventId: string;
 	projectId: string;
@@ -77,8 +79,12 @@ export class DuckDbOperations {
 	private instance?: DuckDBInstance;
 	private connection?: DuckDBConnection;
 
-	constructor(readonly dbPath: string) {
-		mkdirSync(dirname(dbPath), { recursive: true });
+	constructor(
+		readonly dbPath: string,
+		private readonly accessMode: DuckDbAccessMode = "readwrite",
+	) {
+		if (accessMode === "readwrite")
+			mkdirSync(dirname(dbPath), { recursive: true });
 	}
 
 	async exec(sqlText: string): Promise<void> {
@@ -193,6 +199,14 @@ export class DuckDbOperations {
 			`SELECT key FROM ${table} WHERE key IN (${keys.map(sql).join(", ")})`,
 		);
 		return new Set(rows.map((row) => row.key));
+	}
+
+	async existingRawEventIds(eventIds: string[]): Promise<Set<string>> {
+		if (eventIds.length === 0) return new Set();
+		const rows = await this.all<{ event_id: string }>(
+			`SELECT event_id FROM events_raw WHERE event_id IN (${eventIds.map(sql).join(", ")})`,
+		);
+		return new Set(rows.map((row) => row.event_id));
 	}
 
 	async insertProcessedObjects(
@@ -350,7 +364,12 @@ export class DuckDbOperations {
 
 	private async getConnection(): Promise<DuckDBConnection> {
 		if (!this.connection) {
-			this.instance = await DuckDBInstance.create(this.dbPath);
+			this.instance = await DuckDBInstance.create(
+				this.dbPath,
+				this.accessMode === "readonly"
+					? { access_mode: "READ_ONLY" }
+					: undefined,
+			);
 			this.connection = await this.instance.connect();
 		}
 		return this.connection;

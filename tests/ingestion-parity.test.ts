@@ -8,7 +8,7 @@ import {
 	type BatchManifest,
 	MemoryObjectStore,
 } from "@agentpond/core";
-import { buildServer } from "../apps/ingest/src/server.js";
+import { buildServer } from "@agentpond/ingest";
 
 type FixtureObject = {
 	key: string;

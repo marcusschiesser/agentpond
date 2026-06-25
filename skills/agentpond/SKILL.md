@@ -1,8 +1,14 @@
 ---
 name: agentpond
-description: Work with AgentPond trace analytics. Use when needing to inspect traces, observations, sessions, or scores (e.g. annotations), run local SQL analysis, or configure Langfuse-compatible SDK ingestion into AgentPond.
+description: Work with AgentPond trace analytics. Use when needing to inspect traces, observations, sessions, or scores (e.g. annotations), run local SQL analysis, switch AgentPond environments, start the local dev ingestion server, or configure Langfuse-compatible SDK ingestion into AgentPond.
 allowed-tools:
   - Bash(npx agentpond --help *)
+  - Bash(npx agentpond dev *)
+  - Bash(npx agentpond env current *)
+  - Bash(npx agentpond env get *)
+  - Bash(npx agentpond env init *)
+  - Bash(npx agentpond env list *)
+  - Bash(npx agentpond env use *)
   - Bash(npx agentpond sync *)
   - Bash(npx agentpond traces create *)
   - Bash(npx agentpond traces list *)
@@ -17,16 +23,18 @@ allowed-tools:
 
 # AgentPond
 
-AgentPond is a data pond for AI agent traces with an agent-native CLI for local analytics. It accepts Langfuse-compatible ingestion, stores accepted events in S3-compatible object storage, and syncs those events into a local DuckDB cache for inspection.
+AgentPond is a data pond for AI agent traces with an agent-native CLI for local analytics. It accepts Langfuse-compatible ingestion, stores staging/production events in S3-compatible object storage, and uses a local DuckDB cache for inspection. The dev server writes directly to the dev DuckDB cache.
 
 ## Core Principles
 
 Follow these principles for AgentPond work:
 
-1. **Sync before analysis**: Run `npx agentpond sync` before querying recent production data unless the user is intentionally inspecting an existing local cache.
-2. **Use supported CLI commands**: AgentPond exposes focused trace analytics commands and local SQL. 
-3. **Use DuckDB for deeper analysis**: Prefer `npx agentpond sql "..."` when a question requires joins, aggregation, time filtering, raw event inspection, or cost analysis.
-4. **Keep credentials out of chat**: Ask the user to set environment variables or an `.env` file instead of pasting secrets into the conversation.
+1. **Default to dev**: If the user does not mention an environment, assume `dev`.
+2. **Select environments explicitly**: Use `npx agentpond env use <env>` to switch the selected environment, or add `--env <env>` for a single command.
+3. **Sync only when needed**: Run `npx agentpond sync` before querying recent staging/production object-storage data. Do not sync dev; `agentpond dev` writes directly to the dev DuckDB cache.
+4. **Use supported CLI commands**: AgentPond exposes focused trace analytics commands and local SQL.
+5. **Use DuckDB for deeper analysis**: Prefer `npx agentpond sql "..."` when a question requires joins, aggregation, time filtering, raw event inspection, or cost analysis.
+6. **Keep credentials out of chat**: Ask the user to set environment variables or an `.env` file instead of pasting secrets into the conversation.
 
 ## Use Case References
 
@@ -43,29 +51,43 @@ Run AgentPond through `npx` unless the user has installed it globally:
 npx agentpond --help
 ```
 
-Configure the CLI with environment variables or an env file:
+Use AgentPond environments to separate dev, staging, and production caches and configuration:
 
 ```bash
-export AGENTPOND_S3_ENDPOINT=http://localhost:9000
-export AGENTPOND_S3_BUCKET=agentpond
-export AWS_ACCESS_KEY_ID=minio
-export AWS_SECRET_ACCESS_KEY=minio123
+npx agentpond env current
+npx agentpond env list
+npx agentpond env use dev
 ```
 
-For a file-based setup:
+When the user names an environment, use it explicitly:
 
 ```bash
-npx agentpond --env .env sync
+npx agentpond env use staging
+npx agentpond --env production sync
 ```
 
-Common inspection flow:
+If the user asks to set up an environment, initialize its dotenv file:
 
 ```bash
-npx agentpond sync
+npx agentpond env init staging
+```
+
+Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings. Do not ask them to paste secrets into chat.
+
+Common inspection flow for `dev`:
+
+```bash
 npx agentpond traces list --limit 25
 npx agentpond traces get <trace-id>
 npx agentpond observations list --traceId <trace-id>
 npx agentpond scores list --traceId <trace-id>
+```
+
+For staging or production, sync before inspection:
+
+```bash
+npx agentpond --env production sync
+npx agentpond --env production traces list --limit 25
 ```
 
 Run SQL against the local DuckDB cache:
@@ -76,12 +98,32 @@ npx agentpond sql "select id, name, session_id, total_cost from traces order by 
 
 ## Langfuse-Compatible Ingestion
 
+For local development, start the dev ingestion server:
+
+```bash
+npx agentpond dev
+```
+
+This selects the `dev` environment and writes directly to `.agentpond/envs/dev/cache.duckdb`. Keep the process running while SDKs send traces.
+
+To configure an app to send traces to the dev server, use:
+
+```bash
+eval "$(npx agentpond env get dev)"
+```
+
+If the user asks for the env values without running `eval`, use:
+
+```bash
+npx agentpond env get dev
+```
+
 AgentPond ingestion uses Langfuse-compatible endpoints. Applications can use normal Langfuse SDK configuration while pointing at an AgentPond ingestion service:
 
 ```bash
-export LANGFUSE_BASE_URL=http://localhost:3030
-export LANGFUSE_PUBLIC_KEY=pk-agentpond
-export LANGFUSE_SECRET_KEY=sk-agentpond
+export LANGFUSE_BASE_URL=http://127.0.0.1:4318
+export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev
+export LANGFUSE_SECRET_KEY=sk-agentpond-dev
 ```
 
 These variables configure SDK ingestion. They are not credentials for using the AgentPond CLI to query Langfuse Cloud. The AgentPond CLI reads from object storage and the local DuckDB cache.

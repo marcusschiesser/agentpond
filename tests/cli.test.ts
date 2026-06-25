@@ -1,15 +1,18 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
 	type AgentPondConfig,
+	acquireDevServerLock,
 	eventTypes,
 	type IngestionEvent,
+	initAgentPondEnvironment,
 	MemoryObjectStore,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
+import { createDevLoggerOptions } from "../apps/cli/src/commands/dev.js";
 import { createOtelTraceId, main } from "../apps/cli/src/index.js";
 import { manualTraceResourceSpans } from "../apps/cli/src/otel-trace.js";
 import { writeEventsAndSyncCache } from "../apps/cli/src/sync-write.js";
@@ -58,6 +61,10 @@ function testConfig(dbPath: string): AgentPondConfig {
 			forcePathStyle: true,
 		},
 	};
+}
+
+function devDbPath(root: string): string {
+	return join(root, ".agentpond", "envs", "dev", "cache.duckdb");
 }
 
 test("CLI trace creation builds a Langfuse-compatible OTEL root span", () => {
@@ -219,10 +226,9 @@ test("CLI-created scores are immediately visible to score list queries", async (
 
 test("CLI trace and observation reads expose provided usage and cost fields as JSON", async () => {
 	const store = new MemoryObjectStore();
-	const dbPath = join(
-		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
-		"cache.duckdb",
-	);
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-"));
+	const dbPath = devDbPath(root);
 	const config = testConfig(dbPath);
 	const events: IngestionEvent[] = [
 		{
@@ -256,12 +262,11 @@ test("CLI trace and observation reads expose provided usage and cost fields as J
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		process.chdir(root);
 		const observationsOutput = await captureStdout(() =>
 			main([
 				"node",
 				"agentpond",
-				"--db",
-				dbPath,
 				"observations",
 				"list",
 				"--traceId",
@@ -289,16 +294,7 @@ test("CLI trace and observation reads expose provided usage and cost fields as J
 		assert.equal(observations[0].total_cost, 0.082);
 
 		const traceOutput = await captureStdout(() =>
-			main([
-				"node",
-				"agentpond",
-				"--db",
-				dbPath,
-				"traces",
-				"get",
-				"trace-1",
-				"--json",
-			]),
+			main(["node", "agentpond", "traces", "get", "trace-1", "--json"]),
 		);
 		const traces = JSON.parse(traceOutput) as Array<{
 			id: string;
@@ -309,16 +305,16 @@ test("CLI trace and observation reads expose provided usage and cost fields as J
 		assert.equal(traces[0].total_cost, 0.082);
 		assert.equal(process.exitCode, undefined);
 	} finally {
+		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });
 
 test("CLI observation list has stable order for identical start times", async () => {
 	const store = new MemoryObjectStore();
-	const dbPath = join(
-		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
-		"cache.duckdb",
-	);
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-"));
+	const dbPath = devDbPath(root);
 	const config = testConfig(dbPath);
 	await writeEventsAndSyncCache(config, store, [
 		{
@@ -358,12 +354,11 @@ test("CLI observation list has stable order for identical start times", async ()
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		process.chdir(root);
 		const output = await captureStdout(() =>
 			main([
 				"node",
 				"agentpond",
-				"--db",
-				dbPath,
 				"observations",
 				"list",
 				"--traceId",
@@ -379,54 +374,545 @@ test("CLI observation list has stable order for identical start times", async ()
 			["a-span", "b-span"],
 		);
 	} finally {
+		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });
 
 test("CLI read commands report missing required score filters", async () => {
-	const dbPath = join(
-		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
-		"cache.duckdb",
-	);
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		process.chdir(root);
 		const stderr = await captureStderr(() =>
-			main(["node", "agentpond", "--db", dbPath, "scores", "list", "--json"]),
+			main(["node", "agentpond", "scores", "list", "--json"]),
 		);
 
 		assert.equal(process.exitCode, 2);
 		assert.match(stderr, /scores list requires --traceId or --observationId/);
 	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI reports the selected environment when --env is omitted for non-JSON commands", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-log-"));
+	const dbPath = devDbPath(root);
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const db = new AgentPondCache(dbPath);
+		await db.ensureSchema();
+		await db.close();
+
+		const stderr = await captureStderr(() =>
+			captureStdout(() => main(["node", "agentpond", "traces", "list"])),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.match(stderr, /Using AgentPond environment: dev/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI does not report implicit environment in JSON output", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-"));
+	const dbPath = devDbPath(root);
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const db = new AgentPondCache(dbPath);
+		await db.ensureSchema();
+		await db.close();
+
+		const stderr = await captureStderr(() =>
+			captureStdout(() =>
+				main(["node", "agentpond", "traces", "list", "--json"]),
+			),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(stderr, "");
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env current defaults to table output and keeps JSON behind --json", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-current-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const tableOutput = await captureStdout(() =>
+			main(["node", "agentpond", "env", "current"]),
+		);
+		assert.equal(process.exitCode, undefined);
+		assert.match(tableOutput, /^\[/);
+		assert.match(tableOutput, /"name":"dev"/);
+
+		const jsonOutput = await captureStdout(() =>
+			main(["node", "agentpond", "env", "current", "--json"]),
+		);
+		const environment = JSON.parse(jsonOutput) as {
+			name: string;
+			dbPath: string;
+		};
+		assert.equal(environment.name, "dev");
+		assert.match(environment.dbPath, /\.agentpond\/envs\/dev\/cache\.duckdb$/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI sync is a no-op for the dev environment", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-sync-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "sync", "--json"]),
+		);
+		const result = JSON.parse(output) as { skipped: boolean; reason: string };
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.skipped, true);
+		assert.match(result.reason, /sync is not needed for agentpond dev/);
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "dev", "cache.duckdb")),
+			false,
+		);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI traces create writes directly to the dev DuckDB", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-trace-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"traces",
+				"create",
+				"--env",
+				"dev",
+				"--id",
+				"0123456789abcdef0123456789abcdef",
+				"--name",
+				"Direct Dev Trace",
+				"--json",
+			]),
+		);
+		const result = JSON.parse(output) as {
+			traceId: string;
+			eventsProcessed: number;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.traceId, "0123456789abcdef0123456789abcdef");
+		assert.equal(result.eventsProcessed, 2);
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "dev", "events")),
+			false,
+		);
+
+		const db = new AgentPondCache(
+			join(root, ".agentpond", "envs", "dev", "cache.duckdb"),
+		);
+		const rows = await db.query<{ id: string; name: string }>(
+			"SELECT id, name FROM traces WHERE id = '0123456789abcdef0123456789abcdef'",
+		);
+		await db.close();
+
+		assert.deepEqual(rows, [
+			{
+				id: "0123456789abcdef0123456789abcdef",
+				name: "Direct Dev Trace",
+			},
+		]);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI scores create writes directly to the dev DuckDB", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-score-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"scores",
+				"create",
+				"--env",
+				"dev",
+				"--id",
+				"score-direct",
+				"--name",
+				"quality",
+				"--value",
+				"0.95",
+				"--traceId",
+				"trace-direct",
+				"--json",
+			]),
+		);
+		const result = JSON.parse(output) as {
+			scoreId: string;
+			eventsProcessed: number;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.scoreId, "score-direct");
+		assert.equal(result.eventsProcessed, 1);
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "dev", "events")),
+			false,
+		);
+
+		const db = new AgentPondCache(
+			join(root, ".agentpond", "envs", "dev", "cache.duckdb"),
+		);
+		const rows = await db.query<{
+			id: string;
+			trace_id: string;
+			name: string;
+			value: number;
+		}>(
+			"SELECT id, trace_id, name, value FROM scores WHERE id = 'score-direct'",
+		);
+		await db.close();
+
+		assert.deepEqual(rows, [
+			{
+				id: "score-direct",
+				trace_id: "trace-direct",
+				name: "quality",
+				value: 0.95,
+			},
+		]);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env get dev prints generated shell exports without creating dev env file", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "get", "dev"]),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(
+			output,
+			[
+				"export LANGFUSE_BASE_URL=http://127.0.0.1:4318",
+				"export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev",
+				"export LANGFUSE_SECRET_KEY=sk-agentpond-dev",
+				"",
+			].join("\n"),
+		);
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "dev.env")),
+			false,
+		);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env get dev honors custom host and port", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-override-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"get",
+				"dev",
+				"--host",
+				"0.0.0.0",
+				"--port",
+				"9999",
+			]),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.match(output, /export LANGFUSE_BASE_URL=http:\/\/0\.0\.0\.0:9999/);
+		assert.match(output, /export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI dev logger prints JSON logs and suppresses server listen logs", () => {
+	const loggerOptions = createDevLoggerOptions();
+	assert.ok(loggerOptions.stream);
+	const write = process.stdout.write;
+	const chunks: string[] = [];
+	process.stdout.write = ((chunk: string | Uint8Array) => {
+		chunks.push(String(chunk));
+		return true;
+	}) as typeof process.stdout.write;
+	try {
+		loggerOptions.stream.write(
+			`${JSON.stringify({
+				level: 30,
+				msg: "ingested event",
+				source: "ingestion",
+				projectId: "default-project",
+				eventId: "event-1",
+				eventType: eventTypes.TRACE_CREATE,
+				entityId: "trace-1",
+			})}\n`,
+		);
+		loggerOptions.stream.write(
+			`${JSON.stringify({
+				level: 30,
+				msg: "ingested otel payload",
+				source: "otel",
+				projectId: "default-project",
+				resourceSpanCount: 1,
+			})}\n`,
+		);
+		loggerOptions.stream.write(
+			`${JSON.stringify({
+				level: 30,
+				msg: "incoming request",
+				reqId: "req-1",
+			})}\n`,
+		);
+		loggerOptions.stream.write(
+			`${JSON.stringify({
+				level: 30,
+				msg: "Server listening at http://127.0.0.1:4318",
+			})}\n`,
+		);
+	} finally {
+		process.stdout.write = write;
+	}
+
+	assert.deepEqual(
+		chunks
+			.join("")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line)),
+		[
+			{
+				level: 30,
+				msg: "ingested event",
+				source: "ingestion",
+				projectId: "default-project",
+				eventId: "event-1",
+				eventType: eventTypes.TRACE_CREATE,
+				entityId: "trace-1",
+			},
+			{
+				level: 30,
+				msg: "ingested otel payload",
+				source: "otel",
+				projectId: "default-project",
+				resourceSpanCount: 1,
+			},
+			{
+				level: 30,
+				msg: "incoming request",
+				reqId: "req-1",
+			},
+		],
+	);
+});
+
+test("CLI dev write commands fail while the dev server lock is active", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-lock-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const environment = initAgentPondEnvironment("dev");
+		const lock = acquireDevServerLock(environment);
+		try {
+			const stderr = await captureStderr(() =>
+				main([
+					"node",
+					"agentpond",
+					"traces",
+					"create",
+					"--id",
+					"0123456789abcdef0123456789abcdef",
+				]),
+			);
+
+			assert.equal(process.exitCode, 2);
+			assert.match(
+				stderr,
+				/dev server is running; stop it or use the dev ingestion endpoint/,
+			);
+		} finally {
+			lock.release();
+		}
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI read commands work while the dev server lock is active", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-read-lock-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const environment = initAgentPondEnvironment("dev");
+		const db = new AgentPondCache(environment.dbPath);
+		await db.ensureSchema();
+		await db.directIngestion().writeEvents({
+			projectId: "default-project",
+			events: [
+				{
+					id: "trace-read-event",
+					timestamp: "2026-06-14T00:00:00.000Z",
+					type: eventTypes.TRACE_CREATE,
+					body: {
+						id: "trace-read",
+						name: "Readable Trace",
+						sessionId: "session-read",
+					},
+				},
+				{
+					id: "observation-read-event",
+					timestamp: "2026-06-14T00:00:01.000Z",
+					type: eventTypes.GENERATION_CREATE,
+					body: {
+						id: "observation-read",
+						traceId: "trace-read",
+						name: "Readable Observation",
+					},
+				},
+				{
+					id: "score-read-event",
+					timestamp: "2026-06-14T00:00:02.000Z",
+					type: eventTypes.SCORE_CREATE,
+					body: {
+						id: "score-read",
+						traceId: "trace-read",
+						name: "readability",
+						value: 1,
+					},
+				},
+			],
+			source: "test-read-lock",
+		});
+		await db.close();
+		const lock = acquireDevServerLock(environment);
+		try {
+			const runJson = async (args: string[]) => {
+				process.exitCode = undefined;
+				const output = await captureStdout(() =>
+					main(["node", "agentpond", ...args, "--json"]),
+				);
+				assert.equal(process.exitCode, undefined);
+				return JSON.parse(output) as Array<Record<string, unknown>>;
+			};
+
+			assert.equal(
+				(await runJson(["traces", "get", "trace-read"]))[0].id,
+				"trace-read",
+			);
+			assert.equal((await runJson(["traces", "list"]))[0].id, "trace-read");
+			assert.equal(
+				(await runJson(["observations", "list", "--traceId", "trace-read"]))[0]
+					.id,
+				"observation-read",
+			);
+			assert.equal((await runJson(["sessions", "list"]))[0].id, "session-read");
+			assert.equal(
+				(await runJson(["sessions", "get", "session-read"]))[0].id,
+				"session-read",
+			);
+			assert.equal(
+				(await runJson(["scores", "list", "--traceId", "trace-read"]))[0].id,
+				"score-read",
+			);
+			assert.equal(
+				(await runJson(["sql", "SELECT id FROM traces"]))[0].id,
+				"trace-read",
+			);
+		} finally {
+			lock.release();
+		}
+	} finally {
+		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });
 
 test("CLI returns non-zero errors for invalid resources and actions", async () => {
-	const dbPath = join(
-		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
-		"cache.duckdb",
-	);
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		process.chdir(root);
 		const stderr = await captureStderr(() =>
-			main(["node", "agentpond", "--db", dbPath, "frobs", "list"]),
+			main(["node", "agentpond", "frobs", "list"]),
 		);
 
 		assert.equal(process.exitCode, 2);
 		assert.match(stderr, /Unknown command: frobs list/);
 	} finally {
+		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });
 
 test("CLI --limit caps list result count", async () => {
 	const store = new MemoryObjectStore();
-	const dbPath = join(
-		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
-		"cache.duckdb",
-	);
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-"));
+	const dbPath = devDbPath(root);
 	const config = testConfig(dbPath);
 	await writeEventsAndSyncCache(config, store, [
 		{
@@ -452,55 +938,40 @@ test("CLI --limit caps list result count", async () => {
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		process.chdir(root);
 		const output = await captureStdout(() =>
-			main([
-				"node",
-				"agentpond",
-				"--db",
-				dbPath,
-				"traces",
-				"list",
-				"--limit",
-				"2",
-				"--json",
-			]),
+			main(["node", "agentpond", "traces", "list", "--limit", "2", "--json"]),
 		);
 		const traces = JSON.parse(output) as Array<{ id: string }>;
 
 		assert.equal(process.exitCode, undefined);
 		assert.equal(traces.length, 2);
 	} finally {
+		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });
 
 test("CLI --json returns parseable JSON for empty result sets", async () => {
-	const dbPath = join(
-		mkdtempSync(join(tmpdir(), "agentpond-cli-")),
-		"cache.duckdb",
-	);
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-"));
+	const dbPath = devDbPath(root);
 	const db = new AgentPondCache(dbPath);
+	await db.ensureSchema();
 	await db.close();
 
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
+		process.chdir(root);
 		const output = await captureStdout(() =>
-			main([
-				"node",
-				"agentpond",
-				"--db",
-				dbPath,
-				"traces",
-				"get",
-				"missing",
-				"--json",
-			]),
+			main(["node", "agentpond", "traces", "get", "missing", "--json"]),
 		);
 
 		assert.equal(process.exitCode, undefined);
 		assert.deepEqual(JSON.parse(output), []);
 	} finally {
+		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });

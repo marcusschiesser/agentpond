@@ -167,6 +167,7 @@ export function otelResourceSpansToEvents(
 	resourceSpans: unknown[],
 ): IngestionEvent[] {
 	const events: IngestionEvent[] = [];
+	const seenTraces = new Set<string>();
 
 	for (const resourceSpan of resourceSpans) {
 		const scopeSpans =
@@ -185,6 +186,7 @@ export function otelResourceSpansToEvents(
 				const attributes = attributesToRecord(
 					getArray(span, "attributes") ?? [],
 				);
+				const langfuse = langfuseAttributes(attributes);
 				const name = stringField(span, "name") ?? "otel-span";
 				const observationType = stringValue(
 					attributes["langfuse.observation.type"],
@@ -226,39 +228,103 @@ export function otelResourceSpansToEvents(
 				} as IngestionEvent;
 				events.push(observationEvent);
 
-				if (!parentSpanId) {
-					const langfuse = langfuseAttributes(attributes);
-					events.push({
-						id: randomUUID(),
-						timestamp,
-						type: eventTypes.TRACE_CREATE,
-						metadata: { source: "otel" },
-						body: {
-							id: traceId,
-							name: langfuse.traceName ?? name,
-							userId: langfuse.userId,
-							sessionId: langfuse.sessionId,
-							startTime: timestamp,
-							metadata: langfuse.traceMetadata ?? attributes,
-							input:
-								langfuse.traceInput ??
-								parseJsonString(attributes["langfuse.observation.input"]),
-							output:
-								langfuse.traceOutput ??
-								parseJsonString(attributes["langfuse.observation.output"]),
-							tags: langfuse.traceTags,
-							public: langfuse.tracePublic,
-							version: stringValue(attributes["langfuse.version"]),
-							environment:
-								stringValue(attributes["langfuse.environment"]) ?? "default",
-						},
-					});
+				const isAppRoot =
+					booleanValue(attributes["langfuse.internal.is_app_root"]) === true;
+				const isRootSpan =
+					!parentSpanId ||
+					booleanValue(attributes["langfuse.internal.as_root"]) === true ||
+					// Langfuse uses is_app_root in its raw OTEL event path. AgentPond
+					// bridges it here because DuckDB projection consumes trace-create events.
+					isAppRoot;
+				const hasTraceUpdates = hasTraceUpdatesFromAttributes(attributes);
+				if (isRootSpan || hasTraceUpdates || !seenTraces.has(traceId)) {
+					seenTraces.add(traceId);
+					events.push(
+						createTraceEvent({
+							traceId,
+							timestamp,
+							attributes,
+							langfuse,
+							name,
+							isRootSpan,
+							hasTraceUpdates,
+						}),
+					);
 				}
 			}
 		}
 	}
 
-	return events;
+	return filterRedundantShallowTraceEvents(events);
+}
+
+function createTraceEvent(params: {
+	traceId: string;
+	timestamp: string;
+	attributes: Record<string, unknown>;
+	langfuse: LangfuseTraceAttributes;
+	name: string;
+	isRootSpan: boolean;
+	hasTraceUpdates: boolean;
+}): IngestionEvent {
+	const {
+		traceId,
+		timestamp,
+		attributes,
+		langfuse,
+		name,
+		isRootSpan,
+		hasTraceUpdates,
+	} = params;
+	let body: Record<string, unknown> = {
+		id: traceId,
+		timestamp,
+		environment: stringValue(attributes["langfuse.environment"]) ?? "default",
+	};
+
+	if (isRootSpan) {
+		body = {
+			...body,
+			name: langfuse.traceName ?? name,
+			userId: langfuse.userId,
+			sessionId: langfuse.sessionId,
+			startTime: timestamp,
+			metadata: langfuse.traceMetadata ?? attributes,
+			input:
+				langfuse.traceInput ??
+				parseJsonString(attributes["langfuse.observation.input"]),
+			output:
+				langfuse.traceOutput ??
+				parseJsonString(attributes["langfuse.observation.output"]),
+			tags: langfuse.traceTags,
+			public: langfuse.tracePublic,
+			version: stringValue(attributes["langfuse.version"]),
+		};
+	}
+
+	if (hasTraceUpdates && !isRootSpan) {
+		body = {
+			...body,
+			name: langfuse.traceName,
+			userId: langfuse.userId,
+			sessionId: langfuse.sessionId,
+			startTime: timestamp,
+			metadata: langfuse.traceMetadata,
+			input: langfuse.traceInput,
+			output: langfuse.traceOutput,
+			tags: langfuse.traceTags,
+			public: langfuse.tracePublic,
+			version: stringValue(attributes["langfuse.version"]),
+		};
+	}
+
+	return {
+		id: randomUUID(),
+		timestamp,
+		type: eventTypes.TRACE_CREATE,
+		metadata: { source: "otel" },
+		body,
+	};
 }
 
 function observationTypeToEventType(
@@ -346,7 +412,8 @@ function langfuseAttributes(attributes: Record<string, unknown>): {
 	traceTags?: string[];
 	tracePublic?: boolean;
 } {
-	const traceMetadata: Record<string, unknown> = {};
+	const traceMetadata =
+		parseJsonRecordString(attributes["langfuse.trace.metadata"]) ?? {};
 	for (const [key, value] of Object.entries(attributes)) {
 		if (key.startsWith("langfuse.trace.metadata.")) {
 			traceMetadata[key.slice("langfuse.trace.metadata.".length)] =
@@ -356,17 +423,141 @@ function langfuseAttributes(attributes: Record<string, unknown>): {
 
 	return {
 		traceName: stringValue(attributes["langfuse.trace.name"]),
-		userId: stringValue(attributes["user.id"]),
-		sessionId: stringValue(attributes["session.id"]),
+		userId: firstStringValue(attributes, [
+			"langfuse.user.id",
+			"user.id",
+			"langfuse.observation.metadata.langfuse_user_id",
+			"langfuse.trace.metadata.langfuse_user_id",
+			"ai.telemetry.metadata.userId",
+		]),
+		sessionId: firstStringValue(attributes, [
+			"langfuse.session.id",
+			"session.id",
+			"gen_ai.conversation.id",
+			"langfuse.observation.metadata.langfuse_session_id",
+			"langfuse.trace.metadata.langfuse_session_id",
+			"ai.telemetry.metadata.sessionId",
+		]),
 		traceMetadata:
 			Object.keys(traceMetadata).length > 0 ? traceMetadata : undefined,
 		traceInput: parseJsonString(attributes["langfuse.trace.input"]),
 		traceOutput: parseJsonString(attributes["langfuse.trace.output"]),
-		traceTags: arrayValue(attributes["langfuse.trace.tags"])?.filter(
-			(value): value is string => typeof value === "string",
-		),
+		traceTags: traceTagsFromAttributes(attributes),
 		tracePublic: booleanValue(attributes["langfuse.trace.public"]),
 	};
+}
+
+function firstStringValue(
+	attributes: Record<string, unknown>,
+	keys: string[],
+): string | undefined {
+	for (const key of keys) {
+		const value = stringValue(attributes[key]);
+		if (value) return value;
+	}
+	return undefined;
+}
+
+function traceTagsFromAttributes(
+	attributes: Record<string, unknown>,
+): string[] | undefined {
+	const raw =
+		attributes["langfuse.trace.tags"] ??
+		attributes["langfuse.tags"] ??
+		attributes["langfuse.observation.metadata.langfuse_tags"] ??
+		attributes["langfuse.trace.metadata.langfuse_tags"] ??
+		attributes["ai.telemetry.metadata.tags"] ??
+		attributes["tag.tags"];
+	if (raw === undefined || raw === null) return undefined;
+	const array = arrayValue(raw);
+	if (array) return array.map((tag) => String(tag));
+	if (typeof raw !== "string") return [String(raw)];
+	const parsed = parseJsonString(raw);
+	if (Array.isArray(parsed)) return parsed.map((tag) => String(tag));
+	if (raw.includes(",")) return raw.split(",").map((tag) => tag.trim());
+	return raw ? [raw] : undefined;
+}
+
+type LangfuseTraceAttributes = ReturnType<typeof langfuseAttributes>;
+
+function hasTraceUpdatesFromAttributes(
+	attributes: Record<string, unknown>,
+): boolean {
+	const traceAttributeKeys = [
+		"langfuse.trace.name",
+		"langfuse.trace.input",
+		"langfuse.trace.output",
+		"langfuse.trace.metadata",
+		"user.id",
+		"session.id",
+		"langfuse.trace.public",
+		"langfuse.trace.tags",
+		"langfuse.user.id",
+		"langfuse.session.id",
+		"langfuse.observation.metadata.langfuse_user_id",
+		"langfuse.observation.metadata.langfuse_session_id",
+		"langfuse.observation.metadata.langfuse_tags",
+		"langfuse.trace.metadata.langfuse_session_id",
+		"langfuse.trace.metadata.langfuse_user_id",
+		"langfuse.trace.metadata.langfuse_tags",
+		"ai.telemetry.metadata.sessionId",
+		"ai.telemetry.metadata.userId",
+		"ai.telemetry.metadata.tags",
+		"tag.tags",
+	];
+	return (
+		traceAttributeKeys.some((key) => Boolean(attributes[key])) ||
+		Object.keys(attributes).some((key) =>
+			key.startsWith("langfuse.trace.metadata"),
+		)
+	);
+}
+
+function filterRedundantShallowTraceEvents(
+	events: IngestionEvent[],
+): IngestionEvent[] {
+	const fullTraceIds = new Set(
+		events
+			.filter(
+				(event) =>
+					event.type === eventTypes.TRACE_CREATE && !isShallowTraceEvent(event),
+			)
+			.map((event) => stringValue(event.body.id ?? event.body.traceId))
+			.filter((id): id is string => Boolean(id)),
+	);
+	if (fullTraceIds.size === 0) return events;
+	return events.filter((event) => {
+		if (event.type !== eventTypes.TRACE_CREATE) return true;
+		const traceId = stringValue(event.body.id ?? event.body.traceId);
+		return (
+			!traceId || !fullTraceIds.has(traceId) || !isShallowTraceEvent(event)
+		);
+	});
+}
+
+function isShallowTraceEvent(event: IngestionEvent): boolean {
+	const body = event.body as Record<string, unknown>;
+	return (
+		!hasMeaningfulValue(body.name) &&
+		!hasMeaningfulValue(body.externalId) &&
+		!hasMeaningfulValue(body.input) &&
+		!hasMeaningfulValue(body.output) &&
+		!hasMeaningfulValue(body.sessionId) &&
+		!hasMeaningfulValue(body.userId) &&
+		!hasMeaningfulValue(body.metadata) &&
+		!hasMeaningfulValue(body.release) &&
+		!hasMeaningfulValue(body.version) &&
+		!hasMeaningfulValue(body.public) &&
+		!hasMeaningfulValue(body.tags)
+	);
+}
+
+function hasMeaningfulValue(value: unknown): boolean {
+	if (value === undefined || value === null) return false;
+	if (typeof value === "string") return value.length > 0;
+	if (Array.isArray(value)) return value.length > 0;
+	if (typeof value === "object") return Object.keys(value).length > 0;
+	return true;
 }
 
 function parseJsonMetadataValue(value: unknown): unknown {

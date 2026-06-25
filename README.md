@@ -63,28 +63,11 @@ AgentPond is intended for projects whose main requirement is private, durable tr
 You need:
 
 - Node.js and npm
-- Docker with Docker Compose
 
 Install the AgentPond CLI:
 
 ```sh
 npm install -g agentpond
-```
-
-Start the local MinIO object store and AgentPond ingestion service:
-
-```sh
-docker compose up --build
-```
-
-### Configuration
-
-Load the configuration for the services started by `docker compose up` by adding the credentials in `.env.example` to your shell:
-
-```sh
-set -a
-. ./.env.example
-set +a
 ```
 
 ### Create and query a trace
@@ -96,18 +79,12 @@ agentpond traces create \
   --name "checkout support answer" \
   --userId user_42 \
   --sessionId demo-session \
-  --metadata '{"env":"local","feature":"checkout","model":"gpt-5.5-mini"}' \
+  --metadata '{"feature":"checkout","model":"gpt-5.5-mini"}' \
   --input '{"question":"Why was my card declined?"}' \
   --output '{"answer":"The bank declined the authorization. Please try another card or contact your bank."}'
 ```
 
-Synchronize the stored events into the local DuckDB cache:
-
-```sh
-agentpond sync
-```
-
-Inspect the synchronized data:
+Inspect the trace:
 
 ```sh
 agentpond traces list
@@ -116,14 +93,58 @@ agentpond sql "select id, name, session_id from traces"
 
 For the complete command reference, see [CLI usage](./docs/cli.md).
 
+## Example projects
+
+The repository contains scenario-based examples under [examples](./examples/README.md):
+
+- [Basic traces](./examples/basic-traces/README.md): fixture-based Python and TypeScript examples that emit traces, observations, and annotation scores without calling an LLM.
+- [LLM compliance workflow](./examples/llm-compliance/README.md): a Python `uv` example that calls OpenAI, parses a structured compliance score, and records the workflow in Langfuse.
+
+Each scenario README includes prerequisites and run commands.
 
 ## Use AgentPond in your project
 
-AgentPond implements Langfuse-compatible ingestion endpoints. To send traces to AgentPond, configure the environment variables `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY`. By using the values defined in `.env.example`, you're pointing to the local AgentPond deployment started in the last section. 
-
-You can then use the normal Langfuse SDK integration for your language or framework.
+AgentPond implements Langfuse-compatible ingestion endpoints. To send traces to AgentPond, use the normal Langfuse SDK integration for your language or framework.
 
 See the [Langfuse SDK overview](https://langfuse.com/docs/observability/sdk/overview) for SDK installation and instrumentation instructions.
+
+### Environments
+
+AgentPond keeps dev, staging, and production data separate by environment.
+
+#### Development
+
+AgentPond provides a local Langfuse-compatible ingestion server for development. To start it, just call:
+
+```sh
+agentpond dev
+```
+
+Your project can then use `agentpond env get dev` to get the environment values needed to use this ingestion server with the Langfuse SDK. You can copy those values to your project's `.env` file or call this before running the dev server:
+
+```sh
+eval "$(agentpond env get dev)"
+```
+
+#### Staging and production
+
+For staging and production services, you need to deploy the AgentPond ingestion service together with an object store in your infrastructure. [docker-compose.yml](./docker-compose.yml) provides a template for such a deployment that you can run locally with `docker compose up --build`.
+
+To point AgentPond to this service, call the `env init` command in your project:
+
+```sh
+agentpond env init <env-name>
+```
+
+Using `staging` for `env-name`, this generates a `.agentpond/envs/staging.env` file that you need to update with the ingestion and object-store settings for your deployed AgentPond services.
+
+Then you can call:
+
+```sh
+agentpond env use staging
+```
+
+After that, `agentpond` queries traces from the selected staging environment by default.
 
 ### Add coding agent
 
@@ -134,23 +155,6 @@ npx skills add marcusschiesser/agentpond
 ```
 
 This command installs a skill to use the AgentPond CLI, understand its DuckDB schema for advanced queries, and provides trace-analysis guidance to help improve your agents.
-
-### Use your infrastructure
-
-Deploy the ingestion service together with an S3-compatible store in your infrastructure. [docker-compose.yml](./docker-compose.yml) provides a template for local deployment.
-
-For production deployments, replace all example credentials, use TLS, and give the ingestion service and CLI only the object-storage permissions they require.
-
-> Coming soon: templates for your favorite Cloud provider: AWS, Google Cloud and Azure.
-
-## Example projects
-
-The repository contains scenario-based examples under [examples](./examples/README.md):
-
-- [Basic traces](./examples/basic-traces/README.md): fixture-based Python and TypeScript examples that emit traces, observations, and annotation scores without calling an LLM.
-- [LLM compliance workflow](./examples/llm-compliance/README.md): a Python `uv` example that calls OpenAI, parses a structured compliance score, and records the workflow in Langfuse.
-
-Each scenario README includes prerequisites and run commands.
 
 
 ## Development

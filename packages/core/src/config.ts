@@ -1,5 +1,10 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+	type AgentPondEnvironment,
+	type AgentPondStoreType,
+	parseEnvFile,
+	resolveAgentPondEnvironment,
+} from "./environment.js";
 
 export type S3Config = {
 	bucket: string;
@@ -22,80 +27,53 @@ export type AgentPondConfig = {
 	dbPath: string;
 	s3: S3Config;
 	auth?: AuthConfig;
+	environment?: AgentPondEnvironment;
 };
-
-export function loadEnvFile(filePath: string): void {
-	const content = readFileSync(filePath, "utf8");
-	for (const line of content.split("\n")) {
-		const trimmed = line.trim();
-		if (!trimmed || trimmed.startsWith("#")) continue;
-		const eqIdx = trimmed.indexOf("=");
-		if (eqIdx === -1) continue;
-		const key = trimmed.slice(0, eqIdx).trim();
-		let val = trimmed.slice(eqIdx + 1).trim();
-		if (
-			(val.startsWith('"') && val.endsWith('"')) ||
-			(val.startsWith("'") && val.endsWith("'"))
-		) {
-			val = val.slice(1, -1);
-		}
-		process.env[key] = val;
-	}
-}
 
 export function configFromEnv(
 	overrides: Partial<{
-		dbPath: string;
-		s3Bucket: string;
-		s3Prefix: string;
-		s3Endpoint: string;
+		envName: string;
+		storeType: AgentPondStoreType;
 	}> = {},
 ): AgentPondConfig {
-	const projectId = process.env.AGENTPOND_PROJECT_ID ?? "default-project";
-	const publicKey =
-		process.env.LANGFUSE_PUBLIC_KEY ??
-		process.env.AGENTPOND_PUBLIC_KEY ??
-		"pk-agentpond";
-	const secretKey =
-		process.env.LANGFUSE_SECRET_KEY ??
-		process.env.AGENTPOND_SECRET_KEY ??
-		"sk-agentpond";
+	const environment = resolveAgentPondEnvironment({ name: overrides.envName });
+	const fileEnv = parseEnvFile(environment.envFilePath);
+	const env = envValue(fileEnv);
+	const storeType =
+		overrides.storeType ??
+		storeTypeFromValue(env("AGENTPOND_STORE")) ??
+		environment.storeType;
+	const dbPath = join(environment.envDir, "cache.duckdb");
+	const projectId = env("AGENTPOND_PROJECT_ID") ?? "default-project";
+	const publicKey = env("LANGFUSE_PUBLIC_KEY") ?? "pk-agentpond";
+	const secretKey = env("LANGFUSE_SECRET_KEY") ?? "sk-agentpond";
 
 	return {
 		projectId,
-		dbPath:
-			overrides.dbPath ??
-			process.env.AGENTPOND_DB ??
-			join(process.cwd(), ".agentpond", "cache.duckdb"),
+		dbPath,
 		s3: {
-			bucket:
-				overrides.s3Bucket ??
-				process.env.AGENTPOND_S3_BUCKET ??
-				process.env.S3_BUCKET ??
-				"agentpond",
-			prefix: normalizePrefix(
-				overrides.s3Prefix ?? process.env.AGENTPOND_S3_PREFIX ?? "",
-			),
-			endpoint:
-				overrides.s3Endpoint ??
-				process.env.AGENTPOND_S3_ENDPOINT ??
-				process.env.S3_ENDPOINT,
-			region:
-				process.env.AWS_REGION ??
-				process.env.AGENTPOND_S3_REGION ??
-				"us-east-1",
+			bucket: env("AGENTPOND_S3_BUCKET") ?? "agentpond",
+			prefix: normalizePrefix(env("AGENTPOND_S3_PREFIX") ?? ""),
+			endpoint: nonEmpty(env("AGENTPOND_S3_ENDPOINT")),
+			region: env("AWS_REGION") ?? env("AGENTPOND_S3_REGION") ?? "us-east-1",
 			accessKeyId:
-				process.env.AWS_ACCESS_KEY_ID ?? process.env.AGENTPOND_S3_ACCESS_KEY_ID,
+				nonEmpty(env("AWS_ACCESS_KEY_ID")) ??
+				nonEmpty(env("AGENTPOND_S3_ACCESS_KEY_ID")),
 			secretAccessKey:
-				process.env.AWS_SECRET_ACCESS_KEY ??
-				process.env.AGENTPOND_S3_SECRET_ACCESS_KEY,
+				nonEmpty(env("AWS_SECRET_ACCESS_KEY")) ??
+				nonEmpty(env("AGENTPOND_S3_SECRET_ACCESS_KEY")),
 			forcePathStyle:
-				(process.env.AGENTPOND_S3_FORCE_PATH_STYLE ?? "true") !== "false",
+				(env("AGENTPOND_S3_FORCE_PATH_STYLE") ?? "true") !== "false",
 		},
 		auth: {
 			projectId,
 			publicKey,
 			secretKey,
+		},
+		environment: {
+			...environment,
+			dbPath,
+			storeType,
 		},
 	};
 }
@@ -103,4 +81,22 @@ export function configFromEnv(
 export function normalizePrefix(prefix: string): string {
 	if (!prefix) return "";
 	return prefix.endsWith("/") ? prefix : `${prefix}/`;
+}
+
+function envValue(
+	fileEnv: Record<string, string>,
+): (name: string) => string | undefined {
+	return (name) => process.env[name] ?? fileEnv[name];
+}
+
+function nonEmpty(value: string | undefined): string | undefined {
+	return value === undefined || value === "" ? undefined : value;
+}
+
+function storeTypeFromValue(
+	value: string | undefined,
+): AgentPondStoreType | undefined {
+	if (value === undefined) return undefined;
+	if (value === "local" || value === "s3") return value;
+	throw new Error(`AGENTPOND_STORE must be "local" or "s3", got "${value}"`);
 }

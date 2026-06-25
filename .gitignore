@@ -8,3 +8,4 @@ apps/cli/README.md
 *.duckdb.wal
 *.tsbuildinfo
 .env
+.agentpond

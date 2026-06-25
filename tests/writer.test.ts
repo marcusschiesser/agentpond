@@ -5,6 +5,7 @@ import {
 	eventTypes,
 	type IngestionEvent,
 	MemoryObjectStore,
+	parseIngestionEvents,
 } from "@agentpond/core";
 
 test("accepted event writer stores entity objects before the manifest", async () => {
@@ -72,10 +73,8 @@ test("memory object store lists sorted keys within the requested prefix", async 
 	]);
 });
 
-test("processBatch accepts valid events and reports invalid events individually", async () => {
-	const store = new MemoryObjectStore();
-	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
-	const result = await writer.processBatch([
+test("parseIngestionEvents accepts valid events and reports invalid events individually", () => {
+	const result = parseIngestionEvents([
 		{
 			id: "event-1",
 			timestamp: "2026-06-14T00:00:00.000Z",
@@ -90,16 +89,19 @@ test("processBatch accepts valid events and reports invalid events individually"
 		},
 	]);
 
-	assert.deepEqual(result.successes, [{ id: "event-1", status: 201 }]);
+	assert.deepEqual(
+		result.events.map((event) => event.id),
+		["event-1"],
+	);
 	assert.equal(result.errors.length, 1);
 	assert.equal(result.errors[0].id, "bad-event");
 	assert.equal(result.errors[0].status, 400);
 });
 
-test("processBatch rejects carriage returns in ids while processing valid events", async () => {
+test("accepted event writer writes valid events after parse rejects carriage returns", async () => {
 	const store = new MemoryObjectStore();
 	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
-	const result = await writer.processBatch([
+	const result = parseIngestionEvents([
 		{
 			id: "event-1",
 			timestamp: "2026-06-14T00:00:00.000Z",
@@ -113,18 +115,22 @@ test("processBatch rejects carriage returns in ids while processing valid events
 			body: { id: "trace-2" },
 		},
 	]);
+	await writer.writeAcceptedEvents(result.events);
 
-	assert.deepEqual(result.successes, [{ id: "event-1", status: 201 }]);
+	assert.deepEqual(
+		result.events.map((event) => event.id),
+		["event-1"],
+	);
 	assert.equal(result.errors.length, 1);
 	assert.equal(result.errors[0].id, "bad\r-event");
 	assert.equal(result.errors[0].status, 400);
 	assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
 });
 
-test("processBatch rejects unsupported event types while writing valid events", async () => {
+test("accepted event writer writes valid events after parse rejects unsupported event types", async () => {
 	const store = new MemoryObjectStore();
 	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
-	const result = await writer.processBatch([
+	const result = parseIngestionEvents([
 		{
 			id: "event-1",
 			timestamp: "2026-06-14T00:00:00.000Z",
@@ -138,8 +144,12 @@ test("processBatch rejects unsupported event types while writing valid events", 
 			body: { id: "unsupported-1" },
 		},
 	]);
+	await writer.writeAcceptedEvents(result.events);
 
-	assert.deepEqual(result.successes, [{ id: "event-1", status: 201 }]);
+	assert.deepEqual(
+		result.events.map((event) => event.id),
+		["event-1"],
+	);
 	assert.equal(result.errors.length, 1);
 	assert.equal(result.errors[0].id, "unsupported-event");
 	assert.equal(result.errors[0].status, 400);

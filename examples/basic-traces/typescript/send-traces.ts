@@ -21,7 +21,7 @@ function requireLangfuseEnv() {
 	if (missing.length > 0) {
 		throw new Error(
 			`Missing required Langfuse environment variables: ${missing.join(", ")}. ` +
-				"Set LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY, and LANGFUSE_SECRET_KEY before running this example.",
+				'Run eval "$(agentpond env get dev)" before running this example.',
 		);
 	}
 }

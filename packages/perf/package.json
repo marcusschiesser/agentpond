@@ -9,6 +9,7 @@
 	"dependencies": {
 		"@agentpond/core": "workspace:*",
 		"@agentpond/duckdb": "workspace:*",
+		"@agentpond/ingest": "workspace:*",
 		"@langfuse/otel": "^5.4.1",
 		"@langfuse/tracing": "^5.4.1",
 		"@opentelemetry/sdk-node": "^0.208.0"

@@ -4,7 +4,7 @@ Use `npx agentpond` for AgentPond data access unless the user has installed the 
 
 ## Configuration
 
-AgentPond reads object storage and cache settings from environment variables:
+AgentPond reads object storage settings from the selected environment file under `.agentpond/envs/<name>.env`, then process environment variables, then flags:
 
 ```bash
 export AGENTPOND_PROJECT_ID=default-project
@@ -15,16 +15,15 @@ export AGENTPOND_S3_FORCE_PATH_STYLE=true
 export AWS_ACCESS_KEY_ID=minio
 export AWS_SECRET_ACCESS_KEY=minio123
 export AWS_REGION=us-east-1
-export AGENTPOND_DB=./.agentpond/cache.duckdb
 ```
 
-If `AGENTPOND_DB` is not set, AgentPond stores its DuckDB cache at `./.agentpond/cache.duckdb` in the current working directory.
+If no environment is selected, AgentPond uses `dev`. DuckDB caches are stored at `./.agentpond/envs/<name>/cache.duckdb`.
 
 The CLI also accepts common settings as flags:
 
 ```bash
-npx agentpond --env .env sync
-npx agentpond --db ./.agentpond/cache.duckdb sync
+npx agentpond --env dev sync
+npx agentpond --env production sync
 npx agentpond --s3-bucket agentpond --s3-endpoint http://localhost:9000 sync
 ```
 

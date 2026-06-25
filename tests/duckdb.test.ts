@@ -249,6 +249,42 @@ test("DuckDB sync rejects duplicate manifest event ids atomically", async () => 
 	assert.equal(Number(processedManifests[0].count), 1);
 });
 
+test("direct DuckDB writes skip duplicate event ids", async () => {
+	const db = createTempDb();
+	await db.ensureSchema();
+	await db.directIngestion().writeEvents({
+		projectId: "project-a",
+		events: [
+			{
+				id: "trace-event-direct",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "trace-direct", name: "Direct Trace" },
+			},
+		],
+		source: "test-direct",
+	});
+	const second = await db.directIngestion().writeEvents({
+		projectId: "project-a",
+		events: [
+			{
+				id: "trace-event-direct",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "trace-direct", name: "Direct Trace" },
+			},
+		],
+		source: "test-direct",
+	});
+	const rows = await db.query<{ id: string; name: string }>(
+		"SELECT id, name FROM traces WHERE id = 'trace-direct'",
+	);
+	await db.close();
+
+	assert.deepEqual(second, { eventsProcessed: 0, eventsSkipped: 1 });
+	assert.deepEqual(rows, [{ id: "trace-direct", name: "Direct Trace" }]);
+});
+
 test("DuckDB projection keeps newer event when an older event syncs later", async () => {
 	const store = new MemoryObjectStore();
 	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });

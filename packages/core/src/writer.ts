@@ -1,11 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { ObjectStore } from "./object-store.js";
-import type { BatchResult, EntityType, IngestionEvent } from "./schemas.js";
-import {
-	bodyIdForEvent,
-	entityTypeForEvent,
-	parseIngestionEvents,
-} from "./schemas.js";
+import type { EntityType, IngestionEvent } from "./schemas.js";
+import { bodyIdForEvent, entityTypeForEvent } from "./schemas.js";
 
 export type ManifestObject = {
 	key: string;
@@ -91,17 +87,6 @@ export class AcceptedEventWriter {
 			manifest,
 		);
 		return manifest;
-	}
-
-	async processBatch(input: unknown[]): Promise<BatchResult> {
-		const { events, errors } = parseIngestionEvents(input);
-		if (events.length > 0) {
-			await this.writeAcceptedEvents(events);
-		}
-		return {
-			successes: events.map((event) => ({ id: event.id, status: 201 })),
-			errors,
-		};
 	}
 
 	async writeOtelResourceSpans(
