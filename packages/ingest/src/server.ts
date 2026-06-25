@@ -32,12 +32,12 @@ export type IngestionSink = {
 		projectId: string;
 		prefix: string;
 		events: IngestionEvent[];
-	}) => Promise<void>;
+	}) => Promise<unknown>;
 	writeOtelResourceSpans: (params: {
 		projectId: string;
 		prefix: string;
 		resourceSpans: unknown[];
-	}) => Promise<void>;
+	}) => Promise<unknown>;
 };
 
 export function buildServer(options: BuildServerOptions = {}): FastifyInstance {

@@ -18,7 +18,7 @@ import {
 	print,
 	stringFlag,
 } from "../cli-support.js";
-import { devSdkEnvironment } from "../dev-env.js";
+import { devSdkEnvironment, type EnvVar } from "../dev-env.js";
 
 export async function handleEnvironmentCommand(
 	action: string | undefined,

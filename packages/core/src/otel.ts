@@ -20,6 +20,10 @@ type ObservationEventType = Exclude<
 	IngestionEvent["type"],
 	typeof eventTypes.TRACE_CREATE | typeof eventTypes.SCORE_CREATE
 >;
+type TraceCreateBody = Extract<
+	IngestionEvent,
+	{ type: typeof eventTypes.TRACE_CREATE }
+>["body"];
 
 export async function otelBodyToEvents(params: {
 	body: unknown;
@@ -276,7 +280,7 @@ function createTraceEvent(params: {
 		isRootSpan,
 		hasTraceUpdates,
 	} = params;
-	let body: Record<string, unknown> = {
+	let body: TraceCreateBody = {
 		id: traceId,
 		timestamp,
 		environment: stringValue(attributes["langfuse.environment"]) ?? "default",
