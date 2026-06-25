@@ -187,15 +187,15 @@ function logIngestedOtelPayload(
 	logger: IngestionLogger,
 	params: { projectId: string; resourceSpanCount: number },
 ): void {
-		logger.info(
-			{
-				source: "otel",
-				projectId: params.projectId,
+	logger.info(
+		{
+			source: "otel",
+			projectId: params.projectId,
 			resourceSpanCount: params.resourceSpanCount,
-			},
+		},
 		"ingested otel payload",
-		);
-	}
+	);
+}
 
 function authenticateRequest(
 	authorization: string | undefined,

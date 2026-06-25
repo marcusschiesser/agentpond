@@ -8,3 +8,9 @@ This repository uses Changesets to generate package changelogs.
 - Use `patch` for fixes and dependency maintenance, `minor` for new features, and `major` for breaking changes.
 - Keep changeset summaries concise and written for AgentPond users.
 - Do not manually edit generated changelog output unless the release process has already run `pnpm changeset version`.
+
+## Commits
+
+- Use the normal `git commit` path so Husky pre-commit hooks run.
+- Do not use `git commit --no-verify` or disable hooks with `HUSKY=0` unless the user explicitly asks for it.
+- If a hook changes files, review and stage those hook updates before committing again.
