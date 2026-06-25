@@ -1,5 +1,16 @@
 # agentpond
 
+## 0.2.0
+
+### Minor Changes
+
+- 3202c0a: Add a local `agentpond dev` ingestion server that writes directly to the dev DuckDB cache, makes dev sync a no-op, and blocks competing dev writes.
+- 3202c0a: Add named environments with per-environment DuckDB caches and environment-file based storage configuration using `agentpond env`.
+
+### Patch Changes
+
+- 3202c0a: Create traces for Langfuse OTEL spans marked as app roots.
+
 ## 0.1.3
 
 ### Patch Changes
