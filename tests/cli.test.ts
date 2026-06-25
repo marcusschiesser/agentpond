@@ -12,6 +12,7 @@ import {
 	MemoryObjectStore,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
+import { createDevLoggerOptions } from "../apps/cli/src/commands/dev.js";
 import { createOtelTraceId, main } from "../apps/cli/src/index.js";
 import { manualTraceResourceSpans } from "../apps/cli/src/otel-trace.js";
 import { writeEventsAndSyncCache } from "../apps/cli/src/sync-write.js";
@@ -681,6 +682,85 @@ test("CLI env get dev honors custom host and port", async () => {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
+});
+
+test("CLI dev logger prints JSON logs and suppresses server listen logs", () => {
+	const loggerOptions = createDevLoggerOptions();
+	assert.ok(loggerOptions.stream);
+	const write = process.stdout.write;
+	const chunks: string[] = [];
+	process.stdout.write = ((chunk: string | Uint8Array) => {
+		chunks.push(String(chunk));
+		return true;
+	}) as typeof process.stdout.write;
+	try {
+		loggerOptions.stream.write(
+			`${JSON.stringify({
+				level: 30,
+				msg: "ingested event",
+				source: "ingestion",
+				projectId: "default-project",
+				eventId: "event-1",
+				eventType: eventTypes.TRACE_CREATE,
+				entityId: "trace-1",
+			})}\n`,
+		);
+		loggerOptions.stream.write(
+			`${JSON.stringify({
+				level: 30,
+				msg: "ingested otel payload",
+				source: "otel",
+				projectId: "default-project",
+				resourceSpanCount: 1,
+			})}\n`,
+		);
+		loggerOptions.stream.write(
+			`${JSON.stringify({
+				level: 30,
+				msg: "incoming request",
+				reqId: "req-1",
+			})}\n`,
+		);
+		loggerOptions.stream.write(
+			`${JSON.stringify({
+				level: 30,
+				msg: "Server listening at http://127.0.0.1:4318",
+			})}\n`,
+		);
+	} finally {
+		process.stdout.write = write;
+	}
+
+	assert.deepEqual(
+		chunks
+			.join("")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line)),
+		[
+			{
+				level: 30,
+				msg: "ingested event",
+				source: "ingestion",
+				projectId: "default-project",
+				eventId: "event-1",
+				eventType: eventTypes.TRACE_CREATE,
+				entityId: "trace-1",
+			},
+			{
+				level: 30,
+				msg: "ingested otel payload",
+				source: "otel",
+				projectId: "default-project",
+				resourceSpanCount: 1,
+			},
+			{
+				level: 30,
+				msg: "incoming request",
+				reqId: "req-1",
+			},
+		],
+	);
 });
 
 test("CLI dev write commands fail while the dev server lock is active", async () => {

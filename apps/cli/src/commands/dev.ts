@@ -6,6 +6,7 @@ import {
 } from "@agentpond/core";
 import { DuckDbIngestionSink, ensureDuckDbSchema } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/ingest";
+import type { FastifyLoggerOptions } from "fastify";
 import {
 	CliError,
 	type ParsedArgs,
@@ -32,7 +33,7 @@ export async function startDevServer(parsed: ParsedArgs): Promise<void> {
 		config: devConfig,
 		sink: new DuckDbIngestionSink(devConfig.dbPath),
 		authMode: "disabled",
-		logger: false,
+		logger: createDevLoggerOptions(),
 	});
 	const shutdown = async () => {
 		await server.close();
@@ -66,4 +67,26 @@ export async function startDevServer(parsed: ParsedArgs): Promise<void> {
 	console.log(
 		'Or call `eval "$(agentpond env get dev)"` before calling your dev server.',
 	);
+}
+
+export function createDevLoggerOptions(): FastifyLoggerOptions {
+	return {
+		level: "info",
+		stream: {
+			write(line: string) {
+				if (!isServerListenLog(line)) process.stdout.write(line);
+			},
+		},
+	};
+}
+
+function isServerListenLog(line: string): boolean {
+	try {
+		const entry = JSON.parse(line) as { msg?: unknown };
+		return (
+			typeof entry.msg === "string" && entry.msg.startsWith("Server listening")
+		);
+	} catch {
+		return false;
+	}
 }

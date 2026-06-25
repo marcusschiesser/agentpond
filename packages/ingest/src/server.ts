@@ -2,6 +2,7 @@ import { gunzipSync } from "node:zlib";
 import {
 	type AgentPondConfig,
 	AuthError,
+	bodyIdForEvent,
 	configFromEnv,
 	type IngestionEvent,
 	ingestionBatchSchema,
@@ -12,14 +13,18 @@ import {
 	S3ObjectStore,
 	verifyBasicAuth,
 } from "@agentpond/core";
-import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
+import Fastify, {
+	type FastifyInstance,
+	type FastifyLoggerOptions,
+	type FastifyReply,
+} from "fastify";
 
 export type BuildServerOptions = {
 	config?: AgentPondConfig;
 	store?: ObjectStore;
 	authMode?: "required" | "disabled";
 	sink?: IngestionSink;
-	logger?: boolean;
+	logger?: FastifyLoggerOptions;
 };
 
 export type IngestionSink = {
@@ -89,6 +94,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 					prefix: config.s3.prefix,
 					events,
 				});
+				logIngestedEvents(request.log, {
+					source: "ingestion",
+					projectId: auth.projectId,
+					events,
+				});
 			}
 			return reply.status(207).send({
 				successes: events.map((event) => ({ id: event.id, status: 201 })),
@@ -133,6 +143,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 				prefix: config.s3.prefix,
 				resourceSpans,
 			});
+			logIngestedOtelPayload(request.log, {
+				projectId: auth.projectId,
+				resourceSpanCount: resourceSpans.length,
+			});
 			return reply.status(200).send({});
 		} catch (error) {
 			return handleRouteError(error, reply);
@@ -141,6 +155,47 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
 	return server;
 }
+
+type IngestionLogger = {
+	info: (fields: Record<string, unknown>, message: string) => void;
+};
+
+function logIngestedEvents(
+	logger: IngestionLogger,
+	params: {
+		source: "ingestion" | "otel";
+		projectId: string;
+		events: IngestionEvent[];
+	},
+): void {
+	for (const event of params.events) {
+		const entityId = bodyIdForEvent(event);
+		logger.info(
+			{
+				source: params.source,
+				projectId: params.projectId,
+				eventId: event.id,
+				eventType: event.type,
+				...(entityId ? { entityId } : {}),
+			},
+			"ingested event",
+		);
+	}
+}
+
+function logIngestedOtelPayload(
+	logger: IngestionLogger,
+	params: { projectId: string; resourceSpanCount: number },
+): void {
+		logger.info(
+			{
+				source: "otel",
+				projectId: params.projectId,
+			resourceSpanCount: params.resourceSpanCount,
+			},
+		"ingested otel payload",
+		);
+	}
 
 function authenticateRequest(
 	authorization: string | undefined,

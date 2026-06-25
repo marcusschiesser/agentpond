@@ -12,6 +12,7 @@ import {
 } from "@agentpond/core";
 import { AgentPondCache, DuckDbIngestionSink } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/ingest";
+import type { FastifyLoggerOptions } from "fastify";
 import protobuf from "protobufjs";
 
 const config: AgentPondConfig = {
@@ -87,6 +88,45 @@ function attr(key: string, value: unknown): Record<string, unknown> {
 	return { key, value: { stringValue: JSON.stringify(value) } };
 }
 
+type CapturedLog = Record<string, unknown>;
+
+function captureLogger(logs: CapturedLog[]): FastifyLoggerOptions {
+	return {
+		level: "info",
+		stream: {
+			write(line: string) {
+				logs.push(JSON.parse(line) as CapturedLog);
+			},
+		},
+	};
+}
+
+function ingestedEventLogs(
+	logs: CapturedLog[],
+): Array<Record<string, unknown>> {
+	return logs
+		.filter((log) => log.msg === "ingested event")
+		.map(({ source, projectId, eventId, eventType, entityId }) => ({
+			source,
+			projectId,
+			eventId,
+			eventType,
+			...(entityId ? { entityId } : {}),
+		}));
+}
+
+function ingestedOtelPayloadLogs(
+	logs: CapturedLog[],
+): Array<Record<string, unknown>> {
+	return logs
+		.filter((log) => log.msg === "ingested otel payload")
+		.map(({ source, projectId, resourceSpanCount }) => ({
+			source,
+			projectId,
+			resourceSpanCount,
+		}));
+}
+
 test("ingestion endpoint validates auth and returns 207 batch result", async () => {
 	const store = new MemoryObjectStore();
 	const server = buildServer({ config, store });
@@ -112,6 +152,67 @@ test("ingestion endpoint validates auth and returns 207 batch result", async () 
 	assert.equal(response.statusCode, 207);
 	assert.deepEqual(response.json().successes, [{ id: "event-1", status: 201 }]);
 	assert.equal((await store.listKeys("project-a/manifests/")).length, 1);
+	await server.close();
+});
+
+test("ingestion endpoint logs each accepted event", async () => {
+	const logs: CapturedLog[] = [];
+	const store = new MemoryObjectStore();
+	const server = buildServer({ config, store, logger: captureLogger(logs) });
+	const response = await server.inject({
+		method: "POST",
+		url: "/api/public/ingestion",
+		headers: {
+			authorization: authHeader(),
+			"content-type": "application/json",
+		},
+		payload: JSON.stringify({
+			batch: [
+				{
+					id: "event-log-trace",
+					timestamp: "2026-06-14T00:00:00.000Z",
+					type: eventTypes.TRACE_CREATE,
+					body: { id: "trace-log", name: "Trace Log" },
+				},
+				{
+					id: "event-log-score",
+					timestamp: "2026-06-14T00:00:01.000Z",
+					type: eventTypes.SCORE_CREATE,
+					body: {
+						id: "score-log",
+						traceId: "trace-log",
+						name: "quality",
+						value: 1,
+						source: "API",
+					},
+				},
+				{
+					id: "event-log-invalid",
+					timestamp: "2026-06-14T00:00:02.000Z",
+					type: "not-supported",
+					body: { id: "invalid-log" },
+				},
+			],
+		}),
+	});
+
+	assert.equal(response.statusCode, 207);
+	assert.deepEqual(ingestedEventLogs(logs), [
+		{
+			source: "ingestion",
+			projectId: "project-a",
+			eventId: "event-log-trace",
+			eventType: eventTypes.TRACE_CREATE,
+			entityId: "trace-log",
+		},
+		{
+			source: "ingestion",
+			projectId: "project-a",
+			eventId: "event-log-score",
+			eventType: eventTypes.SCORE_CREATE,
+			entityId: "score-log",
+		},
+	]);
 	await server.close();
 });
 
@@ -152,6 +253,25 @@ test("ingestion endpoint rejects missing or non-array batches", async () => {
 		assert.deepEqual(await store.listKeys("project-a/"), []);
 		await server.close();
 	}
+});
+
+test("ingestion endpoint does not log rejected payloads", async () => {
+	const logs: CapturedLog[] = [];
+	const store = new MemoryObjectStore();
+	const server = buildServer({ config, store, logger: captureLogger(logs) });
+	const response = await server.inject({
+		method: "POST",
+		url: "/api/public/ingestion",
+		headers: {
+			authorization: authHeader(),
+			"content-type": "application/json",
+		},
+		payload: JSON.stringify({ batch: {} }),
+	});
+
+	assert.equal(response.statusCode, 400);
+	assert.deepEqual(ingestedEventLogs(logs), []);
+	await server.close();
 });
 
 test("ingestion endpoint rejects invalid auth without writing objects", async () => {
@@ -293,6 +413,44 @@ test("otel generation costs project end-to-end into DuckDB", async () => {
 		},
 	]);
 	assert.deepEqual(traces, [{ total_cost: 0.082 }]);
+});
+
+test("otel endpoint logs the ingested OTEL payload", async () => {
+	const logs: CapturedLog[] = [];
+	const store = new MemoryObjectStore();
+	const server = buildServer({ config, store, logger: captureLogger(logs) });
+	const response = await server.inject({
+		method: "POST",
+		url: "/api/public/otel/v1/traces",
+		headers: {
+			authorization: authHeader(),
+			"content-type": "application/json",
+			"x-langfuse-ingestion-version": "4",
+		},
+		payload: JSON.stringify(
+			otelPayload([
+				{
+					traceId: "trace-otel-log",
+					spanId: "span-otel-log",
+					name: "logged generation",
+					startTimeUnixNano: "1781395200000000000",
+					endTimeUnixNano: "1781395201000000000",
+					attributes: [attr("langfuse.observation.type", "generation")],
+				},
+			]),
+		),
+	});
+
+	assert.equal(response.statusCode, 200);
+	assert.deepEqual(ingestedEventLogs(logs), []);
+	assert.deepEqual(ingestedOtelPayloadLogs(logs), [
+		{
+			source: "otel",
+			projectId: "project-a",
+			resourceSpanCount: 1,
+		},
+	]);
+	await server.close();
 });
 
 test("otel maps Langfuse SDK observation attributes to raw events", async () => {
