@@ -50,6 +50,21 @@ async function captureStderr(fn: () => Promise<void>): Promise<string> {
 	return chunks.join("");
 }
 
+async function captureProcessStdout(fn: () => Promise<void>): Promise<string> {
+	const write = process.stdout.write;
+	const chunks: string[] = [];
+	process.stdout.write = ((chunk: string | Uint8Array) => {
+		chunks.push(String(chunk));
+		return true;
+	}) as typeof process.stdout.write;
+	try {
+		await fn();
+	} finally {
+		process.stdout.write = write;
+	}
+	return chunks.join("");
+}
+
 function testConfig(dbPath: string): AgentPondConfig {
 	return {
 		projectId: "default-project",
@@ -70,15 +85,12 @@ function devDbPath(root: string): string {
 test("CLI trace creation builds a Langfuse-compatible OTEL root span", () => {
 	const resourceSpans = manualTraceResourceSpans(
 		{
-			flags: {
-				name: "Manual Trace",
-				userId: "user-1",
-				sessionId: "session-1",
-				input: '{"prompt":"hello"}',
-				output: "done",
-				metadata: '{"plan":"pro","attempt":2}',
-			},
-			positionals: [],
+			name: "Manual Trace",
+			userId: "user-1",
+			sessionId: "session-1",
+			input: '{"prompt":"hello"}',
+			output: "done",
+			metadata: '{"plan":"pro","attempt":2}',
 		},
 		"0123456789abcdef0123456789abcdef",
 		"2026-06-14T11:03:19.419Z",
@@ -156,10 +168,7 @@ test("CLI trace creation preserves nested metadata values", async () => {
 	);
 	const resourceSpans = manualTraceResourceSpans(
 		{
-			flags: {
-				metadata: '{"details":{"tier":"pro"},"tags":["a","b"],"plain":"ok"}',
-			},
-			positionals: [],
+			metadata: '{"details":{"tier":"pro"},"tags":["a","b"],"plain":"ok"}',
 		},
 		"0123456789abcdef0123456789abcdef",
 		"2026-06-14T11:03:19.419Z",
@@ -901,8 +910,184 @@ test("CLI returns non-zero errors for invalid resources and actions", async () =
 		);
 
 		assert.equal(process.exitCode, 2);
-		assert.match(stderr, /Unknown command: frobs list/);
+		assert.match(stderr, /unknown command 'frobs'/);
 	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI without arguments exits successfully", async () => {
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		await main(["node", "agentpond"]);
+
+		assert.equal(process.exitCode, undefined);
+	} finally {
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI reports unknown options as user errors", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-unknown-option-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "traces", "list", "--wat"]),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /unknown option '--wat'/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI supports equals-style flag values", async () => {
+	const store = new MemoryObjectStore();
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-equals-"));
+	const dbPath = devDbPath(root);
+	const config = testConfig(dbPath);
+	await writeEventsAndSyncCache(config, store, [
+		{
+			id: "trace-event-1",
+			timestamp: "2026-06-14T00:00:00.000Z",
+			type: eventTypes.TRACE_CREATE,
+			body: { id: "trace-1", name: "Trace 1" },
+		},
+		{
+			id: "trace-event-2",
+			timestamp: "2026-06-14T00:00:01.000Z",
+			type: eventTypes.TRACE_CREATE,
+			body: { id: "trace-2", name: "Trace 2" },
+		},
+	]);
+
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "traces", "--json", "list", "--limit=1"]),
+		);
+		const traces = JSON.parse(output) as Array<{ id: string }>;
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(traces.length, 1);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI command-local help does not open the environment cache", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-help-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureProcessStdout(() =>
+			main(["node", "agentpond", "traces", "list", "--help"]),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.match(output, /Usage: agentpond traces list/);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env use without a name errors in non-interactive mode", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-use-nontty-"));
+	const originalExitCode = process.exitCode;
+	const stdinDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdin,
+		"isTTY",
+	);
+	const stdoutDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdout,
+		"isTTY",
+	);
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		Object.defineProperty(process.stdin, "isTTY", {
+			configurable: true,
+			value: false,
+		});
+		Object.defineProperty(process.stdout, "isTTY", {
+			configurable: true,
+			value: false,
+		});
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "env", "use"]),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /Missing environment name/);
+	} finally {
+		if (stdinDescriptor)
+			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+		if (stdoutDescriptor)
+			Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env use can select an environment interactively", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-use-tty-"));
+	const originalExitCode = process.exitCode;
+	const stdinDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdin,
+		"isTTY",
+	);
+	const stdoutDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdout,
+		"isTTY",
+	);
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		initAgentPondEnvironment("staging");
+		Object.defineProperty(process.stdin, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		Object.defineProperty(process.stdout, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "use", "--json"], {
+				selectEnvironment: async ({ choices }) => {
+					assert.deepEqual(
+						choices.map((choice) => choice.value),
+						["staging"],
+					);
+					return "staging";
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(JSON.parse(output), { selected: "staging" });
+	} finally {
+		if (stdinDescriptor)
+			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+		if (stdoutDescriptor)
+			Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}

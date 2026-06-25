@@ -6,20 +6,30 @@ import {
 } from "@agentpond/core";
 import { DuckDbIngestionSink, ensureDuckDbSchema } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/ingest";
+import type { Command } from "commander";
 import type { FastifyLoggerOptions } from "fastify";
-import {
-	CliError,
-	type ParsedArgs,
-	parsePort,
-	stringFlag,
-} from "../cli-support.js";
+import { CliError, parsePort } from "../cli-support.js";
+import { addGlobalOptions } from "../command-support.js";
 import { devSdkEnvironment } from "../dev-env.js";
 
-export async function startDevServer(parsed: ParsedArgs): Promise<void> {
-	const host = stringFlag(parsed, "host") ?? "127.0.0.1";
-	const port = parsePort(stringFlag(parsed, "port") ?? "4318");
-	const action = parsed.positionals[1];
-	if (action) throw new CliError(`Unknown command: dev ${action}`);
+type DevOptions = {
+	host?: string;
+	port?: string;
+};
+
+export function registerDevCommand(program: Command): void {
+	addGlobalOptions(program.command("dev"))
+		.description("start a local Langfuse SDK-compatible ingestion server")
+		.option("--host <host>", "host to bind", "127.0.0.1")
+		.option("--port <port>", "port to bind", "4318")
+		.action(async (options: DevOptions) => {
+			await startDevServer(options);
+		});
+}
+
+export async function startDevServer(options: DevOptions): Promise<void> {
+	const host = options.host ?? "127.0.0.1";
+	const port = parsePort(options.port ?? "4318");
 	const environment = initAgentPondEnvironment("dev");
 	selectAgentPondEnvironment(environment.name);
 	const devConfig = configFromEnv({

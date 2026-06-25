@@ -1,16 +1,13 @@
 import { randomBytes } from "node:crypto";
 
-type ParsedArgs = {
-	flags: Record<string, string | boolean>;
-	positionals: string[];
-};
+type TraceFlags = Record<string, string | boolean | undefined>;
 
 export function manualTraceResourceSpans(
-	parsed: ParsedArgs,
+	flags: TraceFlags,
 	traceId: string,
 	timestamp: string,
 ): unknown[] {
-	const name = stringFlag(parsed, "name") ?? "manual trace";
+	const name = stringFlag(flags, "name") ?? "manual trace";
 	return [
 		{
 			scopeSpans: [
@@ -22,7 +19,7 @@ export function manualTraceResourceSpans(
 							name,
 							startTimeUnixNano: isoToUnixNanos(timestamp),
 							endTimeUnixNano: isoToUnixNanos(timestamp),
-							attributes: traceCreateAttributes(parsed, name),
+							attributes: traceCreateAttributes(flags, name),
 						},
 					],
 				},
@@ -32,7 +29,7 @@ export function manualTraceResourceSpans(
 }
 
 function traceCreateAttributes(
-	parsed: ParsedArgs,
+	flags: TraceFlags,
 	name: string,
 ): Array<Record<string, unknown>> {
 	const attributes: Array<Record<string, unknown>> = [
@@ -40,21 +37,21 @@ function traceCreateAttributes(
 		otelAttr("langfuse.trace.name", name),
 		otelAttr("langfuse.environment", "default"),
 	];
-	const userId = stringFlag(parsed, "userId");
+	const userId = stringFlag(flags, "userId");
 	if (userId) attributes.push(otelAttr("user.id", userId));
-	const sessionId = stringFlag(parsed, "sessionId");
+	const sessionId = stringFlag(flags, "sessionId");
 	if (sessionId) attributes.push(otelAttr("session.id", sessionId));
-	const input = jsonOrStringFlag(parsed, "input");
+	const input = jsonOrStringFlag(flags, "input");
 	if (input !== undefined) {
 		attributes.push(otelAttr("langfuse.trace.input", input));
 		attributes.push(otelAttr("langfuse.observation.input", input));
 	}
-	const output = jsonOrStringFlag(parsed, "output");
+	const output = jsonOrStringFlag(flags, "output");
 	if (output !== undefined) {
 		attributes.push(otelAttr("langfuse.trace.output", output));
 		attributes.push(otelAttr("langfuse.observation.output", output));
 	}
-	const metadata = jsonFlag(parsed, "metadata");
+	const metadata = jsonFlag(flags, "metadata");
 	if (metadata) {
 		for (const [key, value] of Object.entries(metadata)) {
 			attributes.push(otelAttr(`langfuse.trace.metadata.${key}`, value));
@@ -84,16 +81,16 @@ function otelAttr(key: string, value: unknown): Record<string, unknown> {
 	};
 }
 
-function stringFlag(parsed: ParsedArgs, name: string): string | undefined {
-	const value = parsed.flags[name];
+function stringFlag(flags: TraceFlags, name: string): string | undefined {
+	const value = flags[name];
 	return typeof value === "string" ? value : undefined;
 }
 
 function jsonFlag(
-	parsed: ParsedArgs,
+	flags: TraceFlags,
 	name: string,
 ): Record<string, unknown> | undefined {
-	const raw = stringFlag(parsed, name);
+	const raw = stringFlag(flags, name);
 	if (!raw) return undefined;
 	const value = JSON.parse(raw) as unknown;
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -102,8 +99,8 @@ function jsonFlag(
 	return value as Record<string, unknown>;
 }
 
-function jsonOrStringFlag(parsed: ParsedArgs, name: string): unknown {
-	const raw = stringFlag(parsed, name);
+function jsonOrStringFlag(flags: TraceFlags, name: string): unknown {
+	const raw = stringFlag(flags, name);
 	if (!raw) return undefined;
 	try {
 		return JSON.parse(raw) as unknown;

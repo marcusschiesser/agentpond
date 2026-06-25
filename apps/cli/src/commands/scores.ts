@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
-	type configFromEnv,
+	type AgentPondConfig,
 	eventTypes,
 	type IngestionEvent,
 } from "@agentpond/core";
@@ -9,48 +9,88 @@ import {
 	DuckDbIngestionSink,
 	ensureDuckDbSchema,
 } from "@agentpond/duckdb";
+import type { Command } from "commander";
+import { CliError, limit, print, stringFlag } from "../cli-support.js";
 import {
-	CliError,
-	limit,
-	type ParsedArgs,
-	print,
-	requiredFlag,
-	stringFlag,
-} from "../cli-support.js";
+	addGlobalOptions,
+	assertDevServerNotRunning,
+	cacheForRead,
+	commandContext,
+	type GlobalOptions,
+	isDevEnvironment,
+} from "../command-support.js";
 import { objectStoreForConfig } from "../object-store.js";
 import { sql } from "../sql.js";
 import { writeEventsAndSyncCache } from "../sync-write.js";
-import {
-	assertDevServerNotRunning,
-	cacheForRead,
-	isDevEnvironment,
-} from "./environment.js";
 
-export async function handleScoreCommand(
-	action: string | undefined,
-	parsed: ParsedArgs,
-	config: ReturnType<typeof configFromEnv>,
-	json: boolean,
-): Promise<void> {
-	if (action === "create") return createScore(parsed, config, json);
-	if (action === "--help" || !action) return print(helpRows("scores"), json);
-	const db = cacheForRead(config);
-	try {
-		const rows = await readScoreCommand(db, action, parsed);
-		return print(rows, json);
-	} finally {
-		await db.close();
-	}
+type ScoreOptions = GlobalOptions & {
+	comment?: string;
+	dataType?: string;
+	id?: string;
+	limit?: string;
+	name?: string;
+	observationId?: string;
+	sessionId?: string;
+	source?: string;
+	traceId?: string;
+	value?: string;
+};
+
+type ScoreCreateOptions = ScoreOptions & {
+	name: string;
+	value: string;
+};
+
+export function registerScoresCommand(program: Command): void {
+	const scores = addGlobalOptions(
+		program.command("scores").description("create and read scores"),
+	);
+
+	addGlobalOptions(scores.command("create"))
+		.description("create a score")
+		.requiredOption("--name <name>", "score name")
+		.requiredOption("--value <value>", "score value")
+		.option("--id <score-id>", "score id")
+		.option("--traceId <trace-id>", "trace id")
+		.option("--observationId <observation-id>", "observation id")
+		.option("--sessionId <session-id>", "session id")
+		.option("--dataType <type>", "score data type")
+		.option("--source <source>", "score source", "API")
+		.option("--comment <comment>", "score comment")
+		.action(async (options: ScoreCreateOptions, command: Command) => {
+			const { config, json } = commandContext(
+				command.optsWithGlobals<GlobalOptions>(),
+			);
+			return createScore(options, config, json);
+		});
+
+	addGlobalOptions(scores.command("list"))
+		.description("list scores")
+		.option("--traceId <trace-id>", "trace id")
+		.option("--observationId <observation-id>", "observation id")
+		.option("--limit <n>", "maximum row count", "100")
+		.action(async (options: ScoreOptions, command: Command) => {
+			const { config, json } = commandContext(
+				command.optsWithGlobals<GlobalOptions>(),
+			);
+			const db = cacheForRead(config);
+			try {
+				const rows = await readScoreCommand(db, "list", options);
+				return print(rows, json);
+			} finally {
+				await db.close();
+			}
+		});
 }
 
 async function readScoreCommand(
 	db: AgentPondCache,
 	action: string,
-	parsed: ParsedArgs,
+	options: ScoreOptions,
 ): Promise<Record<string, unknown>[]> {
 	if (action === "list") {
-		const traceId = stringFlag(parsed, "traceId");
-		const observationId = stringFlag(parsed, "observationId");
+		const traceId = stringFlag(options, "traceId");
+		const observationId = stringFlag(options, "observationId");
 		if (!traceId && !observationId)
 			throw new CliError("scores list requires --traceId or --observationId");
 		const filters = [
@@ -58,21 +98,19 @@ async function readScoreCommand(
 			observationId ? `observation_id = ${sql(observationId)}` : undefined,
 		].filter(Boolean);
 		return db.query(
-			`SELECT * FROM scores WHERE ${filters.join(" AND ")} ORDER BY timestamp DESC LIMIT ${limit(parsed)}`,
+			`SELECT * FROM scores WHERE ${filters.join(" AND ")} ORDER BY timestamp DESC LIMIT ${limit(options)}`,
 		);
 	}
 	throw new CliError(`Unknown command: scores ${action}`);
 }
 
 export async function createScore(
-	parsed: ParsedArgs,
-	config: ReturnType<typeof configFromEnv>,
+	options: ScoreCreateOptions,
+	config: AgentPondConfig,
 	json: boolean,
 ): Promise<void> {
 	assertDevServerNotRunning(config);
-	const name = requiredFlag(parsed, "name");
-	const value = requiredFlag(parsed, "value");
-	const source = stringFlag(parsed, "source") ?? "API";
+	const source = stringFlag(options, "source") ?? "API";
 	if (source === "EVAL") {
 		throw new CliError(
 			"scores create only allows source=API or source=ANNOTATION",
@@ -87,13 +125,13 @@ export async function createScore(
 		timestamp: now,
 		type: eventTypes.SCORE_CREATE,
 		body: {
-			id: stringFlag(parsed, "id") ?? randomUUID(),
-			traceId: stringFlag(parsed, "traceId"),
-			observationId: stringFlag(parsed, "observationId"),
-			sessionId: stringFlag(parsed, "sessionId"),
-			name,
-			value: parseScoreValue(value),
-			dataType: stringFlag(parsed, "dataType") as
+			id: stringFlag(options, "id") ?? randomUUID(),
+			traceId: stringFlag(options, "traceId"),
+			observationId: stringFlag(options, "observationId"),
+			sessionId: stringFlag(options, "sessionId"),
+			name: options.name,
+			value: parseScoreValue(options.value),
+			dataType: stringFlag(options, "dataType") as
 				| "NUMERIC"
 				| "CATEGORICAL"
 				| "BOOLEAN"
@@ -101,7 +139,7 @@ export async function createScore(
 				| "TEXT"
 				| undefined,
 			source,
-			comment: stringFlag(parsed, "comment"),
+			comment: stringFlag(options, "comment"),
 			createdAt: now,
 			environment: "default",
 		},
@@ -131,8 +169,4 @@ function parseScoreValue(value: string): string | number | boolean {
 	if (value === "false") return false;
 	const numeric = Number(value);
 	return Number.isNaN(numeric) ? value : numeric;
-}
-
-function helpRows(resource: string): Record<string, unknown>[] {
-	return [{ resource, hint: "Run agentpond --help for command usage." }];
 }

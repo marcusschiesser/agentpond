@@ -70,6 +70,10 @@ agentpond env init staging
 agentpond env use production
 ```
 
+Run `agentpond env use` without a name in an interactive terminal to choose from
+known environments. Scripts should keep passing an explicit name, such as
+`agentpond env use production`.
+
 Environment files are stored at `.agentpond/envs/<name>.env`. If no environment has been selected yet, AgentPond uses `dev`.
 
 ## Dev Server
