@@ -70,14 +70,6 @@ function testConfig(dbPath: string): AgentPondConfig {
 		projectId: "default-project",
 		dbPath,
 		prefix: "",
-		s3: {
-			bucket: "agentpond",
-			region: "us-east-1",
-			forcePathStyle: true,
-		},
-		gcs: {
-			bucket: "agentpond",
-		},
 	};
 }
 

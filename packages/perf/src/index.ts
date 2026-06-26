@@ -24,7 +24,7 @@ import { countTraces, formatDuration, timeSync } from "./sync.js";
 async function main(argv = process.argv.slice(2)): Promise<void> {
 	const args = parseArgs(argv);
 	const config = buildConfig(args);
-	const store = new S3ObjectStore(config.s3);
+	const store = new S3ObjectStore(args.s3);
 
 	logStep(
 		`starting Langfuse sync benchmark with ${args.traces} traces and prefix ${args.prefix}`,

@@ -19,14 +19,6 @@ const config: AgentPondConfig = {
 	projectId: "project-a",
 	dbPath: "/tmp/agentpond-test.duckdb",
 	prefix: "",
-	s3: {
-		bucket: "agentpond",
-		region: "us-east-1",
-		forcePathStyle: true,
-	},
-	gcs: {
-		bucket: "agentpond",
-	},
 	auth: {
 		projectId: "project-a",
 		publicKey: "pk",

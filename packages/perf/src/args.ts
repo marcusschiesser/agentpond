@@ -17,7 +17,10 @@ export type PerfArgs = {
 	secretKey: string;
 	prefix: string;
 	dbPath: string;
+	s3: S3ObjectStoreConfig;
 };
+
+type S3ObjectStoreConfig = ConstructorParameters<typeof S3ObjectStore>[0];
 
 const DEFAULT_TRACES = 100_000;
 
@@ -43,6 +46,14 @@ export function parseArgs(argv: string[]): PerfArgs {
 		secretKey: values["secret-key"] ?? "sk-agentpond",
 		prefix: normalizePrefix(values.prefix ?? `perf/${runId}`),
 		dbPath,
+		s3: {
+			bucket: values.bucket ?? "agentpond",
+			endpoint: values.endpoint ?? "http://localhost:9000",
+			region: values.region ?? "us-east-1",
+			accessKeyId: values["access-key-id"] ?? "minio",
+			secretAccessKey: values["secret-access-key"] ?? "minio123",
+			forcePathStyle: true,
+		},
 	};
 }
 
@@ -51,17 +62,6 @@ export function buildConfig(args: PerfArgs): AgentPondConfig {
 		projectId: args.projectId,
 		dbPath: args.dbPath,
 		prefix: args.prefix,
-		s3: {
-			bucket: args.bucket,
-			endpoint: args.endpoint,
-			region: args.region,
-			accessKeyId: args.accessKeyId,
-			secretAccessKey: args.secretAccessKey,
-			forcePathStyle: true,
-		},
-		gcs: {
-			bucket: args.bucket,
-		},
 		auth: {
 			projectId: args.projectId,
 			publicKey: args.publicKey,

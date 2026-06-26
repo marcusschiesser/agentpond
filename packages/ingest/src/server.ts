@@ -1,6 +1,6 @@
 import { gunzipSync } from "node:zlib";
 import { join } from "node:path";
-import { S3ObjectStore } from "@agentpond/aws";
+import { s3ConfigFromEnv, S3ObjectStore } from "@agentpond/aws";
 import {
 	type AgentPondConfig,
 	AuthError,
@@ -15,7 +15,7 @@ import {
 	parseIngestionEvents,
 	verifyBasicAuth,
 } from "@agentpond/core";
-import { GcsObjectStore } from "@agentpond/google";
+import { gcsConfigFromEnv, GcsObjectStore } from "@agentpond/google";
 import Fastify, {
 	type FastifyInstance,
 	type FastifyLoggerOptions,
@@ -169,8 +169,12 @@ function objectStoreForConfig(config: AgentPondConfig): ObjectStore {
 		}
 		return new FileSystemObjectStore(join(envDir, "events"));
 	}
-	if (storeType === "gcs") return new GcsObjectStore(config.gcs);
-	return new S3ObjectStore(config.s3);
+	if (storeType === "gcs") {
+		return new GcsObjectStore(
+			gcsConfigFromEnv(config.environment?.envFilePath),
+		);
+	}
+	return new S3ObjectStore(s3ConfigFromEnv(config.environment?.envFilePath));
 }
 
 type IngestionLogger = {

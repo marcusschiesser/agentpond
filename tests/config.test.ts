@@ -74,18 +74,6 @@ test("generated environment files document defaults and S3 settings", () => {
 		assert.match(productionFile, /AGENTPOND_S3_SECRET_ACCESS_KEY=minio123/);
 		assert.match(productionFile, /Use true for MinIO/);
 		assert.match(productionFile, /AGENTPOND_S3_FORCE_PATH_STYLE=true/);
-		assert.equal(
-			configFromEnv({ envName: "production" }).s3.endpoint,
-			"http://localhost:9000",
-		);
-		assert.equal(
-			configFromEnv({ envName: "production" }).s3.accessKeyId,
-			"minio",
-		);
-		assert.equal(
-			configFromEnv({ envName: "production" }).s3.secretAccessKey,
-			"minio123",
-		);
 	} finally {
 		process.chdir(originalCwd);
 	}
@@ -109,7 +97,6 @@ test("generated environment files document local and GCS settings", () => {
 		assert.match(gcsFile, /AGENTPOND_GCS_BUCKET=agentpond/);
 		assert.doesNotMatch(gcsFile, /AGENTPOND_GCS_PREFIX=/);
 		assert.match(gcsFile, /Application Default Credentials/);
-		assert.equal(configFromEnv({ envName: "gcs-env" }).gcs.bucket, "agentpond");
 		assert.equal(configFromEnv({ envName: "local-env" }).prefix, "");
 		assert.equal(
 			configFromEnv({ envName: "gcs-env" }).environment?.storeType,
@@ -141,7 +128,6 @@ test("config accepts GCS store values and rejects unknown stores", () => {
 		const config = configFromEnv({ envName: "production" });
 
 		assert.equal(config.environment?.storeType, "gcs");
-		assert.equal(config.gcs.bucket, "trace-bucket");
 		assert.equal(config.prefix, "prod/");
 
 		process.env.AGENTPOND_STORE = "azure";

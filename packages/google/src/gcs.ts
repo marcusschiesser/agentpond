@@ -1,5 +1,17 @@
-import type { GcsConfig, ObjectStore } from "@agentpond/core";
+import { envValue, parseEnvFile, type ObjectStore } from "@agentpond/core";
 import { Storage } from "@google-cloud/storage";
+
+export type GcsConfig = {
+	bucket: string;
+};
+
+export function gcsConfigFromEnv(envFilePath?: string): GcsConfig {
+	const fileEnv = envFilePath ? parseEnvFile(envFilePath) : {};
+	const env = envValue(fileEnv);
+	return {
+		bucket: env("AGENTPOND_GCS_BUCKET") ?? "agentpond",
+	};
+}
 
 type GcsFile = {
 	save(data: string, options: { contentType: string }): Promise<void>;

@@ -6,19 +6,6 @@ import {
 	resolveAgentPondEnvironment,
 } from "./environment.js";
 
-export type S3Config = {
-	bucket: string;
-	endpoint?: string;
-	region: string;
-	accessKeyId?: string;
-	secretAccessKey?: string;
-	forcePathStyle: boolean;
-};
-
-export type GcsConfig = {
-	bucket: string;
-};
-
 export type AuthConfig = {
 	projectId: string;
 	publicKey: string;
@@ -29,8 +16,6 @@ export type AgentPondConfig = {
 	projectId: string;
 	dbPath: string;
 	prefix: string;
-	s3: S3Config;
-	gcs: GcsConfig;
 	auth?: AuthConfig;
 	environment?: AgentPondEnvironment;
 };
@@ -63,22 +48,6 @@ export function configFromEnv(
 		projectId,
 		dbPath,
 		prefix,
-		s3: {
-			bucket: env("AGENTPOND_S3_BUCKET") ?? "agentpond",
-			endpoint: nonEmpty(env("AGENTPOND_S3_ENDPOINT")),
-			region: env("AWS_REGION") ?? env("AGENTPOND_S3_REGION") ?? "us-east-1",
-			accessKeyId:
-				nonEmpty(env("AWS_ACCESS_KEY_ID")) ??
-				nonEmpty(env("AGENTPOND_S3_ACCESS_KEY_ID")),
-			secretAccessKey:
-				nonEmpty(env("AWS_SECRET_ACCESS_KEY")) ??
-				nonEmpty(env("AGENTPOND_S3_SECRET_ACCESS_KEY")),
-			forcePathStyle:
-				(env("AGENTPOND_S3_FORCE_PATH_STYLE") ?? "true") !== "false",
-		},
-		gcs: {
-			bucket: env("AGENTPOND_GCS_BUCKET") ?? "agentpond",
-		},
 		auth: {
 			projectId,
 			publicKey,
@@ -97,13 +66,13 @@ export function normalizePrefix(prefix: string): string {
 	return prefix.endsWith("/") ? prefix : `${prefix}/`;
 }
 
-function envValue(
+export function envValue(
 	fileEnv: Record<string, string>,
 ): (name: string) => string | undefined {
 	return (name) => process.env[name] ?? fileEnv[name];
 }
 
-function nonEmpty(value: string | undefined): string | undefined {
+export function nonEmpty(value: string | undefined): string | undefined {
 	return value === undefined || value === "" ? undefined : value;
 }
 
