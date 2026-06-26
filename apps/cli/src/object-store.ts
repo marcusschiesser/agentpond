@@ -1,14 +1,21 @@
 import { join } from "node:path";
+import { S3ObjectStore } from "@agentpond/aws";
 import {
 	type AgentPondConfig,
 	FileSystemObjectStore,
 	type ObjectStore,
-	S3ObjectStore,
 } from "@agentpond/core";
+import { GcsObjectStore } from "@agentpond/google";
 
 export function objectStoreForConfig(config: AgentPondConfig): ObjectStore {
-	if (config.environment?.storeType === "local") {
-		return new FileSystemObjectStore(join(config.environment.envDir, "events"));
+	const storeType = config.environment?.storeType ?? "s3";
+	if (storeType === "local") {
+		const envDir = config.environment?.envDir;
+		if (!envDir) {
+			throw new Error("Local object storage requires an AgentPond environment");
+		}
+		return new FileSystemObjectStore(join(envDir, "events"));
 	}
+	if (storeType === "gcs") return new GcsObjectStore(config.gcs);
 	return new S3ObjectStore(config.s3);
 }

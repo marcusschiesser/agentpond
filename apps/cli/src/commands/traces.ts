@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { AgentPondConfig } from "@agentpond/core";
+import { type AgentPondConfig } from "@agentpond/core";
 import {
 	type AgentPondCache,
 	DuckDbIngestionSink,
@@ -124,7 +124,7 @@ export async function createTrace(
 			config.dbPath,
 		).writeOtelResourceSpans({
 			projectId: config.projectId,
-			prefix: config.s3.prefix,
+			prefix: config.prefix,
 			resourceSpans,
 			source: "cli-dev-trace",
 		});

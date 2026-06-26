@@ -51,11 +51,14 @@ const fixture = JSON.parse(
 const config: AgentPondConfig = {
 	projectId: fixture.projectId,
 	dbPath: "/tmp/agentpond-parity-test.duckdb",
+	prefix: fixture.prefix,
 	s3: {
 		bucket: "agentpond",
-		prefix: fixture.prefix,
 		region: "us-east-1",
 		forcePathStyle: true,
+	},
+	gcs: {
+		bucket: "agentpond",
 	},
 	auth: {
 		projectId: fixture.projectId,

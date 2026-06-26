@@ -8,6 +8,7 @@ import { registerDevCommand } from "./commands/dev.js";
 import {
 	registerEnvCommand,
 	type SelectEnvironmentPrompt,
+	type SelectProviderPrompt,
 } from "./commands/env.js";
 import { registerObservationsCommand } from "./commands/observations.js";
 import { registerScoresCommand } from "./commands/scores.js";
@@ -20,6 +21,7 @@ export { createOtelTraceId } from "./commands/traces.js";
 
 export type ProgramOptions = {
 	selectEnvironment?: SelectEnvironmentPrompt;
+	selectProvider?: SelectProviderPrompt;
 };
 
 export function createProgram(options: ProgramOptions = {}): Command {
@@ -43,6 +45,7 @@ export function createProgram(options: ProgramOptions = {}): Command {
 	registerDevCommand(program);
 	registerEnvCommand(program, {
 		selectEnvironment: options.selectEnvironment,
+		selectProvider: options.selectProvider,
 	});
 	registerSyncCommand(program);
 	registerTracesCommand(program);

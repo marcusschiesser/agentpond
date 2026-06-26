@@ -7,6 +7,8 @@
 	},
 	"references": [
 		{ "path": "../../packages/core" },
+		{ "path": "../../packages/aws" },
+		{ "path": "../../packages/google" },
 		{ "path": "../../packages/duckdb" },
 		{ "path": "../../packages/ingest" }
 	],

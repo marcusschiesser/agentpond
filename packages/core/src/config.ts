@@ -8,12 +8,15 @@ import {
 
 export type S3Config = {
 	bucket: string;
-	prefix: string;
 	endpoint?: string;
 	region: string;
 	accessKeyId?: string;
 	secretAccessKey?: string;
 	forcePathStyle: boolean;
+};
+
+export type GcsConfig = {
+	bucket: string;
 };
 
 export type AuthConfig = {
@@ -25,7 +28,9 @@ export type AuthConfig = {
 export type AgentPondConfig = {
 	projectId: string;
 	dbPath: string;
+	prefix: string;
 	s3: S3Config;
+	gcs: GcsConfig;
 	auth?: AuthConfig;
 	environment?: AgentPondEnvironment;
 };
@@ -45,15 +50,21 @@ export function configFromEnv(
 		environment.storeType;
 	const dbPath = join(environment.envDir, "cache.duckdb");
 	const projectId = env("AGENTPOND_PROJECT_ID") ?? "default-project";
+	const prefix = normalizePrefix(
+		env("AGENTPOND_PREFIX") ??
+			env("AGENTPOND_S3_PREFIX") ??
+			env("AGENTPOND_GCS_PREFIX") ??
+			"",
+	);
 	const publicKey = env("LANGFUSE_PUBLIC_KEY") ?? "pk-agentpond";
 	const secretKey = env("LANGFUSE_SECRET_KEY") ?? "sk-agentpond";
 
 	return {
 		projectId,
 		dbPath,
+		prefix,
 		s3: {
 			bucket: env("AGENTPOND_S3_BUCKET") ?? "agentpond",
-			prefix: normalizePrefix(env("AGENTPOND_S3_PREFIX") ?? ""),
 			endpoint: nonEmpty(env("AGENTPOND_S3_ENDPOINT")),
 			region: env("AWS_REGION") ?? env("AGENTPOND_S3_REGION") ?? "us-east-1",
 			accessKeyId:
@@ -64,6 +75,9 @@ export function configFromEnv(
 				nonEmpty(env("AGENTPOND_S3_SECRET_ACCESS_KEY")),
 			forcePathStyle:
 				(env("AGENTPOND_S3_FORCE_PATH_STYLE") ?? "true") !== "false",
+		},
+		gcs: {
+			bucket: env("AGENTPOND_GCS_BUCKET") ?? "agentpond",
 		},
 		auth: {
 			projectId,
@@ -97,6 +111,8 @@ function storeTypeFromValue(
 	value: string | undefined,
 ): AgentPondStoreType | undefined {
 	if (value === undefined) return undefined;
-	if (value === "local" || value === "s3") return value;
-	throw new Error(`AGENTPOND_STORE must be "local" or "s3", got "${value}"`);
+	if (value === "local" || value === "s3" || value === "gcs") return value;
+	throw new Error(
+		`AGENTPOND_STORE must be "local", "s3", or "gcs", got "${value}"`,
+	);
 }

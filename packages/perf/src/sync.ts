@@ -1,4 +1,4 @@
-import type { S3ObjectStore } from "@agentpond/core";
+import type { S3ObjectStore } from "@agentpond/aws";
 import type { AgentPondCache, SyncProgress } from "@agentpond/duckdb";
 import type { PerfArgs } from "./args.js";
 

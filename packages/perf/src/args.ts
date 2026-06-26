@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentPondConfig, S3ObjectStore } from "@agentpond/core";
+import type { S3ObjectStore } from "@agentpond/aws";
+import type { AgentPondConfig } from "@agentpond/core";
 
 export type PerfArgs = {
 	traces: number;
@@ -49,14 +50,17 @@ export function buildConfig(args: PerfArgs): AgentPondConfig {
 	return {
 		projectId: args.projectId,
 		dbPath: args.dbPath,
+		prefix: args.prefix,
 		s3: {
 			bucket: args.bucket,
-			prefix: args.prefix,
 			endpoint: args.endpoint,
 			region: args.region,
 			accessKeyId: args.accessKeyId,
 			secretAccessKey: args.secretAccessKey,
 			forcePathStyle: true,
+		},
+		gcs: {
+			bucket: args.bucket,
 		},
 		auth: {
 			projectId: args.projectId,

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -69,11 +69,14 @@ function testConfig(dbPath: string): AgentPondConfig {
 	return {
 		projectId: "default-project",
 		dbPath,
+		prefix: "",
 		s3: {
 			bucket: "agentpond",
-			prefix: "",
 			region: "us-east-1",
 			forcePathStyle: true,
+		},
+		gcs: {
+			bucket: "agentpond",
 		},
 	};
 }
@@ -1001,6 +1004,214 @@ test("CLI command-local help does not open the environment cache", async () => {
 		assert.match(output, /Usage: agentpond traces list/);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init writes Google provider files from --provider", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-provider-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"staging",
+				"--provider",
+				"google",
+				"--json",
+			]),
+		);
+		const result = JSON.parse(output) as {
+			provider: string;
+			envFile: string;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.provider, "google");
+		assert.match(readFileSync(result.envFile, "utf8"), /AGENTPOND_STORE=gcs/);
+		assert.match(
+			readFileSync(result.envFile, "utf8"),
+			/AGENTPOND_GCS_BUCKET=agentpond/,
+		);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init writes AWS and local provider files from --provider", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-providers-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const awsOutput = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"aws-env",
+				"--provider",
+				"aws",
+				"--json",
+			]),
+		);
+		const localOutput = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"local-env",
+				"--provider",
+				"local",
+				"--json",
+			]),
+		);
+		const aws = JSON.parse(awsOutput) as { provider: string; envFile: string };
+		const local = JSON.parse(localOutput) as {
+			provider: string;
+			envFile: string;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(aws.provider, "aws");
+		assert.match(readFileSync(aws.envFile, "utf8"), /AGENTPOND_STORE=s3/);
+		assert.match(readFileSync(aws.envFile, "utf8"), /AGENTPOND_S3_BUCKET/);
+		assert.equal(local.provider, "local");
+		assert.match(readFileSync(local.envFile, "utf8"), /AGENTPOND_STORE=local/);
+		assert.doesNotMatch(
+			readFileSync(local.envFile, "utf8"),
+			/AGENTPOND_S3_BUCKET/,
+		);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init rejects invalid providers", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-invalid-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const stderr = await captureStderr(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"staging",
+				"--provider",
+				"azure",
+			]),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /--provider must be aws, google, or local/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init without --provider errors in non-interactive mode", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-nontty-"));
+	const originalExitCode = process.exitCode;
+	const stdinDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdin,
+		"isTTY",
+	);
+	const stdoutDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdout,
+		"isTTY",
+	);
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		Object.defineProperty(process.stdin, "isTTY", {
+			configurable: true,
+			value: false,
+		});
+		Object.defineProperty(process.stdout, "isTTY", {
+			configurable: true,
+			value: false,
+		});
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "env", "init", "staging"]),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /Missing --provider/);
+	} finally {
+		if (stdinDescriptor)
+			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+		if (stdoutDescriptor)
+			Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init can select a provider interactively", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-tty-"));
+	const originalExitCode = process.exitCode;
+	const stdinDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdin,
+		"isTTY",
+	);
+	const stdoutDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdout,
+		"isTTY",
+	);
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		Object.defineProperty(process.stdin, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		Object.defineProperty(process.stdout, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "init", "staging", "--json"], {
+				selectProvider: async ({ choices }) => {
+					assert.deepEqual(
+						choices.map((choice) => choice.value),
+						["aws", "google", "local"],
+					);
+					return "local";
+				},
+			}),
+		);
+		const result = JSON.parse(output) as {
+			provider: string;
+			envFile: string;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.provider, "local");
+		assert.match(readFileSync(result.envFile, "utf8"), /AGENTPOND_STORE=local/);
+	} finally {
+		if (stdinDescriptor)
+			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+		if (stdoutDescriptor)
+			Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}

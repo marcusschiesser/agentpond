@@ -1,4 +1,6 @@
 import { gunzipSync } from "node:zlib";
+import { join } from "node:path";
+import { S3ObjectStore } from "@agentpond/aws";
 import {
 	type AgentPondConfig,
 	AuthError,
@@ -6,13 +8,14 @@ import {
 	configFromEnv,
 	type IngestionEvent,
 	ingestionBatchSchema,
+	FileSystemObjectStore,
 	type ObjectStore,
 	ObjectStoreIngestionSink,
 	otelBodyToResourceSpans,
 	parseIngestionEvents,
-	S3ObjectStore,
 	verifyBasicAuth,
 } from "@agentpond/core";
+import { GcsObjectStore } from "@agentpond/google";
 import Fastify, {
 	type FastifyInstance,
 	type FastifyLoggerOptions,
@@ -42,7 +45,8 @@ export type IngestionSink = {
 
 export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 	const config = options.config ?? configFromEnv();
-	const store = options.store ?? new S3ObjectStore(config.s3);
+	const store = options.store ?? objectStoreForConfig(config);
+	const prefix = config.prefix;
 	const authMode = options.authMode ?? "required";
 	const sink = options.sink ?? new ObjectStoreIngestionSink(store);
 	const server = Fastify({
@@ -91,7 +95,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 			if (events.length > 0) {
 				await sink.writeEvents({
 					projectId: auth.projectId,
-					prefix: config.s3.prefix,
+					prefix,
 					events,
 				});
 				logIngestedEvents(request.log, {
@@ -140,7 +144,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
 			await sink.writeOtelResourceSpans({
 				projectId: auth.projectId,
-				prefix: config.s3.prefix,
+				prefix,
 				resourceSpans,
 			});
 			logIngestedOtelPayload(request.log, {
@@ -154,6 +158,19 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 	});
 
 	return server;
+}
+
+function objectStoreForConfig(config: AgentPondConfig): ObjectStore {
+	const storeType = config.environment?.storeType ?? "s3";
+	if (storeType === "local") {
+		const envDir = config.environment?.envDir;
+		if (!envDir) {
+			throw new Error("Local object storage requires an AgentPond environment");
+		}
+		return new FileSystemObjectStore(join(envDir, "events"));
+	}
+	if (storeType === "gcs") return new GcsObjectStore(config.gcs);
+	return new S3ObjectStore(config.s3);
 }
 
 type IngestionLogger = {

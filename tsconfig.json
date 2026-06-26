@@ -2,6 +2,8 @@
 	"files": [],
 	"references": [
 		{ "path": "./packages/core" },
+		{ "path": "./packages/aws" },
+		{ "path": "./packages/google" },
 		{ "path": "./packages/ingest" },
 		{ "path": "./packages/duckdb" },
 		{ "path": "./packages/perf" },

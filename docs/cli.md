@@ -1,6 +1,6 @@
 # CLI Usage
 
-AgentPond ships a CLI named `agentpond` for syncing traces and scores from remote object storage into a local DuckDB cache, so you can analyze production agent data with SQL and focused trace commands. It can also create manual traces and scores for local testing.
+AgentPond ships a CLI named `agentpond` for syncing traces and scores from local, S3-compatible, or Google Cloud Storage object storage into a local DuckDB cache, so you can analyze production agent data with SQL and focused trace commands. It can also create manual traces and scores for local testing.
 
 ## Install
 
@@ -32,11 +32,19 @@ You can print the same SDK environment for a shell with:
 eval "$(agentpond env get dev)"
 ```
 
-For S3-backed environments, store dotenv-compatible settings in `.agentpond/envs/<name>.env`:
+For shared environments, store dotenv-compatible settings in `.agentpond/envs/<name>.env`:
 
 ```sh
 agentpond env init production
 agentpond env use production
+```
+
+`agentpond env init` prompts for AWS, Google, or local infrastructure in an interactive terminal. Scripts should pass the provider explicitly:
+
+```sh
+agentpond env init production --provider aws
+agentpond env init production --provider google
+agentpond env init production --provider local
 ```
 
 The CLI reads the selected environment file, then applies process environment variables and explicit flags. You can select an environment per command:
@@ -66,7 +74,7 @@ By default, AgentPond stores one DuckDB cache per environment at `./.agentpond/e
 agentpond env current
 agentpond env get dev
 agentpond env list
-agentpond env init staging
+agentpond env init staging --provider aws
 agentpond env use production
 ```
 
@@ -75,6 +83,8 @@ known environments. Scripts should keep passing an explicit name, such as
 `agentpond env use production`.
 
 Environment files are stored at `.agentpond/envs/<name>.env`. If no environment has been selected yet, AgentPond uses `dev`.
+
+GCS environments use `AGENTPOND_GCS_BUCKET` and authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. All storage providers use `AGENTPOND_PREFIX` for an optional object key prefix.
 
 ## Dev Server
 

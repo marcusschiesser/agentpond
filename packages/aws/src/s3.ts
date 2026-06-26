@@ -4,8 +4,7 @@ import {
 	PutObjectCommand,
 	S3Client,
 } from "@aws-sdk/client-s3";
-import type { S3Config } from "../config.js";
-import type { ObjectStore } from "./types.js";
+import type { ObjectStore, S3Config } from "@agentpond/core";
 
 export class S3ObjectStore implements ObjectStore {
 	private readonly client: S3Client;

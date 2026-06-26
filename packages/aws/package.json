@@ -1,5 +1,5 @@
 {
-	"name": "@agentpond/ingest",
+	"name": "@agentpond/aws",
 	"version": "0.1.0",
 	"type": "module",
 	"private": true,
@@ -7,9 +7,7 @@
 		".": "./src/index.ts"
 	},
 	"dependencies": {
-		"@agentpond/aws": "workspace:*",
 		"@agentpond/core": "workspace:*",
-		"@agentpond/google": "workspace:*",
-		"fastify": "^5.6.2"
+		"@aws-sdk/client-s3": "^3.936.0"
 	}
 }

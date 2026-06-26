@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import { S3ObjectStore } from "@agentpond/core";
+import { S3ObjectStore } from "@agentpond/aws";
 import { AgentPondCache } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/ingest";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
