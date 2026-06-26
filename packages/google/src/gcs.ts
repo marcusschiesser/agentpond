@@ -1,4 +1,4 @@
-import { envValue, parseEnvFile, type ObjectStore } from "@agentpond/core";
+import { envValue, type ObjectStore, parseEnvFile } from "@agentpond/core";
 import { Storage } from "@google-cloud/storage";
 
 export type GcsConfig = {
@@ -34,7 +34,7 @@ export class GcsObjectStore implements ObjectStore {
 	private readonly bucket: GcsBucket;
 
 	constructor(
-		private readonly config: GcsConfig,
+		readonly config: GcsConfig,
 		storage: GcsStorage = new Storage(),
 	) {
 		this.bucket = storage.bucket(config.bucket);

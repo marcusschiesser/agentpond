@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { gcsConfigFromEnv, GcsObjectStore } from "@agentpond/google";
+import { GcsObjectStore, gcsConfigFromEnv } from "@agentpond/google";
 
 test("GCS config reads provider settings from env files below process env", () => {
 	const originalBucket = process.env.AGENTPOND_GCS_BUCKET;

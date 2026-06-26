@@ -1,11 +1,11 @@
 import { join } from "node:path";
-import { s3ConfigFromEnv, S3ObjectStore } from "@agentpond/aws";
+import { S3ObjectStore, s3ConfigFromEnv } from "@agentpond/aws";
 import {
 	type AgentPondConfig,
 	FileSystemObjectStore,
 	type ObjectStore,
 } from "@agentpond/core";
-import { gcsConfigFromEnv, GcsObjectStore } from "@agentpond/google";
+import { GcsObjectStore, gcsConfigFromEnv } from "@agentpond/google";
 
 export function objectStoreForConfig(config: AgentPondConfig): ObjectStore {
 	const storeType = config.environment?.storeType ?? "s3";
