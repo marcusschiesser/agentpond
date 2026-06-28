@@ -72,12 +72,12 @@ If the user asks to set up an environment, initialize its dotenv file:
 npx agentpond env init staging
 ```
 
-In an interactive terminal, choose the requested infrastructure provider when prompted. In scripts or non-interactive terminals, pass it explicitly:
+In an interactive terminal, choose the requested object store when prompted. In scripts or non-interactive terminals, pass it explicitly:
 
 ```bash
-npx agentpond env init staging --provider aws
-npx agentpond env init staging --provider google
-npx agentpond env init staging --provider local
+npx agentpond env init staging --store s3
+npx agentpond env init staging --store gcs
+npx agentpond env init staging --store local
 ```
 
 Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings. GCS environments use Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Do not ask users to paste secrets into chat.
@@ -136,4 +136,4 @@ export LANGFUSE_SECRET_KEY=sk-agentpond-dev
 
 These variables configure SDK ingestion. They are not credentials for using the AgentPond CLI to query Langfuse Cloud. The AgentPond CLI reads from object storage and the local DuckDB cache.
 
-For serverless deployments, AWS infrastructure can use `lambdaIngestHandler` from `@agentpond/aws`, and Google infrastructure can use `httpIngestFunction` from `@agentpond/google`. Both handlers expose the same Langfuse-compatible ingestion endpoints and write to the provider object store.
+For serverless deployments, AWS infrastructure can use `lambdaIngestHandler` from `@agentpond/aws`, and Google infrastructure can use `httpIngestFunction` from `@agentpond/google`. Both handlers expose the same Langfuse-compatible ingestion endpoints and write to the configured object store.

@@ -39,12 +39,12 @@ agentpond env init production
 agentpond env use production
 ```
 
-`agentpond env init` prompts for AWS, Google, or local infrastructure in an interactive terminal. Scripts should pass the provider explicitly:
+`agentpond env init` prompts for S3, GCS, or local object storage in an interactive terminal. Scripts should pass the store explicitly:
 
 ```sh
-agentpond env init production --provider aws
-agentpond env init production --provider google
-agentpond env init production --provider local
+agentpond env init production --store s3
+agentpond env init production --store gcs
+agentpond env init production --store local
 ```
 
 The CLI reads the selected environment file, then applies process environment variables and explicit flags. You can select an environment per command:
@@ -74,7 +74,7 @@ By default, AgentPond stores one DuckDB cache per environment at `./.agentpond/e
 agentpond env current
 agentpond env get dev
 agentpond env list
-agentpond env init staging --provider aws
+agentpond env init staging --store s3
 agentpond env use production
 ```
 

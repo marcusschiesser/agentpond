@@ -1,15 +1,15 @@
 import {
-	configFromEnv,
 	type AgentPondConfig,
+	configFromEnv,
 	type ObjectStore,
 } from "@agentpond/core";
 import {
-	handleIngestRequest,
 	type AuthMode,
+	handleIngestRequest,
 	type IngestionLogger,
 	type IngestionSink,
 } from "@agentpond/ingest";
-import { type S3Config, s3ConfigFromEnv, S3ObjectStore } from "./s3.js";
+import { type S3Config, S3ObjectStore, s3ConfigFromEnv } from "./s3.js";
 
 export type AwsIngestHandlerOptions = {
 	config?: AgentPondConfig;

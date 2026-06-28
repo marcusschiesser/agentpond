@@ -19,24 +19,24 @@ export type SelectPrompt<T extends string> = (config: {
 }) => Promise<T>;
 
 export type SelectEnvironmentPrompt = SelectPrompt<string>;
-export type AgentPondProvider = "aws" | "google" | "local";
-export type SelectProviderPrompt = SelectPrompt<AgentPondProvider>;
+export type AgentPondInitStore = AgentPondStoreType;
+export type SelectStorePrompt = SelectPrompt<AgentPondInitStore>;
 
 type EnvOptions = GlobalOptions & {
 	host?: string;
 	port?: string;
-	provider?: string;
+	store?: string;
 };
 
 export function registerEnvCommand(
 	program: Command,
 	options: {
 		selectEnvironment?: SelectEnvironmentPrompt;
-		selectProvider?: SelectProviderPrompt;
+		selectStore?: SelectStorePrompt;
 	} = {},
 ): void {
 	const promptSelect = options.selectEnvironment ?? select<string>;
-	const promptProvider = options.selectProvider ?? select<AgentPondProvider>;
+	const promptStore = options.selectStore ?? select<AgentPondInitStore>;
 	const env = addGlobalOptions(
 		program.command("env").description("manage local AgentPond environments"),
 	);
@@ -79,23 +79,21 @@ export function registerEnvCommand(
 
 	addGlobalOptions(env.command("init <name>"))
 		.description("initialize an environment")
-		.option(
-			"--provider <provider>",
-			"infrastructure provider: aws, google, or local",
-		)
+		.option("--store <store>", "object store: s3, gcs, or local")
 		.action(
 			async (name: string, commandOptions: EnvOptions, command: Command) => {
-				const provider =
-					providerFromValue(commandOptions.provider) ??
-					(await promptForProvider(promptProvider));
-				const storeType = storeTypeForProvider(provider);
-				const environment = initAgentPondEnvironment(name, { storeType });
+				const store =
+					storeFromValue(commandOptions.store) ??
+					(await promptForStore(promptStore));
+				const environment = initAgentPondEnvironment(name, {
+					storeType: store,
+				});
 				return print(
 					{
 						name: environment.name,
 						envFile: environment.envFilePath,
 						dbPath: environment.dbPath,
-						provider,
+						store,
 					},
 					Boolean(command.optsWithGlobals<GlobalOptions>().json),
 				);
@@ -121,33 +119,25 @@ export function registerEnvCommand(
 		);
 }
 
-function providerFromValue(
+function storeFromValue(
 	value: string | undefined,
-): AgentPondProvider | undefined {
+): AgentPondInitStore | undefined {
 	if (value === undefined) return undefined;
-	if (value === "aws" || value === "google" || value === "local") return value;
-	throw new CliError(
-		`--provider must be aws, google, or local, got "${value}"`,
-	);
+	if (value === "s3" || value === "gcs" || value === "local") return value;
+	throw new CliError(`--store must be s3, gcs, or local, got "${value}"`);
 }
 
-function storeTypeForProvider(provider: AgentPondProvider): AgentPondStoreType {
-	if (provider === "aws") return "s3";
-	if (provider === "google") return "gcs";
-	return "local";
-}
-
-async function promptForProvider(
-	promptSelect: SelectProviderPrompt,
-): Promise<AgentPondProvider> {
+async function promptForStore(
+	promptSelect: SelectStorePrompt,
+): Promise<AgentPondInitStore> {
 	if (!process.stdin.isTTY || !process.stdout.isTTY) {
-		throw new CliError("Missing --provider");
+		throw new CliError("Missing --store");
 	}
 	return promptSelect({
-		message: "Select AgentPond infrastructure provider",
+		message: "Select AgentPond object store",
 		choices: [
-			{ name: "AWS (S3)", value: "aws" },
-			{ name: "Google (GCS)", value: "google" },
+			{ name: "AWS S3 (or compatible)", value: "s3" },
+			{ name: "Google Cloud Storage (GCS)", value: "gcs" },
 			{ name: "Local filesystem", value: "local" },
 		],
 	});

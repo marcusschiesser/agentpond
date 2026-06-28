@@ -1001,9 +1001,9 @@ test("CLI command-local help does not open the environment cache", async () => {
 	}
 });
 
-test("CLI env init writes Google provider files from --provider", async () => {
+test("CLI env init writes GCS store files from --store", async () => {
 	const cwd = process.cwd();
-	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-provider-"));
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-store-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
@@ -1015,18 +1015,18 @@ test("CLI env init writes Google provider files from --provider", async () => {
 				"env",
 				"init",
 				"staging",
-				"--provider",
-				"google",
+				"--store",
+				"gcs",
 				"--json",
 			]),
 		);
 		const result = JSON.parse(output) as {
-			provider: string;
+			store: string;
 			envFile: string;
 		};
 
 		assert.equal(process.exitCode, undefined);
-		assert.equal(result.provider, "google");
+		assert.equal(result.store, "gcs");
 		assert.match(readFileSync(result.envFile, "utf8"), /AGENTPOND_STORE=gcs/);
 		assert.match(
 			readFileSync(result.envFile, "utf8"),
@@ -1038,9 +1038,9 @@ test("CLI env init writes Google provider files from --provider", async () => {
 	}
 });
 
-test("CLI env init writes AWS and local provider files from --provider", async () => {
+test("CLI env init writes S3 and local store files from --store", async () => {
 	const cwd = process.cwd();
-	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-providers-"));
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-stores-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
@@ -1051,9 +1051,9 @@ test("CLI env init writes AWS and local provider files from --provider", async (
 				"agentpond",
 				"env",
 				"init",
-				"aws-env",
-				"--provider",
-				"aws",
+				"s3-env",
+				"--store",
+				"s3",
 				"--json",
 			]),
 		);
@@ -1064,22 +1064,22 @@ test("CLI env init writes AWS and local provider files from --provider", async (
 				"env",
 				"init",
 				"local-env",
-				"--provider",
+				"--store",
 				"local",
 				"--json",
 			]),
 		);
-		const aws = JSON.parse(awsOutput) as { provider: string; envFile: string };
+		const s3 = JSON.parse(awsOutput) as { store: string; envFile: string };
 		const local = JSON.parse(localOutput) as {
-			provider: string;
+			store: string;
 			envFile: string;
 		};
 
 		assert.equal(process.exitCode, undefined);
-		assert.equal(aws.provider, "aws");
-		assert.match(readFileSync(aws.envFile, "utf8"), /AGENTPOND_STORE=s3/);
-		assert.match(readFileSync(aws.envFile, "utf8"), /AGENTPOND_S3_BUCKET/);
-		assert.equal(local.provider, "local");
+		assert.equal(s3.store, "s3");
+		assert.match(readFileSync(s3.envFile, "utf8"), /AGENTPOND_STORE=s3/);
+		assert.match(readFileSync(s3.envFile, "utf8"), /AGENTPOND_S3_BUCKET/);
+		assert.equal(local.store, "local");
 		assert.match(readFileSync(local.envFile, "utf8"), /AGENTPOND_STORE=local/);
 		assert.doesNotMatch(
 			readFileSync(local.envFile, "utf8"),
@@ -1091,7 +1091,7 @@ test("CLI env init writes AWS and local provider files from --provider", async (
 	}
 });
 
-test("CLI env init rejects invalid providers", async () => {
+test("CLI env init rejects invalid stores", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-invalid-"));
 	const originalExitCode = process.exitCode;
@@ -1099,26 +1099,18 @@ test("CLI env init rejects invalid providers", async () => {
 	try {
 		process.chdir(root);
 		const stderr = await captureStderr(() =>
-			main([
-				"node",
-				"agentpond",
-				"env",
-				"init",
-				"staging",
-				"--provider",
-				"azure",
-			]),
+			main(["node", "agentpond", "env", "init", "staging", "--store", "azure"]),
 		);
 
 		assert.equal(process.exitCode, 2);
-		assert.match(stderr, /--provider must be aws, google, or local/);
+		assert.match(stderr, /--store must be s3, gcs, or local/);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
 });
 
-test("CLI env init without --provider errors in non-interactive mode", async () => {
+test("CLI env init without --store errors in non-interactive mode", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-nontty-"));
 	const originalExitCode = process.exitCode;
@@ -1146,7 +1138,7 @@ test("CLI env init without --provider errors in non-interactive mode", async () 
 		);
 
 		assert.equal(process.exitCode, 2);
-		assert.match(stderr, /Missing --provider/);
+		assert.match(stderr, /Missing --store/);
 	} finally {
 		if (stdinDescriptor)
 			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
@@ -1157,7 +1149,7 @@ test("CLI env init without --provider errors in non-interactive mode", async () 
 	}
 });
 
-test("CLI env init can select a provider interactively", async () => {
+test("CLI env init can select a store interactively", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-tty-"));
 	const originalExitCode = process.exitCode;
@@ -1182,22 +1174,22 @@ test("CLI env init can select a provider interactively", async () => {
 		});
 		const output = await captureStdout(() =>
 			main(["node", "agentpond", "env", "init", "staging", "--json"], {
-				selectProvider: async ({ choices }) => {
+				selectStore: async ({ choices }) => {
 					assert.deepEqual(
 						choices.map((choice) => choice.value),
-						["aws", "google", "local"],
+						["s3", "gcs", "local"],
 					);
 					return "local";
 				},
 			}),
 		);
 		const result = JSON.parse(output) as {
-			provider: string;
+			store: string;
 			envFile: string;
 		};
 
 		assert.equal(process.exitCode, undefined);
-		assert.equal(result.provider, "local");
+		assert.equal(result.store, "local");
 		assert.match(readFileSync(result.envFile, "utf8"), /AGENTPOND_STORE=local/);
 	} finally {
 		if (stdinDescriptor)

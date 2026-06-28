@@ -144,7 +144,7 @@ To point AgentPond to this service, call the `env init` command in your project:
 agentpond env init <env-name>
 ```
 
-The command prompts for an infrastructure provider (AWS, Google or local) in an interactive terminal. 
+The command prompts for an object store (S3, GCS, or local filesystem) in an interactive terminal.
 
 Using `staging` for `env-name`, this generates a `.agentpond/envs/staging.env` file that you need to update with the ingestion and object-store settings for your deployed AgentPond services.
 

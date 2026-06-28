@@ -28,7 +28,7 @@ export AGENTPOND_PREFIX=
 
 Authenticate GCS with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`; do not ask users to paste service-account JSON into chat.
 
-Provider serverless ingestion exports:
+Provider package serverless ingestion exports:
 
 ```ts
 import { lambdaIngestHandler } from "@agentpond/aws";
@@ -47,13 +47,13 @@ npx agentpond --env production sync
 npx agentpond --s3-bucket agentpond --s3-endpoint http://localhost:9000 sync
 ```
 
-Initialize environments interactively, or pass the infrastructure provider explicitly in scripts:
+Initialize environments interactively, or pass the object store explicitly in scripts:
 
 ```bash
 npx agentpond env init staging
-npx agentpond env init staging --provider aws
-npx agentpond env init staging --provider google
-npx agentpond env init staging --provider local
+npx agentpond env init staging --store s3
+npx agentpond env init staging --store gcs
+npx agentpond env init staging --store local
 ```
 
 ## Sync
