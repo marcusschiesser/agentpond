@@ -1,17 +1,14 @@
 {
-	"name": "@agentpond/google",
+	"name": "@agentpond/fastify-ingest",
 	"version": "0.1.0",
 	"type": "module",
 	"private": true,
-	"scripts": {
-		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts"
-	},
 	"exports": {
 		".": "./src/index.ts"
 	},
 	"dependencies": {
 		"@agentpond/core": "workspace:*",
 		"@agentpond/ingest": "workspace:*",
-		"@google-cloud/storage": "^7.21.0"
+		"fastify": "^5.6.2"
 	}
 }

@@ -28,6 +28,15 @@ export AGENTPOND_PREFIX=
 
 Authenticate GCS with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`; do not ask users to paste service-account JSON into chat.
 
+Provider serverless ingestion exports:
+
+```ts
+import { lambdaIngestHandler } from "@agentpond/aws";
+import { httpIngestFunction } from "@agentpond/google";
+```
+
+Use `lambdaIngestHandler` for AWS Lambda Function URLs or API Gateway HTTP API v2, and `httpIngestFunction` for Google HTTP Cloud Functions.
+
 If no environment is selected, AgentPond uses `dev`. DuckDB caches are stored at `./.agentpond/envs/<name>/cache.duckdb`.
 
 The CLI also accepts common settings as flags:

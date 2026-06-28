@@ -5,6 +5,7 @@
 		{ "path": "./packages/aws" },
 		{ "path": "./packages/google" },
 		{ "path": "./packages/ingest" },
+		{ "path": "./packages/fastify-ingest" },
 		{ "path": "./packages/duckdb" },
 		{ "path": "./packages/perf" },
 		{ "path": "./apps/ingest" },

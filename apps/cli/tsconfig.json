@@ -10,6 +10,7 @@
 		{ "path": "../../packages/aws" },
 		{ "path": "../../packages/google" },
 		{ "path": "../../packages/duckdb" },
+		{ "path": "../../packages/fastify-ingest" },
 		{ "path": "../../packages/ingest" }
 	],
 	"include": ["src/**/*.ts"]

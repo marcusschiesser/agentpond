@@ -33,6 +33,9 @@ importers:
       '@agentpond/duckdb':
         specifier: workspace:*
         version: link:packages/duckdb
+      '@agentpond/fastify-ingest':
+        specifier: workspace:*
+        version: link:packages/fastify-ingest
       '@agentpond/google':
         specifier: workspace:*
         version: link:packages/google
@@ -85,15 +88,27 @@ importers:
       '@agentpond/aws':
         specifier: workspace:*
         version: link:../../packages/aws
+      '@agentpond/fastify-ingest':
+        specifier: workspace:*
+        version: link:../../packages/fastify-ingest
       '@agentpond/google':
         specifier: workspace:*
         version: link:../../packages/google
 
   apps/ingest:
     dependencies:
-      '@agentpond/ingest':
+      '@agentpond/aws':
         specifier: workspace:*
-        version: link:../../packages/ingest
+        version: link:../../packages/aws
+      '@agentpond/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentpond/fastify-ingest':
+        specifier: workspace:*
+        version: link:../../packages/fastify-ingest
+      '@agentpond/google':
+        specifier: workspace:*
+        version: link:../../packages/google
 
   examples/basic-traces/typescript:
     dependencies:
@@ -125,6 +140,9 @@ importers:
       '@agentpond/core':
         specifier: workspace:*
         version: link:../core
+      '@agentpond/ingest':
+        specifier: workspace:*
+        version: link:../ingest
       '@aws-sdk/client-s3':
         specifier: ^3.936.0
         version: 3.1068.0
@@ -150,29 +168,35 @@ importers:
         specifier: ^1.5.4-r.1
         version: 1.5.4-r.1
 
+  packages/fastify-ingest:
+    dependencies:
+      '@agentpond/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agentpond/ingest':
+        specifier: workspace:*
+        version: link:../ingest
+      fastify:
+        specifier: ^5.6.2
+        version: 5.8.5
+
   packages/google:
     dependencies:
       '@agentpond/core':
         specifier: workspace:*
         version: link:../core
+      '@agentpond/ingest':
+        specifier: workspace:*
+        version: link:../ingest
       '@google-cloud/storage':
         specifier: ^7.21.0
         version: 7.21.0
 
   packages/ingest:
     dependencies:
-      '@agentpond/aws':
-        specifier: workspace:*
-        version: link:../aws
       '@agentpond/core':
         specifier: workspace:*
         version: link:../core
-      '@agentpond/google':
-        specifier: workspace:*
-        version: link:../google
-      fastify:
-        specifier: ^5.6.2
-        version: 5.8.5
 
   packages/perf:
     dependencies:
@@ -185,6 +209,9 @@ importers:
       '@agentpond/duckdb':
         specifier: workspace:*
         version: link:../duckdb
+      '@agentpond/fastify-ingest':
+        specifier: workspace:*
+        version: link:../fastify-ingest
       '@agentpond/ingest':
         specifier: workspace:*
         version: link:../ingest

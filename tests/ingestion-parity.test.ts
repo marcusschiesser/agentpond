@@ -8,7 +8,7 @@ import {
 	type BatchManifest,
 	MemoryObjectStore,
 } from "@agentpond/core";
-import { buildServer } from "@agentpond/ingest";
+import { buildServer } from "@agentpond/fastify-ingest";
 
 type FixtureObject = {
 	key: string;

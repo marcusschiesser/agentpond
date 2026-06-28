@@ -33,6 +33,7 @@
 	},
 	"devDependencies": {
 		"@agentpond/aws": "workspace:*",
+		"@agentpond/fastify-ingest": "workspace:*",
 		"@agentpond/google": "workspace:*"
 	}
 }

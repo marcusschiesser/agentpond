@@ -5,6 +5,11 @@
 		"rootDir": "src",
 		"outDir": "dist"
 	},
-	"references": [{ "path": "../../packages/ingest" }],
+	"references": [
+		{ "path": "../../packages/aws" },
+		{ "path": "../../packages/core" },
+		{ "path": "../../packages/fastify-ingest" },
+		{ "path": "../../packages/google" }
+	],
 	"include": ["src/**/*.ts"]
 }

@@ -1,12 +1,9 @@
-import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { S3ObjectStore, s3ConfigFromEnv } from "@agentpond/aws";
 import {
 	type AgentPondConfig,
 	AuthError,
 	bodyIdForEvent,
 	configFromEnv,
-	FileSystemObjectStore,
 	type IngestionEvent,
 	ingestionBatchSchema,
 	type ObjectStore,
@@ -15,20 +12,8 @@ import {
 	parseIngestionEvents,
 	verifyBasicAuth,
 } from "@agentpond/core";
-import { GcsObjectStore, gcsConfigFromEnv } from "@agentpond/google";
-import Fastify, {
-	type FastifyInstance,
-	type FastifyLoggerOptions,
-	type FastifyReply,
-} from "fastify";
 
-export type BuildServerOptions = {
-	config?: AgentPondConfig;
-	store?: ObjectStore;
-	authMode?: "required" | "disabled";
-	sink?: IngestionSink;
-	logger?: FastifyLoggerOptions;
-};
+export type AuthMode = "required" | "disabled";
 
 export type IngestionSink = {
 	writeEvents: (params: {
@@ -43,49 +28,66 @@ export type IngestionSink = {
 	}) => Promise<unknown>;
 };
 
-export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
+export type IngestionLogger = {
+	info: (fields: Record<string, unknown>, message: string) => void;
+};
+
+export type IngestHandlerOptions = {
+	config?: AgentPondConfig;
+	store?: ObjectStore;
+	authMode?: AuthMode;
+	sink?: IngestionSink;
+	logger?: IngestionLogger;
+};
+
+export type IngestHttpRequest = {
+	method: string;
+	path: string;
+	query?: string;
+	headers?: Record<string, unknown>;
+	body?: Buffer | Uint8Array | string;
+};
+
+export type IngestHttpResponse = {
+	status: number;
+	headers: Record<string, string>;
+	body: string;
+};
+
+const jsonHeaders = { "content-type": "application/json" };
+
+export async function handleIngestRequest(
+	request: IngestHttpRequest,
+	options: IngestHandlerOptions = {},
+): Promise<IngestHttpResponse> {
+	const method = request.method.toUpperCase();
+	const path = request.path.split("?", 1)[0];
+
+	if (method === "GET" && path === "/health") {
+		return jsonResponse(200, { ok: true });
+	}
+	if (method !== "POST") return jsonResponse(404, { error: "Not Found" });
+
 	const config = options.config ?? configFromEnv();
-	const store = options.store ?? objectStoreForConfig(config);
-	const prefix = config.prefix;
 	const authMode = options.authMode ?? "required";
-	const sink = options.sink ?? new ObjectStoreIngestionSink(store);
-	const server = Fastify({
-		logger: options.logger ?? process.env.NODE_ENV !== "test",
-		bodyLimit: 16 * 1024 * 1024,
-	});
+	const sink = sinkForOptions(options);
+	const logger = options.logger ?? noopLogger;
 
-	server.addContentTypeParser(
-		"application/json",
-		{ parseAs: "buffer" },
-		(_request, body, done) => {
-			done(null, body);
-		},
-	);
-	server.addContentTypeParser(
-		"application/x-protobuf",
-		{ parseAs: "buffer" },
-		(_request, body, done) => {
-			done(null, body);
-		},
-	);
-
-	server.get("/health", async () => ({ ok: true }));
-
-	server.post("/api/public/ingestion", async (request, reply) => {
+	if (path === "/api/public/ingestion") {
 		try {
 			const auth = authenticateRequest(
-				request.headers.authorization,
+				readHeader(request.headers ?? {}, "authorization"),
 				config,
 				authMode,
 			);
 			const payload = parseJsonBody(
 				request.body,
-				request.headers["content-encoding"],
+				readHeader(request.headers ?? {}, "content-encoding"),
 			);
 			const parsed = ingestionBatchSchema.safeParse(payload);
 
 			if (!parsed.success) {
-				return reply.status(400).send({
+				return jsonResponse(400, {
 					message: "Invalid request data",
 					errors: parsed.error.issues.map((issue) => issue.message),
 				});
@@ -95,91 +97,75 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 			if (events.length > 0) {
 				await sink.writeEvents({
 					projectId: auth.projectId,
-					prefix,
+					prefix: config.prefix,
 					events,
 				});
-				logIngestedEvents(request.log, {
+				logIngestedEvents(logger, {
 					source: "ingestion",
 					projectId: auth.projectId,
 					events,
 				});
 			}
-			return reply.status(207).send({
+			return jsonResponse(207, {
 				successes: events.map((event) => ({ id: event.id, status: 201 })),
 				errors,
 			});
 		} catch (error) {
-			return handleRouteError(error, reply);
+			return errorResponse(error);
 		}
-	});
+	}
 
-	server.post("/api/public/otel/v1/traces", async (request, reply) => {
+	if (path === "/api/public/otel/v1/traces") {
 		try {
 			const auth = authenticateRequest(
-				request.headers.authorization,
+				readHeader(request.headers ?? {}, "authorization"),
 				config,
 				authMode,
 			);
 			const ingestionVersion = readHeader(
-				request.headers,
+				request.headers ?? {},
 				"x-langfuse-ingestion-version",
 			);
 			if (ingestionVersion) {
 				const parsedVersion = Number.parseInt(ingestionVersion, 10);
 				if (Number.isNaN(parsedVersion) || parsedVersion > 4) {
-					return reply.status(400).send({
+					return jsonResponse(400, {
 						error: `Unsupported x-langfuse-ingestion-version: "${ingestionVersion}". Maximum supported: "4".`,
 					});
 				}
 			}
 
-			const contentType = request.headers["content-type"];
 			const resourceSpans = await otelBodyToResourceSpans({
 				body: request.body,
-				contentType: Array.isArray(contentType) ? contentType[0] : contentType,
-				contentEncoding: headerToString(request.headers["content-encoding"]),
+				contentType: readHeader(request.headers ?? {}, "content-type"),
+				contentEncoding: readHeader(request.headers ?? {}, "content-encoding"),
 				projectId: auth.projectId,
 			});
-			if (resourceSpans.length === 0) return reply.status(200).send({});
+			if (resourceSpans.length === 0) return jsonResponse(200, {});
 
 			await sink.writeOtelResourceSpans({
 				projectId: auth.projectId,
-				prefix,
+				prefix: config.prefix,
 				resourceSpans,
 			});
-			logIngestedOtelPayload(request.log, {
+			logIngestedOtelPayload(logger, {
 				projectId: auth.projectId,
 				resourceSpanCount: resourceSpans.length,
 			});
-			return reply.status(200).send({});
+			return jsonResponse(200, {});
 		} catch (error) {
-			return handleRouteError(error, reply);
+			return errorResponse(error);
 		}
-	});
+	}
 
-	return server;
+	return jsonResponse(404, { error: "Not Found" });
 }
 
-function objectStoreForConfig(config: AgentPondConfig): ObjectStore {
-	const storeType = config.environment?.storeType ?? "s3";
-	if (storeType === "local") {
-		const envDir = config.environment?.envDir;
-		if (!envDir) {
-			throw new Error("Local object storage requires an AgentPond environment");
-		}
-		return new FileSystemObjectStore(join(envDir, "events"));
-	}
-	if (storeType === "gcs") {
-		return new GcsObjectStore(
-			gcsConfigFromEnv(config.environment?.envFilePath),
-		);
-	}
-	return new S3ObjectStore(s3ConfigFromEnv(config.environment?.envFilePath));
+function sinkForOptions(options: IngestHandlerOptions): IngestionSink {
+	if (options.sink) return options.sink;
+	if (options.store) return new ObjectStoreIngestionSink(options.store);
+	throw new Error("AgentPond ingest requires either a store or a sink");
 }
-
-type IngestionLogger = {
-	info: (fields: Record<string, unknown>, message: string) => void;
-};
 
 function logIngestedEvents(
 	logger: IngestionLogger,
@@ -221,7 +207,7 @@ function logIngestedOtelPayload(
 function authenticateRequest(
 	authorization: string | undefined,
 	config: AgentPondConfig,
-	authMode: "required" | "disabled",
+	authMode: AuthMode,
 ): { projectId: string; publicKey: string } {
 	if (authMode === "disabled") {
 		return {
@@ -245,15 +231,20 @@ function readBasicAuthPublicKey(
 	return separator >= 0 ? decoded.slice(0, separator) : decoded;
 }
 
-function parseJsonBody(body: unknown, contentEncoding: unknown): unknown {
+function parseJsonBody(
+	body: Buffer | Uint8Array | string | undefined,
+	contentEncoding: unknown,
+): unknown {
 	const encoding = headerToString(contentEncoding);
 	let buffer: Buffer;
 	if (Buffer.isBuffer(body)) {
 		buffer = body;
+	} else if (body instanceof Uint8Array) {
+		buffer = Buffer.from(body);
 	} else if (typeof body === "string") {
 		buffer = Buffer.from(body);
 	} else {
-		return body;
+		buffer = Buffer.alloc(0);
 	}
 
 	if (encoding?.toLowerCase().includes("gzip")) {
@@ -262,32 +253,42 @@ function parseJsonBody(body: unknown, contentEncoding: unknown): unknown {
 	return JSON.parse(buffer.toString("utf8"));
 }
 
-function handleRouteError(error: unknown, reply: FastifyReply) {
+function errorResponse(error: unknown): IngestHttpResponse {
 	if (error instanceof AuthError) {
-		return reply
-			.status(error.status)
-			.send({ error: error.name, message: error.message });
+		return jsonResponse(error.status, {
+			error: error.name,
+			message: error.message,
+		});
 	}
 	const message = error instanceof Error ? error.message : String(error);
 	if (message.includes("Invalid content type")) {
-		return reply.status(400).send({ error: "Invalid content type" });
+		return jsonResponse(400, { error: "Invalid content type" });
 	}
 	if (message.includes("Failed to parse OTel")) {
-		return reply.status(400).send({ error: message });
+		return jsonResponse(400, { error: message });
 	}
 	if (message.includes("JSON")) {
-		return reply
-			.status(400)
-			.send({ message: "Invalid request data", errors: [message] });
+		return jsonResponse(400, {
+			message: "Invalid request data",
+			errors: [message],
+		});
 	}
 	requestLogSafe(error);
-	return reply.status(500).send({ error: "Internal Server Error", message });
+	return jsonResponse(500, { error: "Internal Server Error", message });
 }
 
 function readHeader(
 	headers: Record<string, unknown>,
 	name: string,
 ): string | undefined {
+	const lowerName = name.toLowerCase();
+	for (const [key, value] of Object.entries(headers)) {
+		if (key.toLowerCase() === lowerName) return headerToString(value);
+	}
+	const underscoreName = name.replaceAll("-", "_").toLowerCase();
+	for (const [key, value] of Object.entries(headers)) {
+		if (key.toLowerCase() === underscoreName) return headerToString(value);
+	}
 	return (
 		headerToString(headers[name]) ??
 		headerToString(headers[name.replaceAll("-", "_")])
@@ -300,7 +301,19 @@ function headerToString(value: unknown): string | undefined {
 	return undefined;
 }
 
+function jsonResponse(status: number, body: unknown): IngestHttpResponse {
+	return {
+		status,
+		headers: jsonHeaders,
+		body: JSON.stringify(body),
+	};
+}
+
 function requestLogSafe(error: unknown): void {
 	if (process.env.NODE_ENV === "test") return;
 	console.error(error);
 }
+
+const noopLogger: IngestionLogger = {
+	info: () => undefined,
+};

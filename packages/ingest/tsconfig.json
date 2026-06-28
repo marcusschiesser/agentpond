@@ -5,10 +5,6 @@
 		"rootDir": "src",
 		"outDir": "dist"
 	},
-	"references": [
-		{ "path": "../core" },
-		{ "path": "../aws" },
-		{ "path": "../google" }
-	],
+	"references": [{ "path": "../core" }],
 	"include": ["src/**/*.ts"]
 }

@@ -86,6 +86,8 @@ Environment files are stored at `.agentpond/envs/<name>.env`. If no environment 
 
 GCS environments use `AGENTPOND_GCS_BUCKET` and authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. All storage providers use `AGENTPOND_PREFIX` for an optional object key prefix.
 
+For serverless ingestion deployments, `@agentpond/aws` exports `lambdaIngestHandler` for AWS Lambda Function URLs or API Gateway HTTP API v2, and `@agentpond/google` exports `httpIngestFunction` for Google HTTP Cloud Functions. Both handlers use the same Langfuse-compatible ingestion endpoints as `agentpond dev`.
+
 ## Dev Server
 
 Start a local Langfuse SDK-compatible ingestion server:

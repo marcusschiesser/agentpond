@@ -136,7 +136,7 @@ eval "$(agentpond env get dev)"
 
 #### Staging and production
 
-For staging and production services, you need to deploy the AgentPond ingestion service together with an object store in your infrastructure. [docker-compose.yml](./docker-compose.yml) provides a template for such a deployment that you can run locally with `docker compose up --build`.
+For staging and production services, you need to deploy the AgentPond ingestion service together with an object store in your infrastructure. [docker-compose.yml](./docker-compose.yml) provides a template for such a deployment that you can run locally with `docker compose up --build`. AWS deployments can use `lambdaIngestHandler` from `@agentpond/aws` for Lambda Function URLs or API Gateway HTTP API v2, and Google deployments can use `httpIngestFunction` from `@agentpond/google` for HTTP Cloud Functions.
 
 To point AgentPond to this service, call the `env init` command in your project:
 

@@ -9,6 +9,7 @@
 		{ "path": "../core" },
 		{ "path": "../aws" },
 		{ "path": "../duckdb" },
+		{ "path": "../fastify-ingest" },
 		{ "path": "../ingest" }
 	],
 	"include": ["src/**/*.ts"]

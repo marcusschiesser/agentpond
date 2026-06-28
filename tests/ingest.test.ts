@@ -11,7 +11,7 @@ import {
 	otelBodyToEvents,
 } from "@agentpond/core";
 import { AgentPondCache, DuckDbIngestionSink } from "@agentpond/duckdb";
-import { buildServer } from "@agentpond/ingest";
+import { buildServer } from "@agentpond/fastify-ingest";
 import type { FastifyLoggerOptions } from "fastify";
 import protobuf from "protobufjs";
 

@@ -7,6 +7,9 @@
 		"dev": "tsx src/index.ts"
 	},
 	"dependencies": {
-		"@agentpond/ingest": "workspace:*"
+		"@agentpond/aws": "workspace:*",
+		"@agentpond/core": "workspace:*",
+		"@agentpond/fastify-ingest": "workspace:*",
+		"@agentpond/google": "workspace:*"
 	}
 }
