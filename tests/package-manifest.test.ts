@@ -15,3 +15,71 @@ test("published CLI package does not declare private workspace runtime dependenc
 
 	assert.deepEqual(privateWorkspaceDeps, []);
 });
+
+test("core package does not declare cloud provider SDK dependencies", () => {
+	const manifest = JSON.parse(
+		readFileSync(
+			join(process.cwd(), "packages", "core", "package.json"),
+			"utf8",
+		),
+	) as {
+		dependencies?: Record<string, string>;
+	};
+
+	assert.equal(manifest.dependencies?.["@aws-sdk/client-s3"], undefined);
+	assert.equal(manifest.dependencies?.["@google-cloud/storage"], undefined);
+});
+
+test("ingest package does not declare transport or provider dependencies", () => {
+	const manifest = JSON.parse(
+		readFileSync(
+			join(process.cwd(), "packages", "ingest", "package.json"),
+			"utf8",
+		),
+	) as {
+		dependencies?: Record<string, string>;
+	};
+
+	assert.equal(manifest.dependencies?.fastify, undefined);
+	assert.equal(manifest.dependencies?.["@agentpond/aws"], undefined);
+	assert.equal(manifest.dependencies?.["@agentpond/google"], undefined);
+	assert.equal(manifest.dependencies?.["@aws-sdk/client-s3"], undefined);
+	assert.equal(manifest.dependencies?.["@google-cloud/storage"], undefined);
+});
+
+test("Fastify and provider SDK dependencies live in adapter packages", () => {
+	const fastifyManifest = JSON.parse(
+		readFileSync(
+			join(process.cwd(), "packages", "fastify-ingest", "package.json"),
+			"utf8",
+		),
+	) as {
+		dependencies?: Record<string, string>;
+	};
+	const awsManifest = JSON.parse(
+		readFileSync(
+			join(process.cwd(), "packages", "aws", "package.json"),
+			"utf8",
+		),
+	) as {
+		dependencies?: Record<string, string>;
+	};
+	const googleManifest = JSON.parse(
+		readFileSync(
+			join(process.cwd(), "packages", "google", "package.json"),
+			"utf8",
+		),
+	) as {
+		dependencies?: Record<string, string>;
+	};
+
+	assert.equal(typeof fastifyManifest.dependencies?.fastify, "string");
+	assert.equal(
+		typeof awsManifest.dependencies?.["@aws-sdk/client-s3"],
+		"string",
+	);
+	assert.equal(
+		typeof googleManifest.dependencies?.["@google-cloud/storage"],
+		"string",
+	);
+});

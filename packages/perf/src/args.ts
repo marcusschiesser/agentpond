@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentPondConfig, S3ObjectStore } from "@agentpond/core";
+import type { S3ObjectStore } from "@agentpond/aws";
+import type { AgentPondConfig } from "@agentpond/core";
 
 export type PerfArgs = {
 	traces: number;
@@ -16,7 +17,10 @@ export type PerfArgs = {
 	secretKey: string;
 	prefix: string;
 	dbPath: string;
+	s3: S3ObjectStoreConfig;
 };
+
+type S3ObjectStoreConfig = ConstructorParameters<typeof S3ObjectStore>[0];
 
 const DEFAULT_TRACES = 100_000;
 
@@ -42,6 +46,14 @@ export function parseArgs(argv: string[]): PerfArgs {
 		secretKey: values["secret-key"] ?? "sk-agentpond",
 		prefix: normalizePrefix(values.prefix ?? `perf/${runId}`),
 		dbPath,
+		s3: {
+			bucket: values.bucket ?? "agentpond",
+			endpoint: values.endpoint ?? "http://localhost:9000",
+			region: values.region ?? "us-east-1",
+			accessKeyId: values["access-key-id"] ?? "minio",
+			secretAccessKey: values["secret-access-key"] ?? "minio123",
+			forcePathStyle: true,
+		},
 	};
 }
 
@@ -49,15 +61,7 @@ export function buildConfig(args: PerfArgs): AgentPondConfig {
 	return {
 		projectId: args.projectId,
 		dbPath: args.dbPath,
-		s3: {
-			bucket: args.bucket,
-			prefix: args.prefix,
-			endpoint: args.endpoint,
-			region: args.region,
-			accessKeyId: args.accessKeyId,
-			secretAccessKey: args.secretAccessKey,
-			forcePathStyle: true,
-		},
+		prefix: args.prefix,
 		auth: {
 			projectId: args.projectId,
 			publicKey: args.publicKey,

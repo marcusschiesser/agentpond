@@ -15,7 +15,7 @@
 		"lint": "biome lint . --files-ignore-unknown=true",
 		"biome:ci": "biome ci . --files-ignore-unknown=true",
 		"prepare": "husky",
-		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts",
+		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts packages/*/tests/*.test.ts",
 		"typecheck": "tsc --noEmit --pretty false",
 		"changeset": "changeset",
 		"version-packages": "changeset version",
@@ -25,7 +25,6 @@
 		"perf:sync": "pnpm --filter @agentpond/perf sync"
 	},
 	"dependencies": {
-		"@aws-sdk/client-s3": "^3.936.0",
 		"@duckdb/node-api": "^1.5.4-r.1",
 		"@opentelemetry/otlp-transformer": "^0.208.0",
 		"fastify": "^5.6.2",
@@ -33,8 +32,11 @@
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
+		"@agentpond/aws": "workspace:*",
 		"@agentpond/core": "workspace:*",
 		"@agentpond/duckdb": "workspace:*",
+		"@agentpond/fastify-ingest": "workspace:*",
+		"@agentpond/google": "workspace:*",
 		"@agentpond/ingest": "workspace:*",
 		"@biomejs/biome": "^2.5.0",
 		"@changesets/cli": "^2.29.7",

@@ -30,7 +30,7 @@ export function registerSyncCommand(program: Command): void {
 				const result = await db.syncFromStore({
 					store: objectStoreForConfig(config),
 					projectId: config.projectId,
-					prefix: config.s3.prefix,
+					prefix: config.prefix,
 				});
 				return print(result, json);
 			} finally {

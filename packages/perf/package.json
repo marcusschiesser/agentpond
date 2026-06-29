@@ -7,8 +7,10 @@
 		"sync": "tsx src/index.ts"
 	},
 	"dependencies": {
+		"@agentpond/aws": "workspace:*",
 		"@agentpond/core": "workspace:*",
 		"@agentpond/duckdb": "workspace:*",
+		"@agentpond/fastify-ingest": "workspace:*",
 		"@agentpond/ingest": "workspace:*",
 		"@langfuse/otel": "^5.4.1",
 		"@langfuse/tracing": "^5.4.1",

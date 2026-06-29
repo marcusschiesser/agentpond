@@ -9,6 +9,11 @@ This repository uses Changesets to generate package changelogs.
 - Keep changeset summaries concise and written for AgentPond users.
 - Do not manually edit generated changelog output unless the release process has already run `pnpm changeset version`.
 
+## AgentPond Skill
+
+- Keep `skills/agentpond/SKILL.md` and `skills/agentpond/references/cli.md` in sync with CLI behavior changes.
+- When a PR changes commands, flags, prompts, environment variables, or storage setup, update the skill in the same PR.
+
 ## Commits
 
 - Use the normal `git commit` path so Husky pre-commit hooks run.

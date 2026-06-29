@@ -8,14 +8,14 @@ import {
 import { AgentPondCache } from "@agentpond/duckdb";
 
 export async function writeOtelAndSyncCache(
-	config: Pick<AgentPondConfig, "dbPath" | "projectId" | "s3">,
+	config: AgentPondConfig,
 	store: ObjectStore,
 	resourceSpans: unknown[],
 ) {
 	const writer = new AcceptedEventWriter({
 		store,
 		projectId: config.projectId,
-		prefix: config.s3.prefix,
+		prefix: config.prefix,
 	});
 	const object = await writer.writeOtelResourceSpans(resourceSpans);
 	const db = new AgentPondCache(config.dbPath);
@@ -23,7 +23,7 @@ export async function writeOtelAndSyncCache(
 		await db.syncFromStore({
 			store,
 			projectId: config.projectId,
-			prefix: config.s3.prefix,
+			prefix: config.prefix,
 		});
 	} finally {
 		await db.close();
@@ -32,14 +32,14 @@ export async function writeOtelAndSyncCache(
 }
 
 export async function writeEventsAndSyncCache(
-	config: Pick<AgentPondConfig, "dbPath" | "projectId" | "s3">,
+	config: AgentPondConfig,
 	store: ObjectStore,
 	events: IngestionEvent[],
 ): Promise<BatchManifest> {
 	const writer = new AcceptedEventWriter({
 		store,
 		projectId: config.projectId,
-		prefix: config.s3.prefix,
+		prefix: config.prefix,
 	});
 	const manifest = await writer.writeAcceptedEvents(events);
 	const db = new AgentPondCache(config.dbPath);
@@ -47,7 +47,7 @@ export async function writeEventsAndSyncCache(
 		await db.syncFromStore({
 			store,
 			projectId: config.projectId,
-			prefix: config.s3.prefix,
+			prefix: config.prefix,
 		});
 	} finally {
 		await db.close();

@@ -1,0 +1,17 @@
+{
+	"name": "@agentpond/aws",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts"
+	},
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@agentpond/core": "workspace:*",
+		"@agentpond/ingest": "workspace:*",
+		"@aws-sdk/client-s3": "^3.936.0"
+	}
+}

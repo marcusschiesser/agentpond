@@ -7,7 +7,7 @@ import {
 } from "node:fs";
 import { basename, join } from "node:path";
 
-export type AgentPondStoreType = "local" | "s3";
+export type AgentPondStoreType = "local" | "s3" | "gcs";
 
 export type AgentPondEnvironment = {
 	name: string;
@@ -100,14 +100,17 @@ export function selectAgentPondEnvironment(name: string): AgentPondEnvironment {
 	return environment;
 }
 
-export function initAgentPondEnvironment(name: string): AgentPondEnvironment {
+export function initAgentPondEnvironment(
+	name: string,
+	options: { storeType?: AgentPondStoreType } = {},
+): AgentPondEnvironment {
 	const environment = resolveAgentPondEnvironment({ name });
 	mkdirSync(environment.envDir, { recursive: true });
 	mkdirSync(join(environment.agentpondDir, "envs"), { recursive: true });
 	if (environment.name !== "dev" && !existsSync(environment.envFilePath)) {
 		writeFileSync(
 			environment.envFilePath,
-			defaultEnvironmentFile(environment.name),
+			defaultEnvironmentFile(environment.name, options.storeType ?? "s3"),
 			"utf8",
 		);
 	}
@@ -147,12 +150,17 @@ function normalizeEnvironmentName(name: string): string {
 	return name;
 }
 
-function defaultEnvironmentFile(name: string): string {
+function defaultEnvironmentFile(
+	name: string,
+	storeType: AgentPondStoreType,
+): string {
 	const isDev = name === "dev";
 	if (isDev) return "";
 	const lines = [
 		"# Project id used to share the same object store across different projects.",
 		"AGENTPOND_PROJECT_ID=default-project",
+		"# Optional key prefix inside the selected object store.",
+		"AGENTPOND_PREFIX=",
 		"",
 		"# Langfuse-compatible base URL used by SDKs.",
 		"LANGFUSE_BASE_URL=http://localhost:4318",
@@ -163,14 +171,34 @@ function defaultEnvironmentFile(name: string): string {
 		"LANGFUSE_SECRET_KEY=sk-agentpond",
 		"",
 	];
-	lines.unshift(
+	return [...storeEnvironmentLines(storeType), ...lines].join("\n");
+}
+
+function storeEnvironmentLines(storeType: AgentPondStoreType): string[] {
+	if (storeType === "local") {
+		return [
+			"# Storage backend for this environment.",
+			"AGENTPOND_STORE=local",
+			"",
+		];
+	}
+	if (storeType === "gcs") {
+		return [
+			"# Storage backend for this environment. GCS-backed environments sync from object storage.",
+			"AGENTPOND_STORE=gcs",
+			"",
+			"# Google Cloud Storage bucket containing AgentPond ingestion objects.",
+			"AGENTPOND_GCS_BUCKET=agentpond",
+			"# Authenticate with Google Application Default Credentials or GOOGLE_APPLICATION_CREDENTIALS.",
+			"",
+		];
+	}
+	return [
 		"# Storage backend for this environment. S3-backed environments sync from object storage.",
 		"AGENTPOND_STORE=s3",
 		"",
 		"# S3 bucket containing AgentPond ingestion objects.",
 		"AGENTPOND_S3_BUCKET=agentpond",
-		"# Optional key prefix inside the S3 bucket.",
-		"AGENTPOND_S3_PREFIX=",
 		"# Local MinIO endpoint from docker-compose.yml. Leave empty for Amazon S3.",
 		"AGENTPOND_S3_ENDPOINT=http://localhost:9000",
 		"# AWS/S3 region used by the object-store client.",
@@ -182,6 +210,5 @@ function defaultEnvironmentFile(name: string): string {
 		"# Use true for MinIO. Use false for Amazon S3 virtual-hosted buckets.",
 		"AGENTPOND_S3_FORCE_PATH_STYLE=true",
 		"",
-	);
-	return lines.join("\n");
+	];
 }

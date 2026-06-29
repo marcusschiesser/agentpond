@@ -8,7 +8,7 @@ import {
 	type BatchManifest,
 	MemoryObjectStore,
 } from "@agentpond/core";
-import { buildServer } from "@agentpond/ingest";
+import { buildServer } from "@agentpond/fastify-ingest";
 
 type FixtureObject = {
 	key: string;
@@ -51,12 +51,7 @@ const fixture = JSON.parse(
 const config: AgentPondConfig = {
 	projectId: fixture.projectId,
 	dbPath: "/tmp/agentpond-parity-test.duckdb",
-	s3: {
-		bucket: "agentpond",
-		prefix: fixture.prefix,
-		region: "us-east-1",
-		forcePathStyle: true,
-	},
+	prefix: fixture.prefix,
 	auth: {
 		projectId: fixture.projectId,
 		publicKey: "pk",

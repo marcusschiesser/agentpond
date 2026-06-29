@@ -23,7 +23,7 @@ allowed-tools:
 
 # AgentPond
 
-AgentPond is a data pond for AI agent traces with an agent-native CLI for local analytics. It accepts Langfuse-compatible ingestion, stores staging/production events in S3-compatible object storage, and uses a local DuckDB cache for inspection. The dev server writes directly to the dev DuckDB cache.
+AgentPond is a data pond for AI agent traces with an agent-native CLI for local analytics. It accepts Langfuse-compatible ingestion, stores staging/production events in local, S3-compatible, or Google Cloud Storage object storage, and uses a local DuckDB cache for inspection. The dev server writes directly to the dev DuckDB cache.
 
 ## Core Principles
 
@@ -72,7 +72,15 @@ If the user asks to set up an environment, initialize its dotenv file:
 npx agentpond env init staging
 ```
 
-Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings. Do not ask them to paste secrets into chat.
+In an interactive terminal, choose the requested object store when prompted. In scripts or non-interactive terminals, pass it explicitly:
+
+```bash
+npx agentpond env init staging --store s3
+npx agentpond env init staging --store gcs
+npx agentpond env init staging --store local
+```
+
+Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings. GCS environments use Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Do not ask users to paste secrets into chat.
 
 Common inspection flow for `dev`:
 
@@ -127,3 +135,5 @@ export LANGFUSE_SECRET_KEY=sk-agentpond-dev
 ```
 
 These variables configure SDK ingestion. They are not credentials for using the AgentPond CLI to query Langfuse Cloud. The AgentPond CLI reads from object storage and the local DuckDB cache.
+
+For serverless deployments, AWS infrastructure can use `lambdaIngestHandler` from `@agentpond/aws`, and Google infrastructure can use `httpIngestFunction` from `@agentpond/google`. Both handlers expose the same Langfuse-compatible ingestion endpoints and write to the configured object store.

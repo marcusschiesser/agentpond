@@ -14,7 +14,7 @@
   <a href="https://www.npmjs.com/package/agentpond"><img src="https://img.shields.io/node/v/agentpond.svg" alt="Node.js version"></a>
 </p>
 
-AgentPond is a lightweight, self-hosted trace backend and CLI for AI agents. It accepts traces from Langfuse SDKs and OTLP, stores raw events in S3-compatible object storage, and syncs them into a local DuckDB cache for fast analysis.
+AgentPond is a lightweight, self-hosted trace backend and CLI for AI agents. It accepts traces from Langfuse SDKs and OTLP, stores raw events in a cloud object storage, and syncs them into a local DuckDB cache for fast analysis.
 
 It is designed for AI projects that want to:
 
@@ -31,14 +31,14 @@ AgentPond provides Langfuse-compatible ingestion endpoints, so supported Langfus
 
 ![AgentPond data flow from agent traces through object storage and local CLI analysis](./docs/assets/agentpond-how-it-works.png)
 
-S3-compatible object storage is the source of truth. The local DuckDB database is a rebuildable cache optimized for fast analytical queries.
+The object storage is the source of truth. The local DuckDB database is a rebuildable cache optimized for fast analytical queries.
 
 This gives you durable remote storage without requiring an always-on analytical database. Developers and coding agents can sync the latest production data, query it locally, identify recurring failures, and use those findings to improve the agent.
 
 ## Features
 
 - Langfuse-compatible ingestion endpoints for SDK and OTLP traces
-- S3-compatible raw event storage
+- Use AWS S3, Google Cloud Storage or local filesystem as raw event storage
 - UTC bucket discovery and incremental synchronization
 - Local DuckDB cache containing:
   - `events_raw`
@@ -136,13 +136,15 @@ eval "$(agentpond env get dev)"
 
 #### Staging and production
 
-For staging and production services, you need to deploy the AgentPond ingestion service together with an object store in your infrastructure. [docker-compose.yml](./docker-compose.yml) provides a template for such a deployment that you can run locally with `docker compose up --build`.
+For staging and production services, you need to deploy the AgentPond ingestion service together with an object store in your infrastructure. [docker-compose.yml](./docker-compose.yml) provides a template for such a deployment that you can run locally with `docker compose up --build`. AWS deployments can use `lambdaIngestHandler` from `@agentpond/aws` for Lambda Function URLs or API Gateway HTTP API v2, and Google deployments can use `httpIngestFunction` from `@agentpond/google` for HTTP Cloud Functions.
 
 To point AgentPond to this service, call the `env init` command in your project:
 
 ```sh
 agentpond env init <env-name>
 ```
+
+The command prompts for an object store (S3, GCS, or local filesystem) in an interactive terminal.
 
 Using `staging` for `env-name`, this generates a `.agentpond/envs/staging.env` file that you need to update with the ingestion and object-store settings for your deployed AgentPond services.
 

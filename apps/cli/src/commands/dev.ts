@@ -5,7 +5,7 @@ import {
 	selectAgentPondEnvironment,
 } from "@agentpond/core";
 import { DuckDbIngestionSink, ensureDuckDbSchema } from "@agentpond/duckdb";
-import { buildServer } from "@agentpond/ingest";
+import { buildServer } from "@agentpond/fastify-ingest";
 import type { Command } from "commander";
 import type { FastifyLoggerOptions } from "fastify";
 import { CliError, parsePort } from "../cli-support.js";

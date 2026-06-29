@@ -11,19 +11,14 @@ import {
 	otelBodyToEvents,
 } from "@agentpond/core";
 import { AgentPondCache, DuckDbIngestionSink } from "@agentpond/duckdb";
-import { buildServer } from "@agentpond/ingest";
+import { buildServer } from "@agentpond/fastify-ingest";
 import type { FastifyLoggerOptions } from "fastify";
 import protobuf from "protobufjs";
 
 const config: AgentPondConfig = {
 	projectId: "project-a",
 	dbPath: "/tmp/agentpond-test.duckdb",
-	s3: {
-		bucket: "agentpond",
-		prefix: "",
-		region: "us-east-1",
-		forcePathStyle: true,
-	},
+	prefix: "",
 	auth: {
 		projectId: "project-a",
 		publicKey: "pk",

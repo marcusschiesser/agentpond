@@ -1,4 +1,4 @@
-import type { S3ObjectStore } from "@agentpond/core";
+import type { S3ObjectStore } from "@agentpond/aws";
 
 export type StorageStats = {
 	objectCount: number;
