@@ -34,7 +34,11 @@ export function configFromEnv(
 		storeTypeFromValue(env("AGENTPOND_STORE")) ??
 		environment.storeType;
 	const dbPath = join(environment.envDir, "cache.duckdb");
-	const projectId = env("AGENTPOND_PROJECT_ID") ?? "default-project";
+	const projectId =
+		env("AGENTPOND_PROJECT_ID") ??
+		env("GCLOUD_PROJECT") ??
+		env("GCP_PROJECT") ??
+		"default-project";
 	const prefix = normalizePrefix(
 		env("AGENTPOND_PREFIX") ??
 			env("AGENTPOND_S3_PREFIX") ??
