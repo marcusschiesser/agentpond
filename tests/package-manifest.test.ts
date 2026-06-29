@@ -3,94 +3,109 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-test("published CLI package only declares publishable workspace runtime dependencies", () => {
-	const manifest = JSON.parse(
-		readFileSync(join(process.cwd(), "apps", "cli", "package.json"), "utf8"),
-	) as {
-		dependencies?: Record<string, string>;
+type PackageManifest = {
+	name: string;
+	private?: boolean;
+	description?: string;
+	license?: string;
+	files?: string[];
+	types?: string;
+	repository?: {
+		directory?: string;
 	};
-	const privateWorkspaceDeps = Object.keys(manifest.dependencies ?? {})
-		.filter((name) => name.startsWith("@agentpond/"))
-		.filter((name) => {
-			const packageName = name.replace("@agentpond/", "");
-			const dependencyManifest = JSON.parse(
-				readFileSync(
-					join(process.cwd(), "packages", packageName, "package.json"),
-					"utf8",
-				),
-			) as {
-				private?: boolean;
-			};
-			return dependencyManifest.private === true;
-		});
+	exports?: {
+		"."?: {
+			types?: string;
+			import?: string;
+		};
+	};
+	dependencies?: Record<string, string>;
+	peerDependencies?: Record<string, string>;
+	optionalDependencies?: Record<string, string>;
+};
 
-	assert.deepEqual(privateWorkspaceDeps, []);
+const publishablePackages = [
+	"packages/core",
+	"packages/ingest",
+	"packages/fastify-ingest",
+	"packages/aws",
+	"packages/google",
+	"packages/duckdb",
+] as const;
+
+function readManifest(packagePath: string): PackageManifest {
+	return JSON.parse(
+		readFileSync(join(process.cwd(), packagePath, "package.json"), "utf8"),
+	) as PackageManifest;
+}
+
+test("publishable packages declare npm-ready dist exports", () => {
+	for (const packagePath of publishablePackages) {
+		const manifest = readManifest(packagePath);
+
+		assert.notEqual(
+			manifest.private,
+			true,
+			`${manifest.name} must be publishable`,
+		);
+		assert.equal(
+			typeof manifest.description,
+			"string",
+			`${manifest.name} must declare a description`,
+		);
+		assert.notEqual(
+			manifest.description?.trim(),
+			"",
+			`${manifest.name} must declare a non-empty description`,
+		);
+		assert.equal(manifest.license, "MIT", `${manifest.name} must use MIT`);
+		assert.equal(
+			manifest.repository?.directory,
+			packagePath,
+			`${manifest.name} must declare its repository directory`,
+		);
+		assert.deepEqual(
+			manifest.files,
+			["dist"],
+			`${manifest.name} must publish only dist files`,
+		);
+		assert.equal(
+			manifest.types,
+			"./dist/index.d.ts",
+			`${manifest.name} must expose dist types`,
+		);
+		assert.equal(
+			manifest.exports?.["."]?.types,
+			"./dist/index.d.ts",
+			`${manifest.name} must export dist types`,
+		);
+		assert.equal(
+			manifest.exports?.["."]?.import,
+			"./dist/index.js",
+			`${manifest.name} must export dist ESM`,
+		);
+	}
 });
 
-test("core package does not declare cloud provider SDK dependencies", () => {
-	const manifest = JSON.parse(
-		readFileSync(
-			join(process.cwd(), "packages", "core", "package.json"),
-			"utf8",
-		),
-	) as {
-		dependencies?: Record<string, string>;
-	};
+test("publishable packages do not depend on private workspace packages", () => {
+	for (const packagePath of publishablePackages) {
+		const manifest = readManifest(packagePath);
+		const runtimeDependencyNames = [
+			...Object.keys(manifest.dependencies ?? {}),
+			...Object.keys(manifest.peerDependencies ?? {}),
+			...Object.keys(manifest.optionalDependencies ?? {}),
+		];
+		const privateWorkspaceDeps = runtimeDependencyNames
+			.filter((name) => name.startsWith("@agentpond/"))
+			.filter((name) => {
+				const packageName = name.replace("@agentpond/", "");
+				return readManifest(`packages/${packageName}`).private === true;
+			});
 
-	assert.equal(manifest.dependencies?.["@aws-sdk/client-s3"], undefined);
-	assert.equal(manifest.dependencies?.["@google-cloud/storage"], undefined);
-});
-
-test("ingest package does not declare transport or provider dependencies", () => {
-	const manifest = JSON.parse(
-		readFileSync(
-			join(process.cwd(), "packages", "ingest", "package.json"),
-			"utf8",
-		),
-	) as {
-		dependencies?: Record<string, string>;
-	};
-
-	assert.equal(manifest.dependencies?.fastify, undefined);
-	assert.equal(manifest.dependencies?.["@agentpond/aws"], undefined);
-	assert.equal(manifest.dependencies?.["@agentpond/google"], undefined);
-	assert.equal(manifest.dependencies?.["@aws-sdk/client-s3"], undefined);
-	assert.equal(manifest.dependencies?.["@google-cloud/storage"], undefined);
-});
-
-test("Fastify and provider SDK dependencies live in adapter packages", () => {
-	const fastifyManifest = JSON.parse(
-		readFileSync(
-			join(process.cwd(), "packages", "fastify-ingest", "package.json"),
-			"utf8",
-		),
-	) as {
-		dependencies?: Record<string, string>;
-	};
-	const awsManifest = JSON.parse(
-		readFileSync(
-			join(process.cwd(), "packages", "aws", "package.json"),
-			"utf8",
-		),
-	) as {
-		dependencies?: Record<string, string>;
-	};
-	const googleManifest = JSON.parse(
-		readFileSync(
-			join(process.cwd(), "packages", "google", "package.json"),
-			"utf8",
-		),
-	) as {
-		dependencies?: Record<string, string>;
-	};
-
-	assert.equal(typeof fastifyManifest.dependencies?.fastify, "string");
-	assert.equal(
-		typeof awsManifest.dependencies?.["@aws-sdk/client-s3"],
-		"string",
-	);
-	assert.equal(
-		typeof googleManifest.dependencies?.["@google-cloud/storage"],
-		"string",
-	);
+		assert.deepEqual(
+			privateWorkspaceDeps,
+			[],
+			`${manifest.name} must not depend on private workspace packages`,
+		);
+	}
 });
