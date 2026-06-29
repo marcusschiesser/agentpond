@@ -175,6 +175,9 @@ importers:
       '@agentpond/duckdb':
         specifier: workspace:*
         version: link:../duckdb
+      protobufjs:
+        specifier: ^7.6.4
+        version: 7.6.4
 
   packages/google:
     dependencies:
