@@ -6,5 +6,8 @@ if git status --short | grep --quiet '^MM'; then
   exit 1
 fi
 
+pnpm exec biome check --write --staged --only=assist/source/organizeImports --files-ignore-unknown=true --no-errors-on-unmatched
+git update-index --again
+
 pnpm exec biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched
 git update-index --again

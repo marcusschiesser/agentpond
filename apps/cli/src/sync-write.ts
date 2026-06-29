@@ -3,8 +3,8 @@ import {
 	type AgentPondConfig,
 	type BatchManifest,
 	type IngestionEvent,
-	type OtelStorageObject,
 	type ObjectStore,
+	type OtelStorageObject,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
 
