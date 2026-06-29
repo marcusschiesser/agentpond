@@ -88,6 +88,12 @@ importers:
       '@agentpond/aws':
         specifier: workspace:*
         version: link:../../packages/aws
+      '@agentpond/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentpond/duckdb':
+        specifier: workspace:*
+        version: link:../../packages/duckdb
       '@agentpond/fastify-ingest':
         specifier: workspace:*
         version: link:../../packages/fastify-ingest
@@ -179,6 +185,10 @@ importers:
       fastify:
         specifier: ^5.6.2
         version: 5.8.5
+    devDependencies:
+      '@agentpond/duckdb':
+        specifier: workspace:*
+        version: link:../duckdb
 
   packages/google:
     dependencies:

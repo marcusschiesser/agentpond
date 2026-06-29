@@ -12,10 +12,10 @@ import {
 	MemoryObjectStore,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
-import { createDevLoggerOptions } from "../apps/cli/src/commands/dev.js";
-import { createOtelTraceId, main } from "../apps/cli/src/index.js";
-import { manualTraceResourceSpans } from "../apps/cli/src/otel-trace.js";
-import { writeEventsAndSyncCache } from "../apps/cli/src/sync-write.js";
+import { createDevLoggerOptions } from "../src/commands/dev.js";
+import { createOtelTraceId, main } from "../src/index.js";
+import { manualTraceResourceSpans } from "../src/otel-trace.js";
+import { writeEventsAndSyncCache } from "../src/sync-write.js";
 
 async function captureStdout(fn: () => Promise<void>): Promise<string> {
 	const consoleLog = console.log;

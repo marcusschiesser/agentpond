@@ -16,6 +16,7 @@
 	},
 	"scripts": {
 		"build": "tsup",
+		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts",
 		"prepack": "node ./scripts/copy-readme.mjs"
 	},
 	"repository": {
@@ -33,6 +34,8 @@
 	},
 	"devDependencies": {
 		"@agentpond/aws": "workspace:*",
+		"@agentpond/core": "workspace:*",
+		"@agentpond/duckdb": "workspace:*",
 		"@agentpond/fastify-ingest": "workspace:*",
 		"@agentpond/google": "workspace:*"
 	}
