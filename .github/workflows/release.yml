@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      publish_ingest_image:
+        description: "Build and publish the AgentPond ingest service image for the current package version"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -19,7 +26,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 11.4.0
 
@@ -41,6 +48,7 @@ jobs:
 
       - name: Create release PR or publish
         id: changesets
+        if: github.event_name == 'push'
         uses: changesets/action@v1
         with:
           version: pnpm version-packages
@@ -51,24 +59,30 @@ jobs:
 
       - name: Set image version
         id: image-version
-        if: contains(steps.changesets.outputs.publishedPackages, '@agentpond/ingest-service')
-        run: echo "version=$(node -p 'require(\"./apps/ingest/package.json\").version')" >> "$GITHUB_OUTPUT"
+        if: contains(steps.changesets.outputs.publishedPackages, '@agentpond/ingest-service') || inputs.publish_ingest_image == true
+        run: |
+          VERSION="$(node -p "require('./apps/ingest/package.json').version")"
+          if [ -z "$VERSION" ]; then
+            echo "Could not determine ingest image version" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Setup Docker Buildx
-        if: contains(steps.changesets.outputs.publishedPackages, '@agentpond/ingest-service')
-        uses: docker/setup-buildx-action@v3
+        if: steps.image-version.outputs.version != ''
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to GHCR
-        if: contains(steps.changesets.outputs.publishedPackages, '@agentpond/ingest-service')
-        uses: docker/login-action@v3
+        if: steps.image-version.outputs.version != ''
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and publish GHCR image
-        if: contains(steps.changesets.outputs.publishedPackages, '@agentpond/ingest-service')
-        uses: docker/build-push-action@v6
+        if: steps.image-version.outputs.version != ''
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -79,7 +93,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Verify GHCR image is public
-        if: contains(steps.changesets.outputs.publishedPackages, '@agentpond/ingest-service')
+        if: steps.image-version.outputs.version != ''
         run: |
           docker logout ghcr.io
           docker image rm ghcr.io/marcusschiesser/agentpond:${{ steps.image-version.outputs.version }} || true
