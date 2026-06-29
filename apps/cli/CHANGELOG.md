@@ -1,5 +1,11 @@
 # agentpond
 
+## 0.3.1
+
+### Patch Changes
+
+- 1100c0d: Fix the npm README image for the How it works diagram.
+
 ## 0.3.0
 
 ### Minor Changes

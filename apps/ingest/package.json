@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/ingest-service",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Container-ready AgentPond Langfuse-compatible ingestion service",
 	"license": "MIT",
 	"type": "module",
