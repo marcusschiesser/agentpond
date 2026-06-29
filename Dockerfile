@@ -6,7 +6,7 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm build
 # pnpm deploy needs legacy mode because this workspace does not use injected workspace packages.
-RUN pnpm --filter agentpond-ingest deploy --legacy --prod /prod
+RUN pnpm --filter @agentpond/ingest-service deploy --legacy --prod /prod
 
 FROM node:24-alpine AS runtime
 WORKDIR /app

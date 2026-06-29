@@ -1,11 +1,21 @@
 {
-	"name": "agentpond-ingest",
+	"name": "@agentpond/ingest-service",
 	"version": "0.1.0",
+	"description": "Container-ready AgentPond Langfuse-compatible ingestion service",
+	"license": "MIT",
 	"type": "module",
-	"private": true,
+	"main": "./dist/index.js",
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "tsup",
 		"dev": "tsx src/index.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/marcusschiesser/agentpond.git",
+		"directory": "apps/ingest"
 	},
 	"dependencies": {
 		"@agentpond/aws": "workspace:*",
