@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/core",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Core types, configuration, object storage, and OTLP helpers for AgentPond",
 	"license": "MIT",
 	"type": "module",

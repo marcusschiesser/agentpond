@@ -1,5 +1,24 @@
 # agentpond
 
+## 0.3.0
+
+### Minor Changes
+
+- 66f2583: Add Google Cloud Storage object-store support, store selection during environment initialization, split cloud SDK integrations into provider packages, and add provider serverless ingestion handlers.
+- 5f6b2e0: Require Node.js 24 or newer for the AgentPond CLI.
+
+### Patch Changes
+
+- f75bd8c: Migrate the CLI to Commander and add interactive environment selection with Inquirer prompts.
+- 336ff84: Publish production AgentPond ingestion service images to the public GitHub Container Registry on release.
+- 25f4b0a: Publish reusable AgentPond libraries to npm and externalize them from app bundles.
+- Updated dependencies [25f4b0a]
+  - @agentpond/aws@0.2.0
+  - @agentpond/core@0.2.0
+  - @agentpond/duckdb@0.2.0
+  - @agentpond/fastify-ingest@0.2.0
+  - @agentpond/google@0.2.0
+
 ## 0.2.0
 
 ### Minor Changes
