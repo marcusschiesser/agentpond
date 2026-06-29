@@ -9,7 +9,7 @@
 		"node": ">=24"
 	},
 	"scripts": {
-		"build": "tsc -b && pnpm --filter agentpond build",
+		"build": "tsc -b && pnpm -r --if-present build",
 		"format": "biome format --write . --files-ignore-unknown=true",
 		"format:check": "biome format . --files-ignore-unknown=true",
 		"lint": "biome lint . --files-ignore-unknown=true",

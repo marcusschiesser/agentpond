@@ -24,7 +24,7 @@ services:
       "
 
   ingest:
-    build: .
+    image: ghcr.io/marcusschiesser/agentpond:latest
     depends_on:
       - create-bucket
     environment:

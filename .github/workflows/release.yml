@@ -9,6 +9,7 @@ permissions:
   contents: write
   pull-requests: write
   id-token: write
+  packages: write
 
 jobs:
   release:
@@ -47,6 +48,42 @@ jobs:
           title: "Release: agentpond"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image version
+        id: image-version
+        if: steps.changesets.outputs.published == 'true'
+        run: echo "version=$(node -p 'require(\"./apps/cli/package.json\").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Docker Buildx
+        if: steps.changesets.outputs.published == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: steps.changesets.outputs.published == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish GHCR image
+        if: steps.changesets.outputs.published == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/marcusschiesser/agentpond:${{ steps.image-version.outputs.version }}
+            ghcr.io/marcusschiesser/agentpond:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify GHCR image is public
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          docker logout ghcr.io
+          docker image rm ghcr.io/marcusschiesser/agentpond:${{ steps.image-version.outputs.version }} || true
+          docker pull ghcr.io/marcusschiesser/agentpond:${{ steps.image-version.outputs.version }}
 
       - name: Rename release PR
         if: steps.changesets.outputs.hasChangesets == 'true'
