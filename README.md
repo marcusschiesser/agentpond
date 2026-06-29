@@ -29,7 +29,7 @@ AgentPond provides Langfuse-compatible ingestion endpoints, so supported Langfus
 
 ## How it works
 
-![AgentPond data flow from agent traces through object storage and local CLI analysis](./docs/assets/agentpond-how-it-works.png)
+![AgentPond data flow from agent traces through object storage and local CLI analysis](https://raw.githubusercontent.com/marcusschiesser/agentpond/main/docs/assets/agentpond-how-it-works.png)
 
 The object storage is the source of truth. The local DuckDB database is a rebuildable cache optimized for fast analytical queries.
 
