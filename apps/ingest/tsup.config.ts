@@ -9,7 +9,6 @@ export default defineConfig({
 	clean: true,
 	sourcemap: true,
 	splitting: false,
-	noExternal: [/^@agentpond\//],
 	banner: {
 		js: [
 			"import { createRequire as __agentpondCreateRequire } from 'node:module';",

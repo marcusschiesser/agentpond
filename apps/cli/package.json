@@ -25,18 +25,16 @@
 		"directory": "apps/cli"
 	},
 	"dependencies": {
+		"@agentpond/aws": "workspace:*",
+		"@agentpond/core": "workspace:*",
+		"@agentpond/duckdb": "workspace:*",
+		"@agentpond/fastify-ingest": "workspace:*",
+		"@agentpond/google": "workspace:*",
 		"@duckdb/node-api": "^1.5.4-r.1",
 		"@inquirer/prompts": "8.5.2",
 		"commander": "15.0.0",
 		"fastify": "^5.6.2",
 		"protobufjs": "^7.6.4",
 		"zod": "^4.3.6"
-	},
-	"devDependencies": {
-		"@agentpond/aws": "workspace:*",
-		"@agentpond/core": "workspace:*",
-		"@agentpond/duckdb": "workspace:*",
-		"@agentpond/fastify-ingest": "workspace:*",
-		"@agentpond/google": "workspace:*"
 	}
 }

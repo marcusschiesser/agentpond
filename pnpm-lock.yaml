@@ -66,6 +66,21 @@ importers:
 
   apps/cli:
     dependencies:
+      '@agentpond/aws':
+        specifier: workspace:*
+        version: link:../../packages/aws
+      '@agentpond/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentpond/duckdb':
+        specifier: workspace:*
+        version: link:../../packages/duckdb
+      '@agentpond/fastify-ingest':
+        specifier: workspace:*
+        version: link:../../packages/fastify-ingest
+      '@agentpond/google':
+        specifier: workspace:*
+        version: link:../../packages/google
       '@duckdb/node-api':
         specifier: ^1.5.4-r.1
         version: 1.5.4-r.1
@@ -84,22 +99,6 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.4.3
-    devDependencies:
-      '@agentpond/aws':
-        specifier: workspace:*
-        version: link:../../packages/aws
-      '@agentpond/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@agentpond/duckdb':
-        specifier: workspace:*
-        version: link:../../packages/duckdb
-      '@agentpond/fastify-ingest':
-        specifier: workspace:*
-        version: link:../../packages/fastify-ingest
-      '@agentpond/google':
-        specifier: workspace:*
-        version: link:../../packages/google
 
   apps/ingest:
     dependencies:

@@ -3,15 +3,26 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-test("published CLI package does not declare private workspace runtime dependencies", () => {
+test("published CLI package only declares publishable workspace runtime dependencies", () => {
 	const manifest = JSON.parse(
 		readFileSync(join(process.cwd(), "apps", "cli", "package.json"), "utf8"),
 	) as {
 		dependencies?: Record<string, string>;
 	};
-	const privateWorkspaceDeps = Object.keys(manifest.dependencies ?? {}).filter(
-		(name) => name.startsWith("@agentpond/"),
-	);
+	const privateWorkspaceDeps = Object.keys(manifest.dependencies ?? {})
+		.filter((name) => name.startsWith("@agentpond/"))
+		.filter((name) => {
+			const packageName = name.replace("@agentpond/", "");
+			const dependencyManifest = JSON.parse(
+				readFileSync(
+					join(process.cwd(), "packages", packageName, "package.json"),
+					"utf8",
+				),
+			) as {
+				private?: boolean;
+			};
+			return dependencyManifest.private === true;
+		});
 
 	assert.deepEqual(privateWorkspaceDeps, []);
 });

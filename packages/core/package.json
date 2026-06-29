@@ -1,13 +1,26 @@
 {
 	"name": "@agentpond/core",
 	"version": "0.1.0",
+	"description": "Core types, configuration, object storage, and OTLP helpers for AgentPond",
+	"license": "MIT",
 	"type": "module",
-	"private": true,
+	"files": [
+		"dist"
+	],
+	"types": "./dist/index.d.ts",
 	"scripts": {
 		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts"
 	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/marcusschiesser/agentpond.git",
+		"directory": "packages/core"
+	},
 	"exports": {
-		".": "./src/index.ts"
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
 	},
 	"dependencies": {
 		"@opentelemetry/otlp-transformer": "^0.208.0",

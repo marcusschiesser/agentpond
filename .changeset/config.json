@@ -7,5 +7,5 @@
 	"access": "public",
 	"baseBranch": "main",
 	"updateInternalDependencies": "patch",
-	"ignore": ["@agentpond/core", "@agentpond/duckdb", "agentpond-ingest"]
+	"ignore": ["agentpond-ingest"]
 }

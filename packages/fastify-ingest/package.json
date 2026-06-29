@@ -1,13 +1,26 @@
 {
 	"name": "@agentpond/fastify-ingest",
 	"version": "0.1.0",
+	"description": "Fastify server adapter for AgentPond ingestion endpoints",
+	"license": "MIT",
 	"type": "module",
-	"private": true,
+	"files": [
+		"dist"
+	],
+	"types": "./dist/index.d.ts",
 	"scripts": {
 		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts"
 	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/marcusschiesser/agentpond.git",
+		"directory": "packages/fastify-ingest"
+	},
 	"exports": {
-		".": "./src/index.ts"
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
 	},
 	"dependencies": {
 		"@agentpond/core": "workspace:*",

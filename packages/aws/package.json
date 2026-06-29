@@ -1,13 +1,26 @@
 {
 	"name": "@agentpond/aws",
 	"version": "0.1.0",
+	"description": "AWS S3 storage and Lambda ingestion adapters for AgentPond",
+	"license": "MIT",
 	"type": "module",
-	"private": true,
+	"files": [
+		"dist"
+	],
+	"types": "./dist/index.d.ts",
 	"scripts": {
 		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts"
 	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/marcusschiesser/agentpond.git",
+		"directory": "packages/aws"
+	},
 	"exports": {
-		".": "./src/index.ts"
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
 	},
 	"dependencies": {
 		"@agentpond/core": "workspace:*",
