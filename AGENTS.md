@@ -16,7 +16,7 @@ This repository uses Changesets to generate package changelogs.
 
 ## Duplicate Code
 
-- Run `pnpm exec jscpd --reporters ai` when analyzing duplicate-code findings.
+- Use the `$dry-refactoring` skill when analyzing or fixing duplicate-code findings.
 
 ## Commits
 

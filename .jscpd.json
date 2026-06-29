@@ -1,0 +1,14 @@
+{
+	"minTokens": 80,
+	"ignore": [
+		"**/node_modules/**",
+		"**/dist/**",
+		"**/*.test.ts",
+		"**/tests/**",
+		"**/fixtures/**",
+		"examples/**",
+		"pnpm-lock.yaml",
+		"package-lock.json",
+		"yarn.lock"
+	]
+}
