@@ -14,6 +14,10 @@ This repository uses Changesets to generate package changelogs.
 - Keep `skills/agentpond/SKILL.md` and `skills/agentpond/references/cli.md` in sync with CLI behavior changes.
 - When a PR changes commands, flags, prompts, environment variables, or storage setup, update the skill in the same PR.
 
+## Duplicate Code
+
+- Run `pnpm exec jscpd --reporters ai` when analyzing duplicate-code findings.
+
 ## Commits
 
 - Use the normal `git commit` path so Husky pre-commit hooks run.

@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import {
+	type DuckDBAppender,
 	type DuckDBConnection,
 	DuckDBInstance,
 	timestampValue as duckDbTimestampValue,
@@ -261,57 +262,53 @@ export class DuckDbOperations {
 	}
 
 	async appendTraces(rows: TraceAppendRow[]): Promise<void> {
-		if (rows.length === 0) return;
-		const appender = await (await this.getConnection()).createAppender(
-			"traces",
-		);
-		try {
-			for (const row of rows) {
-				appendVarcharOrNull(appender, row.id);
-				appendVarcharOrNull(appender, row.projectId);
-				appendVarcharOrNull(appender, row.name);
-				appendVarcharOrNull(appender, row.userId);
-				appendVarcharOrNull(appender, row.sessionId);
-				appendTimestampOrNull(appender, row.startTime);
-				appendTimestampOrNull(appender, row.endTime);
-				appendVarcharOrNull(appender, row.metadataJson);
-				appendVarcharOrNull(appender, row.inputJson);
-				appendVarcharOrNull(appender, row.outputJson);
-				appendDoubleOrNull(appender, row.totalCost);
-				appendTimestampOrNull(appender, row.updatedAt);
-				appender.endRow();
-			}
-			appender.closeSync();
-		} catch (error) {
-			appender.closeSync();
-			throw error;
-		}
+		await this.appendRows("traces", rows, (appender, row) => {
+			appendVarcharOrNull(appender, row.id);
+			appendVarcharOrNull(appender, row.projectId);
+			appendVarcharOrNull(appender, row.name);
+			appendVarcharOrNull(appender, row.userId);
+			appendVarcharOrNull(appender, row.sessionId);
+			appendTimestampOrNull(appender, row.startTime);
+			appendTimestampOrNull(appender, row.endTime);
+			appendVarcharOrNull(appender, row.metadataJson);
+			appendVarcharOrNull(appender, row.inputJson);
+			appendVarcharOrNull(appender, row.outputJson);
+			appendDoubleOrNull(appender, row.totalCost);
+			appendTimestampOrNull(appender, row.updatedAt);
+			appender.endRow();
+		});
 	}
 
 	async appendObservations(rows: ObservationAppendRow[]): Promise<void> {
+		await this.appendRows("observations", rows, (appender, row) => {
+			appendVarcharOrNull(appender, row.id);
+			appendVarcharOrNull(appender, row.projectId);
+			appendVarcharOrNull(appender, row.traceId);
+			appendVarcharOrNull(appender, row.parentObservationId);
+			appendVarcharOrNull(appender, row.type);
+			appendVarcharOrNull(appender, row.name);
+			appendTimestampOrNull(appender, row.startTime);
+			appendTimestampOrNull(appender, row.endTime);
+			appendVarcharOrNull(appender, row.metadataJson);
+			appendVarcharOrNull(appender, row.inputJson);
+			appendVarcharOrNull(appender, row.outputJson);
+			appendVarcharOrNull(appender, row.usageDetailsJson);
+			appendVarcharOrNull(appender, row.costDetailsJson);
+			appendDoubleOrNull(appender, row.totalCost);
+			appendTimestampOrNull(appender, row.updatedAt);
+			appender.endRow();
+		});
+	}
+
+	private async appendRows<T>(
+		table: string,
+		rows: T[],
+		appendRow: (appender: DuckDBAppender, row: T) => void,
+	): Promise<void> {
 		if (rows.length === 0) return;
-		const appender = await (await this.getConnection()).createAppender(
-			"observations",
-		);
+		const appender = await (await this.getConnection()).createAppender(table);
 		try {
-			for (const row of rows) {
-				appendVarcharOrNull(appender, row.id);
-				appendVarcharOrNull(appender, row.projectId);
-				appendVarcharOrNull(appender, row.traceId);
-				appendVarcharOrNull(appender, row.parentObservationId);
-				appendVarcharOrNull(appender, row.type);
-				appendVarcharOrNull(appender, row.name);
-				appendTimestampOrNull(appender, row.startTime);
-				appendTimestampOrNull(appender, row.endTime);
-				appendVarcharOrNull(appender, row.metadataJson);
-				appendVarcharOrNull(appender, row.inputJson);
-				appendVarcharOrNull(appender, row.outputJson);
-				appendVarcharOrNull(appender, row.usageDetailsJson);
-				appendVarcharOrNull(appender, row.costDetailsJson);
-				appendDoubleOrNull(appender, row.totalCost);
-				appendTimestampOrNull(appender, row.updatedAt);
-				appender.endRow();
-			}
+			for (const row of rows) appendRow(appender, row);
 			appender.closeSync();
 		} catch (error) {
 			appender.closeSync();

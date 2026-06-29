@@ -1,4 +1,4 @@
-import type { ObjectStore } from "@agentpond/core";
+import { type ObjectStore, utcHourPath } from "@agentpond/core";
 
 export type BucketScanWindow = {
 	start: Date;
@@ -73,12 +73,4 @@ function* utcHourBuckets(start: Date, end: Date): Generator<string> {
 		yield utcHourPath(cursor);
 		cursor = addMinutes(cursor, 60);
 	}
-}
-
-function utcHourPath(date: Date): string {
-	const yyyy = String(date.getUTCFullYear());
-	const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-	const dd = String(date.getUTCDate()).padStart(2, "0");
-	const hh = String(date.getUTCHours()).padStart(2, "0");
-	return `${yyyy}/${mm}/${dd}/${hh}`;
 }

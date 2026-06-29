@@ -44,6 +44,31 @@ export const idSchema = z
 
 const isoTimestampSchema = z.iso.datetime({ offset: true });
 const nullableIsoTimestampSchema = isoTimestampSchema.nullish();
+const usageUnitSchema = z
+	.enum([
+		"CHARACTERS",
+		"TOKENS",
+		"SECONDS",
+		"MILLISECONDS",
+		"IMAGES",
+		"REQUESTS",
+	])
+	.nullish();
+const jsonInputOutputFields = {
+	metadata: jsonRecordSchema.nullish(),
+	input: jsonValue.nullish(),
+	output: jsonValue.nullish(),
+};
+const usageValueFields = {
+	input: z.number().int().nullish(),
+	output: z.number().int().nullish(),
+	total: z.number().int().nullish(),
+	unit: usageUnitSchema,
+	inputCost: z.number().nullish(),
+	outputCost: z.number().nullish(),
+	totalCost: z.number().nullish(),
+};
+const usageValueSchema = z.object(usageValueFields).nullish();
 const environmentSchema = z
 	.string()
 	.toLowerCase()
@@ -58,25 +83,10 @@ const environmentSchema = z
 
 const usageSchema = z
 	.object({
-		input: z.number().int().nullish(),
-		output: z.number().int().nullish(),
-		total: z.number().int().nullish(),
-		unit: z
-			.enum([
-				"CHARACTERS",
-				"TOKENS",
-				"SECONDS",
-				"MILLISECONDS",
-				"IMAGES",
-				"REQUESTS",
-			])
-			.nullish(),
+		...usageValueFields,
 		promptTokens: z.number().int().nullish(),
 		completionTokens: z.number().int().nullish(),
 		totalTokens: z.number().int().nullish(),
-		inputCost: z.number().nullish(),
-		outputCost: z.number().nullish(),
-		totalCost: z.number().nullish(),
 	})
 	.nullish()
 	.transform((value) => {
@@ -102,61 +112,40 @@ const usageSchema = z
 		}
 		return value;
 	})
-	.pipe(
-		z
-			.object({
-				input: z.number().int().nullish(),
-				output: z.number().int().nullish(),
-				total: z.number().int().nullish(),
-				unit: z
-					.enum([
-						"CHARACTERS",
-						"TOKENS",
-						"SECONDS",
-						"MILLISECONDS",
-						"IMAGES",
-						"REQUESTS",
-					])
-					.nullish(),
-				inputCost: z.number().nullish(),
-				outputCost: z.number().nullish(),
-				totalCost: z.number().nullish(),
-			})
-			.nullish(),
-	);
+	.pipe(usageValueSchema);
 
-const usageDetailsSchema = z
-	.record(z.string(), z.unknown())
-	.nullish()
-	.transform((value) => {
-		if (!value) return value;
-		const result: Record<string, number> = {};
-		for (const [key, entry] of Object.entries(value)) {
-			if (typeof entry === "number" && Number.isInteger(entry) && entry >= 0) {
-				result[key] = entry;
-			} else if (typeof entry === "string") {
-				const parsed = Number.parseInt(entry, 10);
-				if (!Number.isNaN(parsed) && parsed >= 0) result[key] = parsed;
-			}
-		}
-		return Object.keys(result).length > 0 ? result : undefined;
-	})
-	.nullish();
+const usageDetailsSchema = numericRecordSchema((entry) => {
+	if (typeof entry === "number" && Number.isInteger(entry) && entry >= 0) {
+		return entry;
+	}
+	if (typeof entry === "string") {
+		const parsed = Number.parseInt(entry, 10);
+		if (!Number.isNaN(parsed) && parsed >= 0) return parsed;
+	}
+	return undefined;
+});
 
-const costDetailsSchema = z
-	.record(z.string(), z.unknown())
-	.nullish()
-	.transform((value) => {
-		if (!value) return value;
-		const result: Record<string, number> = {};
-		for (const [key, entry] of Object.entries(value)) {
-			if (typeof entry === "number" && Number.isFinite(entry) && entry >= 0) {
-				result[key] = entry;
+const costDetailsSchema = numericRecordSchema((entry) =>
+	typeof entry === "number" && Number.isFinite(entry) && entry >= 0
+		? entry
+		: undefined,
+);
+
+function numericRecordSchema(parse: (entry: unknown) => number | undefined) {
+	return z
+		.record(z.string(), z.unknown())
+		.nullish()
+		.transform((value) => {
+			if (!value) return value;
+			const result: Record<string, number> = {};
+			for (const [key, entry] of Object.entries(value)) {
+				const parsed = parse(entry);
+				if (parsed !== undefined) result[key] = parsed;
 			}
-		}
-		return Object.keys(result).length > 0 ? result : undefined;
-	})
-	.nullish();
+			return Object.keys(result).length > 0 ? result : undefined;
+		})
+		.nullish();
+}
 
 const traceBodySchema = z
 	.object({
@@ -164,12 +153,10 @@ const traceBodySchema = z
 		timestamp: nullableIsoTimestampSchema,
 		name: z.string().max(1000).nullish(),
 		externalId: z.string().nullish(),
-		input: jsonValue.nullish(),
-		output: jsonValue.nullish(),
+		...jsonInputOutputFields,
 		sessionId: z.string().nullish(),
 		userId: z.string().nullish(),
 		environment: environmentSchema,
-		metadata: jsonRecordSchema.nullish(),
 		release: z.string().nullish(),
 		version: z.string().nullish(),
 		public: z.boolean().nullish(),
@@ -183,9 +170,7 @@ const optionalObservationBodySchema = z
 		environment: environmentSchema,
 		name: z.string().nullish(),
 		startTime: nullableIsoTimestampSchema,
-		metadata: jsonRecordSchema.nullish(),
-		input: jsonValue.nullish(),
-		output: jsonValue.nullish(),
+		...jsonInputOutputFields,
 		level: z.enum(["DEBUG", "DEFAULT", "WARNING", "ERROR"]).nullish(),
 		statusMessage: z.string().nullish(),
 		parentObservationId: idSchema.nullish(),
@@ -245,7 +230,7 @@ const scoreBodySchema = z
 			.nullish(),
 		source: z.enum(["API", "EVAL", "ANNOTATION"]).default("API"),
 		comment: z.string().nullish(),
-		metadata: jsonRecordSchema.nullish(),
+		metadata: jsonInputOutputFields.metadata,
 		configId: z.string().nullish(),
 		queueId: z.string().nullish(),
 		authorUserId: z.string().nullish(),

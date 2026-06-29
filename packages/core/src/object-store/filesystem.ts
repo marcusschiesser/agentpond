@@ -1,10 +1,24 @@
 import type { Dirent } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import type { AgentPondEnvironment } from "../environment.js";
 import type { ObjectStore } from "./types.js";
 
 export class FileSystemObjectStore implements ObjectStore {
 	private readonly root: string;
+
+	static fromEnvDir(envDir: string): FileSystemObjectStore {
+		return new FileSystemObjectStore(join(envDir, "events"));
+	}
+
+	static fromEnvironment(
+		environment: AgentPondEnvironment | undefined,
+	): FileSystemObjectStore {
+		if (!environment) {
+			throw new Error("Local object storage requires an AgentPond environment");
+		}
+		return FileSystemObjectStore.fromEnvDir(environment.envDir);
+	}
 
 	constructor(rootPath: string) {
 		this.root = resolve(rootPath);

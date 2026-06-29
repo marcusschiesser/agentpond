@@ -472,18 +472,10 @@ function buildTraceAppendRow(
 	return {
 		id,
 		projectId,
-		name: stringValue(body.name),
 		userId: stringValue(body.userId),
 		sessionId: stringValue(body.sessionId),
-		startTime: timestampValue(
-			body.startTime ?? body.createdAt ?? event.timestamp,
-		),
-		endTime: timestampValue(body.endTime),
-		metadataJson: jsonString(body.metadata),
-		inputJson: jsonString(body.input),
-		outputJson: jsonString(body.output),
+		...appendRowBodyFields(body, event),
 		totalCost: undefined,
-		updatedAt: timestampValue(event.timestamp),
 	};
 }
 
@@ -502,6 +494,27 @@ function buildObservationAppendRow(
 		traceId: stringValue(body.traceId),
 		parentObservationId: stringValue(body.parentObservationId),
 		type: event.type,
+		...appendRowBodyFields(body, event),
+		usageDetailsJson: jsonString(body.usageDetails),
+		costDetailsJson: jsonString(costDetails),
+		totalCost,
+	};
+}
+
+function appendRowBodyFields(
+	body: Record<string, unknown>,
+	event: IngestionEvent,
+): Pick<
+	TraceAppendRow,
+	| "name"
+	| "startTime"
+	| "endTime"
+	| "metadataJson"
+	| "inputJson"
+	| "outputJson"
+	| "updatedAt"
+> {
+	return {
 		name: stringValue(body.name),
 		startTime: timestampValue(
 			body.startTime ?? body.createdAt ?? event.timestamp,
@@ -510,9 +523,6 @@ function buildObservationAppendRow(
 		metadataJson: jsonString(body.metadata),
 		inputJson: jsonString(body.input),
 		outputJson: jsonString(body.output),
-		usageDetailsJson: jsonString(body.usageDetails),
-		costDetailsJson: jsonString(costDetails),
-		totalCost,
 		updatedAt: timestampValue(event.timestamp),
 	};
 }

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { ObjectStore } from "./object-store.js";
 import type { EntityType, IngestionEvent } from "./schemas.js";
 import { bodyIdForEvent, entityTypeForEvent } from "./schemas.js";
+import { utcMinutePath } from "./time.js";
 
 export type ManifestObject = {
 	key: string;
@@ -95,30 +96,13 @@ export class AcceptedEventWriter {
 	): Promise<OtelStorageObject | undefined> {
 		if (resourceSpans.length === 0) return undefined;
 
-		const key = `${this.prefix}otel/${this.options.projectId}/${this.currentTimePath()}/${batchId}.json`;
+		const key = `${this.prefix}otel/${this.options.projectId}/${utcMinutePath(new Date())}/${batchId}.json`;
 		await this.options.store.putJson(key, resourceSpans);
 		return { key, spanCount: countOtelSpans(resourceSpans) };
 	}
 
 	private manifestKey(batchId: string, timestamp: string): string {
-		const date = new Date(timestamp);
-		const yyyy = String(date.getUTCFullYear());
-		const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-		const dd = String(date.getUTCDate()).padStart(2, "0");
-		const hh = String(date.getUTCHours()).padStart(2, "0");
-		const min = String(date.getUTCMinutes()).padStart(2, "0");
-		return `${this.prefix}${this.options.projectId}/manifests/${yyyy}/${mm}/${dd}/${hh}/${min}/${batchId}.json`;
-	}
-
-	private currentTimePath(): string {
-		// Keep the OTEL key shape stable; only the bucket timezone is forced to UTC.
-		const date = new Date();
-		const yyyy = String(date.getUTCFullYear());
-		const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-		const dd = String(date.getUTCDate()).padStart(2, "0");
-		const hh = String(date.getUTCHours()).padStart(2, "0");
-		const min = String(date.getUTCMinutes()).padStart(2, "0");
-		return `${yyyy}/${mm}/${dd}/${hh}/${min}`;
+		return `${this.prefix}${this.options.projectId}/manifests/${utcMinutePath(new Date(timestamp))}/${batchId}.json`;
 	}
 }
 

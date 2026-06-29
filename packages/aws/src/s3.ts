@@ -1,4 +1,5 @@
 import {
+	type AgentPondEnvironment,
 	envValue,
 	nonEmpty,
 	type ObjectStore,
@@ -40,6 +41,12 @@ export function s3ConfigFromEnv(envFilePath?: string): S3Config {
 
 export class S3ObjectStore implements ObjectStore {
 	private readonly client: S3Client;
+
+	static fromEnvironment(
+		environment: AgentPondEnvironment | undefined,
+	): S3ObjectStore {
+		return new S3ObjectStore(s3ConfigFromEnv(environment?.envFilePath));
+	}
 
 	constructor(private readonly config: S3Config) {
 		this.client = new S3Client({
