@@ -141,6 +141,46 @@ test("Google HTTP ingest function accepts JSON ingestion from rawBody", async ()
 	assert.equal((await store.listKeys("project-a/")).length > 0, true);
 });
 
+test("Google HTTP ingest function strips configured path prefixes", async () => {
+	const store = new MemoryObjectStore();
+	const fn = createHttpIngestFunction({
+		config,
+		store,
+		pathPrefix: "/agentPondIngest",
+	});
+	const res = createResponse();
+
+	await fn(
+		{
+			method: "POST",
+			originalUrl: "/agentPondIngest/api/public/ingestion?batch=1",
+			headers: {
+				authorization: authHeader(),
+				"content-type": "application/json",
+			},
+			rawBody: JSON.stringify({ batch: [] }),
+		},
+		res,
+	);
+
+	assert.equal(res.statusCode, 207);
+	assert.deepEqual(JSON.parse(res.body), { successes: [], errors: [] });
+});
+
+test("Google HTTP ingest function leaves unprefixed paths routable when path prefixes are configured", async () => {
+	const fn = createHttpIngestFunction({
+		config,
+		store: new MemoryObjectStore(),
+		pathPrefix: "/agentPondIngest",
+	});
+	const res = createResponse();
+
+	await fn({ method: "GET", url: "/health?ready=1" }, res);
+
+	assert.equal(res.statusCode, 200);
+	assert.deepEqual(JSON.parse(res.body), { ok: true });
+});
+
 test("Google HTTP ingest function forwards OTEL headers", async () => {
 	const fn = createHttpIngestFunction({
 		config,

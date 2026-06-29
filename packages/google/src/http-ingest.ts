@@ -18,6 +18,7 @@ export type GoogleIngestFunctionOptions = {
 	authMode?: AuthMode;
 	sink?: IngestionSink;
 	logger?: IngestionLogger;
+	pathPrefix?: string | string[];
 };
 
 export type GoogleHttpRequest = {
@@ -57,7 +58,7 @@ export function createHttpIngestFunction(
 		const response = await handleIngestRequest(
 			{
 				method: req.method ?? "GET",
-				path: req.originalUrl ?? req.url ?? req.path ?? "/",
+				path: requestPath(req, options.pathPrefix),
 				headers: req.headers,
 				body: requestBody(req),
 			},
@@ -69,6 +70,38 @@ export function createHttpIngestFunction(
 		);
 		res.status(response.status).set(response.headers).send(response.body);
 	};
+}
+
+function requestPath(
+	req: GoogleHttpRequest,
+	pathPrefix?: string | string[],
+): string {
+	const rawPath = req.originalUrl ?? req.url ?? req.path ?? "/";
+	if (!pathPrefix) return rawPath;
+
+	const path = rawPath.split("?", 1)[0] || "/";
+	for (const prefix of normalizePathPrefixes(pathPrefix)) {
+		const exactIndex = path === prefix ? 0 : -1;
+		const segmentIndex = path.indexOf(`${prefix}/`);
+		const index = exactIndex >= 0 ? exactIndex : segmentIndex;
+		if (index < 0) continue;
+
+		const suffix = path.slice(index + prefix.length);
+		return suffix.startsWith("/") ? suffix : suffix ? `/${suffix}` : "/";
+	}
+	return path.startsWith("/") ? path : `/${path}`;
+}
+
+function normalizePathPrefixes(pathPrefix: string | string[]): string[] {
+	const prefixes = Array.isArray(pathPrefix) ? pathPrefix : [pathPrefix];
+	return prefixes
+		.map((prefix) => {
+			const withLeadingSlash = prefix.startsWith("/") ? prefix : `/${prefix}`;
+			return withLeadingSlash.endsWith("/") && withLeadingSlash !== "/"
+				? withLeadingSlash.slice(0, -1)
+				: withLeadingSlash;
+		})
+		.filter((prefix) => prefix !== "/");
 }
 
 function requestBody(

@@ -136,4 +136,4 @@ export LANGFUSE_SECRET_KEY=sk-agentpond-dev
 
 These variables configure SDK ingestion. They are not credentials for using the AgentPond CLI to query Langfuse Cloud. The AgentPond CLI reads from object storage and the local DuckDB cache.
 
-For serverless deployments, AWS infrastructure can use `lambdaIngestHandler` from `@agentpond/aws`, and Google infrastructure can use `httpIngestFunction` from `@agentpond/google`. Both handlers expose the same Langfuse-compatible ingestion endpoints and write to the configured object store.
+For serverless deployments, AWS infrastructure can use `lambdaIngestHandler` from `@agentpond/aws`, and Google infrastructure can use `httpIngestFunction` or `createHttpIngestFunction` from `@agentpond/google`. Firebase Functions should use `createHttpIngestFunction` with `pathPrefix` to strip Firebase function URL prefixes. These handlers expose the same Langfuse-compatible ingestion endpoints and write to the configured object store.
