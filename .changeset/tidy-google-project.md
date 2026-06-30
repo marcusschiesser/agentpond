@@ -1,5 +1,5 @@
 ---
-"@agentpond/core": minor
+"@agentpond/google": minor
 ---
 
-Use Google Cloud project environment variables as AgentPond project id fallbacks.
+Use Google Cloud project environment variables as Google ingest auth project id fallbacks.

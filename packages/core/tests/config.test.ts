@@ -216,13 +216,9 @@ test("environment selection and explicit --env names resolve separate caches", (
 test("environment file values are loaded below process env", () => {
 	const originalCwd = process.cwd();
 	const originalProject = process.env.AGENTPOND_PROJECT_ID;
-	const originalGcloudProject = process.env.GCLOUD_PROJECT;
-	const originalGcpProject = process.env.GCP_PROJECT;
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
 	try {
 		delete process.env.AGENTPOND_PROJECT_ID;
-		delete process.env.GCLOUD_PROJECT;
-		delete process.env.GCP_PROJECT;
 		process.chdir(cwd);
 		const env = initAgentPondEnvironment("production");
 		writeFileSync(
@@ -255,75 +251,6 @@ test("environment file values are loaded below process env", () => {
 			delete process.env.AGENTPOND_PROJECT_ID;
 		} else {
 			process.env.AGENTPOND_PROJECT_ID = originalProject;
-		}
-		if (originalGcloudProject === undefined) {
-			delete process.env.GCLOUD_PROJECT;
-		} else {
-			process.env.GCLOUD_PROJECT = originalGcloudProject;
-		}
-		if (originalGcpProject === undefined) {
-			delete process.env.GCP_PROJECT;
-		} else {
-			process.env.GCP_PROJECT = originalGcpProject;
-		}
-	}
-});
-
-test("config uses Google Cloud project environment fallbacks", () => {
-	const originalCwd = process.cwd();
-	const originalProject = process.env.AGENTPOND_PROJECT_ID;
-	const originalGcloudProject = process.env.GCLOUD_PROJECT;
-	const originalGcpProject = process.env.GCP_PROJECT;
-	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
-	try {
-		delete process.env.AGENTPOND_PROJECT_ID;
-		delete process.env.GCLOUD_PROJECT;
-		delete process.env.GCP_PROJECT;
-		process.chdir(cwd);
-		const env = initAgentPondEnvironment("production");
-		writeFileSync(
-			env.envFilePath,
-			["AGENTPOND_STORE=gcs", "AGENTPOND_GCS_BUCKET=file-bucket", ""].join(
-				"\n",
-			),
-			"utf8",
-		);
-
-		assert.equal(
-			configFromEnv({ envName: "production" }).projectId,
-			"default-project",
-		);
-		process.env.GCP_PROJECT = "gcp-project";
-		assert.equal(
-			configFromEnv({ envName: "production" }).projectId,
-			"gcp-project",
-		);
-		process.env.GCLOUD_PROJECT = "gcloud-project";
-		assert.equal(
-			configFromEnv({ envName: "production" }).projectId,
-			"gcloud-project",
-		);
-		process.env.AGENTPOND_PROJECT_ID = "agentpond-project";
-		assert.equal(
-			configFromEnv({ envName: "production" }).projectId,
-			"agentpond-project",
-		);
-	} finally {
-		process.chdir(originalCwd);
-		if (originalProject === undefined) {
-			delete process.env.AGENTPOND_PROJECT_ID;
-		} else {
-			process.env.AGENTPOND_PROJECT_ID = originalProject;
-		}
-		if (originalGcloudProject === undefined) {
-			delete process.env.GCLOUD_PROJECT;
-		} else {
-			process.env.GCLOUD_PROJECT = originalGcloudProject;
-		}
-		if (originalGcpProject === undefined) {
-			delete process.env.GCP_PROJECT;
-		} else {
-			process.env.GCP_PROJECT = originalGcpProject;
 		}
 	}
 });

@@ -10,6 +10,7 @@ import {
 	createHttpIngestFunction,
 	GcsObjectStore,
 	gcsConfigFromRuntimeEnv,
+	googleAuthFromRuntimeEnv,
 } from "@agentpond/google";
 
 const auth: AuthConfig = {
@@ -114,6 +115,32 @@ test("GCS object store creates sink with runtime prefix", async () => {
 	});
 
 	assert.equal((await store.listKeys("prod/project-a/")).length > 0, true);
+});
+
+test("Google auth reads Google Cloud project fallbacks from runtime env", () => {
+	const runtimeEnv = {
+		LANGFUSE_PUBLIC_KEY: "pk-runtime",
+		LANGFUSE_SECRET_KEY: "sk-runtime",
+		GCP_PROJECT: "gcp-project",
+		GCLOUD_PROJECT: "gcloud-project",
+	};
+
+	assert.deepEqual(googleAuthFromRuntimeEnv(runtimeEnv), {
+		projectId: "gcloud-project",
+		publicKey: "pk-runtime",
+		secretKey: "sk-runtime",
+	});
+	assert.deepEqual(
+		googleAuthFromRuntimeEnv({
+			...runtimeEnv,
+			AGENTPOND_PROJECT_ID: "agentpond-project",
+		}),
+		{
+			projectId: "agentpond-project",
+			publicKey: "pk-runtime",
+			secretKey: "sk-runtime",
+		},
+	);
 });
 
 test("Google HTTP ingest function responds to health checks", async () => {

@@ -34,11 +34,7 @@ export function configFromEnv(
 		storeTypeFromValue(env("AGENTPOND_STORE")) ??
 		environment.storeType;
 	const dbPath = join(environment.envDir, "cache.duckdb");
-	const projectId =
-		env("AGENTPOND_PROJECT_ID") ??
-		env("GCLOUD_PROJECT") ??
-		env("GCP_PROJECT") ??
-		"default-project";
+	const projectId = env("AGENTPOND_PROJECT_ID") ?? "default-project";
 	const prefix = normalizePrefix(
 		env("AGENTPOND_PREFIX") ??
 			env("AGENTPOND_S3_PREFIX") ??
@@ -68,11 +64,7 @@ export function configFromEnv(
 export function authFromRuntimeEnv(
 	env: NodeJS.ProcessEnv = process.env,
 ): AuthConfig {
-	const projectId =
-		env.AGENTPOND_PROJECT_ID ??
-		env.GCLOUD_PROJECT ??
-		env.GCP_PROJECT ??
-		"default-project";
+	const projectId = env.AGENTPOND_PROJECT_ID ?? "default-project";
 	return {
 		projectId,
 		publicKey: env.LANGFUSE_PUBLIC_KEY ?? "pk-agentpond",

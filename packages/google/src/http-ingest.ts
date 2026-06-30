@@ -1,5 +1,6 @@
 import {
 	type AgentPondConfig,
+	authFromRuntimeEnv,
 	type AuthConfig,
 	sinkForConfig,
 } from "@agentpond/core";
@@ -42,6 +43,7 @@ export function createHttpIngestFunction(
 	options: GoogleIngestFunctionOptions = {},
 ): GoogleHttpIngestFunction {
 	const sink = options.sink ?? GcsObjectStore.fromRuntimeEnv().toSink();
+	const auth = options.auth ?? googleAuthFromRuntimeEnv();
 
 	return async (req, res) => {
 		const response = await handleIngestRequest(
@@ -53,11 +55,22 @@ export function createHttpIngestFunction(
 			},
 			{
 				...options,
+				auth,
 				sink,
 			},
 		);
 		res.status(response.status).set(response.headers).send(response.body);
 	};
+}
+
+export function googleAuthFromRuntimeEnv(
+	env: NodeJS.ProcessEnv = process.env,
+): AuthConfig {
+	return authFromRuntimeEnv({
+		...env,
+		AGENTPOND_PROJECT_ID:
+			env.AGENTPOND_PROJECT_ID ?? env.GCLOUD_PROJECT ?? env.GCP_PROJECT,
+	});
 }
 
 export function googleSinkForConfig(config: AgentPondConfig): IngestionSink {
