@@ -116,6 +116,46 @@ test("S3 object store creates sink with runtime prefix", async () => {
 	);
 });
 
+test("S3 object store can be created from explicit AWS config", async () => {
+	const keys: string[] = [];
+	const store = S3ObjectStore.fromConfig({
+		bucket: "configured-bucket",
+		region: "us-east-1",
+	});
+	(
+		store as unknown as {
+			client: {
+				send: (command: {
+					input: { Bucket?: string; Key?: string };
+				}) => Promise<unknown>;
+			};
+		}
+	).client = {
+		send: async (command) => {
+			assert.equal(command.input.Bucket, "configured-bucket");
+			if (command.input.Key) keys.push(command.input.Key);
+			return {};
+		},
+	};
+
+	await store.toSink().writeEvents({
+		projectId: "project-a",
+		events: [
+			{
+				id: "event-aws-config-1",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "trace-aws-config-1" },
+			},
+		],
+	});
+
+	assert.equal(
+		keys.every((key) => key.startsWith("project-a/")),
+		true,
+	);
+});
+
 test("AWS Lambda ingest handler responds to health checks", async () => {
 	const handler = createLambdaIngestHandler({
 		auth,

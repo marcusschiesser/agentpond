@@ -47,6 +47,12 @@ test("GCS config reads provider settings from runtime env", () => {
 	}
 });
 
+test("GCS object store can be created from explicit config", () => {
+	const store = GcsObjectStore.fromConfig({ bucket: "configured-bucket" });
+
+	assert.equal(store.config.bucket, "configured-bucket");
+});
+
 test("GCS object store writes, reads, and lists JSON objects", async () => {
 	const objects = new Map<string, string>();
 	const store = new GcsObjectStore(

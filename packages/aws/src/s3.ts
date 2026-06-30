@@ -22,7 +22,7 @@ export type S3Config = {
 	region: string;
 	accessKeyId?: string;
 	secretAccessKey?: string;
-	forcePathStyle: boolean;
+	forcePathStyle?: boolean;
 };
 
 function s3ConfigForAgentPondEnvironment(envFilePath?: string): S3Config {
@@ -62,11 +62,15 @@ export class S3ObjectStore implements ObjectStore {
 		return new S3ObjectStore(s3ConfigFromRuntimeEnv());
 	}
 
+	static fromConfig(config: S3Config): S3ObjectStore {
+		return new S3ObjectStore(config);
+	}
+
 	constructor(private readonly config: S3Config) {
 		this.client = new S3Client({
 			endpoint: config.endpoint,
 			region: config.region,
-			forcePathStyle: config.forcePathStyle,
+			forcePathStyle: config.forcePathStyle ?? false,
 			credentials:
 				config.accessKeyId && config.secretAccessKey
 					? {

@@ -58,6 +58,10 @@ export class GcsObjectStore implements ObjectStore {
 		return new GcsObjectStore(gcsConfigFromRuntimeEnv());
 	}
 
+	static fromConfig(config: GcsConfig): GcsObjectStore {
+		return new GcsObjectStore(config);
+	}
+
 	constructor(
 		readonly config: GcsConfig,
 		storage: GcsStorage = new Storage(),
