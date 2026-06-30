@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/fastify-ingest",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "Fastify server adapter for AgentPond ingestion endpoints",
 	"license": "MIT",
 	"type": "module",
