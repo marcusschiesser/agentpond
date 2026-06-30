@@ -14,7 +14,7 @@
 		"@agentpond/ingest": "workspace:*",
 		"@langfuse/otel": "^5.4.1",
 		"@langfuse/tracing": "^5.4.1",
-		"@opentelemetry/sdk-node": "^0.208.0"
+		"@opentelemetry/sdk-node": "^0.219.0"
 	},
 	"devDependencies": {
 		"@types/node": "^24.10.1",

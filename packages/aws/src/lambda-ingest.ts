@@ -1,21 +1,17 @@
 import {
 	type AgentPondConfig,
-	configFromEnv,
-	type ObjectStore,
+	type AuthConfig,
+	sinkForConfig,
 } from "@agentpond/core";
 import {
-	type AuthMode,
 	handleIngestRequest,
 	type IngestionLogger,
 	type IngestionSink,
 } from "@agentpond/ingest";
-import { type S3Config, S3ObjectStore, s3ConfigFromEnv } from "./s3.js";
+import { S3ObjectStore } from "./s3.js";
 
 export type AwsIngestHandlerOptions = {
-	config?: AgentPondConfig;
-	store?: ObjectStore;
-	s3?: S3Config;
-	authMode?: AuthMode;
+	auth?: AuthConfig | false;
 	sink?: IngestionSink;
 	logger?: IngestionLogger;
 };
@@ -49,14 +45,7 @@ export type LambdaIngestHandler = (
 export function createLambdaIngestHandler(
 	options: AwsIngestHandlerOptions = {},
 ): LambdaIngestHandler {
-	const config = options.config ?? configFromEnv();
-	const store =
-		options.store ??
-		(options.sink
-			? undefined
-			: new S3ObjectStore(
-					options.s3 ?? s3ConfigFromEnv(config.environment?.envFilePath),
-				));
+	const sink = options.sink ?? S3ObjectStore.fromRuntimeEnv().toSink();
 
 	return async (event) => {
 		const body = event.body
@@ -72,8 +61,7 @@ export function createLambdaIngestHandler(
 			},
 			{
 				...options,
-				config,
-				store,
+				sink,
 			},
 		);
 		return {
@@ -83,6 +71,12 @@ export function createLambdaIngestHandler(
 			isBase64Encoded: false,
 		};
 	};
+}
+
+export function awsSinkForConfig(config: AgentPondConfig): IngestionSink {
+	return sinkForConfig(config, {
+		s3: S3ObjectStore.fromEnvironment,
+	});
 }
 
 export const lambdaIngestHandler = createLambdaIngestHandler();

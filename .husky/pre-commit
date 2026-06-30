@@ -11,3 +11,6 @@ git update-index --again
 
 pnpm exec biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched
 git update-index --again
+
+pnpm run biome:ci
+pnpm run audit:prod

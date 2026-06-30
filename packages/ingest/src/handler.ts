@@ -1,42 +1,26 @@
 import { gunzipSync } from "node:zlib";
 import {
-	type AgentPondConfig,
+	type AuthConfig,
 	AuthError,
+	authFromRuntimeEnv,
 	bodyIdForEvent,
-	configFromEnv,
 	type IngestionEvent,
+	type IngestionSink,
 	ingestionBatchSchema,
-	type ObjectStore,
-	ObjectStoreIngestionSink,
 	otelBodyToResourceSpans,
 	parseIngestionEvents,
 	verifyBasicAuth,
 } from "@agentpond/core";
 
-export type AuthMode = "required" | "disabled";
-
-export type IngestionSink = {
-	writeEvents: (params: {
-		projectId: string;
-		prefix: string;
-		events: IngestionEvent[];
-	}) => Promise<unknown>;
-	writeOtelResourceSpans: (params: {
-		projectId: string;
-		prefix: string;
-		resourceSpans: unknown[];
-	}) => Promise<unknown>;
-};
+export type { IngestionSink } from "@agentpond/core";
 
 export type IngestionLogger = {
 	info: (fields: Record<string, unknown>, message: string) => void;
 };
 
 export type IngestHandlerOptions = {
-	config?: AgentPondConfig;
-	store?: ObjectStore;
-	authMode?: AuthMode;
-	sink?: IngestionSink;
+	auth?: AuthConfig | false;
+	sink: IngestionSink;
 	logger?: IngestionLogger;
 };
 
@@ -58,7 +42,7 @@ const jsonHeaders = { "content-type": "application/json" };
 
 export async function handleIngestRequest(
 	request: IngestHttpRequest,
-	options: IngestHandlerOptions = {},
+	options?: IngestHandlerOptions,
 ): Promise<IngestHttpResponse> {
 	const method = request.method.toUpperCase();
 	const path = request.path.split("?", 1)[0];
@@ -68,17 +52,16 @@ export async function handleIngestRequest(
 	}
 	if (method !== "POST") return jsonResponse(404, { error: "Not Found" });
 
-	const config = options.config ?? configFromEnv();
-	const authMode = options.authMode ?? "required";
+	const requestAuth =
+		options?.auth === undefined ? authFromRuntimeEnv() : options.auth;
 	const sink = sinkForOptions(options);
-	const logger = options.logger ?? noopLogger;
+	const logger = options?.logger ?? noopLogger;
 
 	if (path === "/api/public/ingestion") {
 		try {
 			const auth = authenticateRequest(
 				readHeader(request.headers ?? {}, "authorization"),
-				config,
-				authMode,
+				requestAuth,
 			);
 			const payload = parseJsonBody(
 				request.body,
@@ -97,7 +80,6 @@ export async function handleIngestRequest(
 			if (events.length > 0) {
 				await sink.writeEvents({
 					projectId: auth.projectId,
-					prefix: config.prefix,
 					events,
 				});
 				logIngestedEvents(logger, {
@@ -119,8 +101,7 @@ export async function handleIngestRequest(
 		try {
 			const auth = authenticateRequest(
 				readHeader(request.headers ?? {}, "authorization"),
-				config,
-				authMode,
+				requestAuth,
 			);
 			const ingestionVersion = readHeader(
 				request.headers ?? {},
@@ -145,7 +126,6 @@ export async function handleIngestRequest(
 
 			await sink.writeOtelResourceSpans({
 				projectId: auth.projectId,
-				prefix: config.prefix,
 				resourceSpans,
 			});
 			logIngestedOtelPayload(logger, {
@@ -161,10 +141,11 @@ export async function handleIngestRequest(
 	return jsonResponse(404, { error: "Not Found" });
 }
 
-function sinkForOptions(options: IngestHandlerOptions): IngestionSink {
-	if (options.sink) return options.sink;
-	if (options.store) return new ObjectStoreIngestionSink(options.store);
-	throw new Error("AgentPond ingest requires either a store or a sink");
+function sinkForOptions(
+	options: IngestHandlerOptions | undefined,
+): IngestionSink {
+	if (options?.sink) return options.sink;
+	throw new Error("AgentPond ingest requires a sink");
 }
 
 function logIngestedEvents(
@@ -206,17 +187,15 @@ function logIngestedOtelPayload(
 
 function authenticateRequest(
 	authorization: string | undefined,
-	config: AgentPondConfig,
-	authMode: AuthMode,
+	auth: AuthConfig | false,
 ): { projectId: string; publicKey: string } {
-	if (authMode === "disabled") {
+	if (auth === false) {
 		return {
-			projectId: config.projectId,
+			projectId: "default-project",
 			publicKey: readBasicAuthPublicKey(authorization) ?? "pk-agentpond-dev",
 		};
 	}
-	if (!config.auth) throw new AuthError("Auth is not configured");
-	return verifyBasicAuth(authorization, config.auth);
+	return verifyBasicAuth(authorization, auth);
 }
 
 function readBasicAuthPublicKey(

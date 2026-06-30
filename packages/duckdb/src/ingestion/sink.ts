@@ -1,16 +1,25 @@
-import type { IngestionEvent } from "@agentpond/core";
+import {
+	type IngestionEvent,
+	type IngestionSink,
+	resolveAgentPondEnvironment,
+} from "@agentpond/core";
 import { AgentPondCache } from "../cache/index.js";
 import type {
 	DirectWriteResult,
 	DuckDbDirectIngestion,
 } from "./direct-ingestion.js";
 
-export class DuckDbIngestionSink {
+export class DuckDbIngestionSink implements IngestionSink {
+	static fromAgentPondEnv(name: string): DuckDbIngestionSink {
+		return new DuckDbIngestionSink(
+			resolveAgentPondEnvironment({ name }).dbPath,
+		);
+	}
+
 	constructor(private readonly dbPath: string) {}
 
 	async writeEvents(params: {
 		projectId: string;
-		prefix: string;
 		events: IngestionEvent[];
 		source?: string;
 	}): Promise<DirectWriteResult> {
@@ -25,7 +34,6 @@ export class DuckDbIngestionSink {
 
 	async writeOtelResourceSpans(params: {
 		projectId: string;
-		prefix: string;
 		resourceSpans: unknown[];
 		source?: string;
 	}): Promise<DirectWriteResult> {

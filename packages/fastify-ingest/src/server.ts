@@ -1,20 +1,18 @@
-import { configFromEnv } from "@agentpond/core";
-import {
-	handleIngestRequest,
-	type IngestHandlerOptions,
-} from "@agentpond/ingest";
+import type { AuthConfig } from "@agentpond/core";
+import { handleIngestRequest, type IngestionSink } from "@agentpond/ingest";
 import Fastify, {
 	type FastifyInstance,
 	type FastifyLoggerOptions,
 	type FastifyRequest,
 } from "fastify";
 
-export type BuildServerOptions = Omit<IngestHandlerOptions, "logger"> & {
+export type BuildServerOptions = {
+	sink: IngestionSink;
+	auth?: AuthConfig | false;
 	logger?: FastifyLoggerOptions;
 };
 
-export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
-	const config = options.config ?? configFromEnv();
+export function buildServer(options: BuildServerOptions): FastifyInstance {
 	const server = Fastify({
 		logger: options.logger ?? process.env.NODE_ENV !== "test",
 		bodyLimit: 16 * 1024 * 1024,
@@ -48,7 +46,6 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 				},
 				{
 					...options,
-					config,
 					logger: request.log,
 				},
 			);

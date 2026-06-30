@@ -1,23 +1,21 @@
 import {
 	type AgentPondConfig,
-	configFromEnv,
-	type ObjectStore,
+	type AuthConfig,
+	authFromRuntimeEnv,
+	sinkForConfig,
 } from "@agentpond/core";
 import {
-	type AuthMode,
 	handleIngestRequest,
 	type IngestionLogger,
 	type IngestionSink,
 } from "@agentpond/ingest";
-import { type GcsConfig, GcsObjectStore, gcsConfigFromEnv } from "./gcs.js";
+import { GcsObjectStore } from "./gcs.js";
 
 export type GoogleIngestFunctionOptions = {
-	config?: AgentPondConfig;
-	store?: ObjectStore;
-	gcs?: GcsConfig;
-	authMode?: AuthMode;
+	auth?: AuthConfig | false;
 	sink?: IngestionSink;
 	logger?: IngestionLogger;
+	pathPrefix?: string | string[];
 };
 
 export type GoogleHttpRequest = {
@@ -44,31 +42,73 @@ export type GoogleHttpIngestFunction = (
 export function createHttpIngestFunction(
 	options: GoogleIngestFunctionOptions = {},
 ): GoogleHttpIngestFunction {
-	const config = options.config ?? configFromEnv();
-	const store =
-		options.store ??
-		(options.sink
-			? undefined
-			: new GcsObjectStore(
-					options.gcs ?? gcsConfigFromEnv(config.environment?.envFilePath),
-				));
+	const sink = options.sink ?? GcsObjectStore.fromRuntimeEnv().toSink();
+	const auth = options.auth ?? googleAuthFromRuntimeEnv();
 
 	return async (req, res) => {
 		const response = await handleIngestRequest(
 			{
 				method: req.method ?? "GET",
-				path: req.originalUrl ?? req.url ?? req.path ?? "/",
+				path: requestPath(req, options.pathPrefix),
 				headers: req.headers,
 				body: requestBody(req),
 			},
 			{
 				...options,
-				config,
-				store,
+				auth,
+				sink,
 			},
 		);
 		res.status(response.status).set(response.headers).send(response.body);
 	};
+}
+
+export function googleAuthFromRuntimeEnv(
+	env: NodeJS.ProcessEnv = process.env,
+): AuthConfig {
+	return authFromRuntimeEnv({
+		...env,
+		AGENTPOND_PROJECT_ID:
+			env.AGENTPOND_PROJECT_ID ?? env.GCLOUD_PROJECT ?? env.GCP_PROJECT,
+	});
+}
+
+export function googleSinkForConfig(config: AgentPondConfig): IngestionSink {
+	return sinkForConfig(config, {
+		gcs: GcsObjectStore.fromEnvironment,
+	});
+}
+
+function requestPath(
+	req: GoogleHttpRequest,
+	pathPrefix?: string | string[],
+): string {
+	const rawPath = req.originalUrl ?? req.url ?? req.path ?? "/";
+	if (!pathPrefix) return rawPath;
+
+	const path = rawPath.split("?", 1)[0] || "/";
+	for (const prefix of normalizePathPrefixes(pathPrefix)) {
+		const exactIndex = path === prefix ? 0 : -1;
+		const segmentIndex = path.indexOf(`${prefix}/`);
+		const index = exactIndex >= 0 ? exactIndex : segmentIndex;
+		if (index < 0) continue;
+
+		const suffix = path.slice(index + prefix.length);
+		return suffix.startsWith("/") ? suffix : suffix ? `/${suffix}` : "/";
+	}
+	return path.startsWith("/") ? path : `/${path}`;
+}
+
+function normalizePathPrefixes(pathPrefix: string | string[]): string[] {
+	const prefixes = Array.isArray(pathPrefix) ? pathPrefix : [pathPrefix];
+	return prefixes
+		.map((prefix) => {
+			const withLeadingSlash = prefix.startsWith("/") ? prefix : `/${prefix}`;
+			return withLeadingSlash.endsWith("/") && withLeadingSlash !== "/"
+				? withLeadingSlash.slice(0, -1)
+				: withLeadingSlash;
+		})
+		.filter((prefix) => prefix !== "/");
 }
 
 function requestBody(

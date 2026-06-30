@@ -31,11 +31,15 @@ Authenticate GCS with Google Application Default Credentials or `GOOGLE_APPLICAT
 Provider package serverless ingestion exports:
 
 ```ts
-import { lambdaIngestHandler } from "@agentpond/aws";
-import { httpIngestFunction } from "@agentpond/google";
+import { lambdaIngestHandler, S3ObjectStore } from "@agentpond/aws";
+import {
+	createHttpIngestFunction,
+	GcsObjectStore,
+	httpIngestFunction,
+} from "@agentpond/google";
 ```
 
-Use `lambdaIngestHandler` for AWS Lambda Function URLs or API Gateway HTTP API v2, and `httpIngestFunction` for Google HTTP Cloud Functions.
+Use `lambdaIngestHandler` for AWS Lambda Function URLs or API Gateway HTTP API v2, `httpIngestFunction` for Google HTTP Cloud Functions, and `createHttpIngestFunction` with `pathPrefix` and `GcsObjectStore.fromRuntimeEnv().toSink()` for Firebase Functions.
 
 If no environment is selected, AgentPond uses `dev`. DuckDB caches are stored at `./.agentpond/envs/<name>/cache.duckdb`.
 

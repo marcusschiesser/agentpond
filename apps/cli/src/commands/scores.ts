@@ -149,7 +149,6 @@ export async function createScore(
 		await ensureDuckDbSchema(config.dbPath);
 		const result = await new DuckDbIngestionSink(config.dbPath).writeEvents({
 			projectId: config.projectId,
-			prefix: config.prefix,
 			events: [event],
 			source: "cli-dev-score",
 		});

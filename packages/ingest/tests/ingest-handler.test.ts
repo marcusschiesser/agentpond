@@ -2,21 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { gzipSync } from "node:zlib";
 import {
-	type AgentPondConfig,
+	type AuthConfig,
 	eventTypes,
 	MemoryObjectStore,
+	sinkFromStore,
 } from "@agentpond/core";
 import { handleIngestRequest } from "@agentpond/ingest";
 
-const config: AgentPondConfig = {
+const auth: AuthConfig = {
 	projectId: "project-a",
-	dbPath: "/tmp/agentpond-handler-test.duckdb",
-	prefix: "",
-	auth: {
-		projectId: "project-a",
-		publicKey: "pk",
-		secretKey: "sk",
-	},
+	publicKey: "pk",
+	secretKey: "sk",
 };
 
 function authHeader(): string {
@@ -54,7 +50,7 @@ test("pure ingest handler accepts JSON ingestion batches", async () => {
 				],
 			}),
 		},
-		{ config, store },
+		{ auth, sink: sinkFromStore(store) },
 	);
 
 	assert.equal(response.status, 207);
@@ -78,7 +74,7 @@ test("pure ingest handler accepts gzip OTEL JSON and underscore version headers"
 			},
 			body: gzipSync(JSON.stringify({ resourceSpans: [] })),
 		},
-		{ config, store },
+		{ auth, sink: sinkFromStore(store) },
 	);
 
 	assert.equal(response.status, 200);
@@ -96,9 +92,34 @@ test("pure ingest handler rejects invalid auth", async () => {
 			},
 			body: JSON.stringify({ batch: [] }),
 		},
-		{ config, store: new MemoryObjectStore() },
+		{ auth, sink: sinkFromStore(new MemoryObjectStore()) },
 	);
 
 	assert.equal(response.status, 401);
 	assert.equal(JSON.parse(response.body).error, "UnauthorizedError");
+});
+
+test("pure ingest handler can disable auth for dev ingestion", async () => {
+	const store = new MemoryObjectStore();
+	const response = await handleIngestRequest(
+		{
+			method: "POST",
+			path: "/api/public/ingestion",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				batch: [
+					{
+						id: "event-dev-1",
+						timestamp: "2026-06-14T00:00:00.000Z",
+						type: eventTypes.TRACE_CREATE,
+						body: { id: "trace-dev-1", name: "Dev Trace" },
+					},
+				],
+			}),
+		},
+		{ auth: false, sink: sinkFromStore(store) },
+	);
+
+	assert.equal(response.status, 207);
+	assert.equal((await store.listKeys("default-project/")).length > 0, true);
 });

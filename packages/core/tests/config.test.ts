@@ -11,11 +11,14 @@ import { join } from "node:path";
 import test from "node:test";
 import {
 	configFromEnv,
+	eventTypes,
 	FileSystemObjectStore,
 	initAgentPondEnvironment,
 	listAgentPondEnvironments,
 	resolveAgentPondEnvironment,
 	selectAgentPondEnvironment,
+	sinkForConfig,
+	sinkFromStore,
 } from "@agentpond/core";
 
 test("config defaults to the dev environment DuckDB cache", () => {
@@ -286,4 +289,59 @@ test("filesystem object store writes, reads, lists, and rejects escapes", async 
 		() => store.putJson("../outside.json", { bad: true }),
 		/Object key escapes store root/,
 	);
+});
+
+test("sinkFromStore writes accepted ingestion events to object storage", async () => {
+	const store = new FileSystemObjectStore(
+		mkdtempSync(join(tmpdir(), "agentpond-sink-")),
+	);
+	const sink = sinkFromStore(store, { prefix: "prefix/" });
+
+	await sink.writeEvents({
+		projectId: "project-a",
+		events: [
+			{
+				id: "event-sink-1",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "trace-sink-1", name: "Sink Trace" },
+			},
+		],
+	});
+
+	assert.equal((await store.listKeys("prefix/project-a/trace/")).length, 1);
+	assert.equal((await store.listKeys("prefix/project-a/manifests/")).length, 1);
+});
+
+test("sinkForConfig wraps the configured object store factory", async () => {
+	const originalCwd = process.cwd();
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-sink-config-"));
+	const store = new FileSystemObjectStore(
+		mkdtempSync(join(tmpdir(), "agentpond-sink-factory-")),
+	);
+	try {
+		process.chdir(cwd);
+		const env = initAgentPondEnvironment("gcs-env", { storeType: "gcs" });
+		writeFileSync(
+			env.envFilePath,
+			[
+				"AGENTPOND_STORE=gcs",
+				"AGENTPOND_PROJECT_ID=project-a",
+				"AGENTPOND_GCS_BUCKET=agentpond",
+				"",
+			].join("\n"),
+			"utf8",
+		);
+		const config = configFromEnv({ envName: "gcs-env" });
+		const sink = sinkForConfig(config, { gcs: () => store });
+
+		await sink.writeOtelResourceSpans({
+			projectId: config.projectId,
+			resourceSpans: [{ resource: {}, scopeSpans: [] }],
+		});
+
+		assert.equal((await store.listKeys("otel/project-a/")).length, 1);
+	} finally {
+		process.chdir(originalCwd);
+	}
 });
