@@ -368,11 +368,10 @@ test("sinkFromStore writes accepted ingestion events to object storage", async (
 	const store = new FileSystemObjectStore(
 		mkdtempSync(join(tmpdir(), "agentpond-sink-")),
 	);
-	const sink = sinkFromStore(store);
+	const sink = sinkFromStore(store, { prefix: "prefix/" });
 
 	await sink.writeEvents({
 		projectId: "project-a",
-		prefix: "prefix/",
 		events: [
 			{
 				id: "event-sink-1",
@@ -411,7 +410,6 @@ test("sinkForConfig wraps the configured object store factory", async () => {
 
 		await sink.writeOtelResourceSpans({
 			projectId: config.projectId,
-			prefix: config.prefix,
 			resourceSpans: [{ resource: {}, scopeSpans: [] }],
 		});
 

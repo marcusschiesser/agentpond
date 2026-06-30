@@ -12,7 +12,10 @@ const port = Number.parseInt(process.env.PORT ?? "3000", 10);
 const host = process.env.HOST ?? "0.0.0.0";
 const config = configFromEnv();
 
-const server = buildServer({ config, sink: ingestionSinkForConfig(config) });
+const server = buildServer({
+	auth: config.auth,
+	sink: ingestionSinkForConfig(config),
+});
 await server.listen({ port, host });
 
 function ingestionSinkForConfig(config: AgentPondConfig): IngestionSink {

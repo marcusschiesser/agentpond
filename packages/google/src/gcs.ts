@@ -1,8 +1,12 @@
 import {
 	type AgentPondEnvironment,
 	envValue,
+	type IngestionSink,
+	normalizePrefix,
 	type ObjectStore,
+	type ObjectStoreIngestionSinkOptions,
 	parseEnvFile,
+	sinkFromStore,
 } from "@agentpond/core";
 import { Storage } from "@google-cloud/storage";
 
@@ -10,12 +14,16 @@ export type GcsConfig = {
 	bucket: string;
 };
 
-export function gcsConfigFromEnv(envFilePath?: string): GcsConfig {
+function gcsConfigForAgentPondEnvironment(envFilePath?: string): GcsConfig {
 	const fileEnv = envFilePath ? parseEnvFile(envFilePath) : {};
 	const env = envValue(fileEnv);
 	return {
 		bucket: env("AGENTPOND_GCS_BUCKET") ?? "agentpond",
 	};
+}
+
+export function gcsConfigFromRuntimeEnv(): GcsConfig {
+	return gcsConfigForAgentPondEnvironment();
 }
 
 type GcsFile = {
@@ -41,7 +49,13 @@ export class GcsObjectStore implements ObjectStore {
 	static fromEnvironment(
 		environment: AgentPondEnvironment | undefined,
 	): GcsObjectStore {
-		return new GcsObjectStore(gcsConfigFromEnv(environment?.envFilePath));
+		return new GcsObjectStore(
+			gcsConfigForAgentPondEnvironment(environment?.envFilePath),
+		);
+	}
+
+	static fromRuntimeEnv(): GcsObjectStore {
+		return new GcsObjectStore(gcsConfigFromRuntimeEnv());
 	}
 
 	constructor(
@@ -49,6 +63,18 @@ export class GcsObjectStore implements ObjectStore {
 		storage: GcsStorage = new Storage(),
 	) {
 		this.bucket = storage.bucket(config.bucket);
+	}
+
+	toSink(options: ObjectStoreIngestionSinkOptions = {}): IngestionSink {
+		return sinkFromStore(this, {
+			prefix:
+				options.prefix ??
+				normalizePrefix(
+					process.env.AGENTPOND_PREFIX ??
+						process.env.AGENTPOND_GCS_PREFIX ??
+						"",
+				),
+		});
 	}
 
 	async putJson(key: string, value: unknown): Promise<void> {

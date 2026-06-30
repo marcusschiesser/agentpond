@@ -1,9 +1,13 @@
 import {
 	type AgentPondEnvironment,
 	envValue,
+	type IngestionSink,
 	nonEmpty,
+	normalizePrefix,
 	type ObjectStore,
+	type ObjectStoreIngestionSinkOptions,
 	parseEnvFile,
+	sinkFromStore,
 } from "@agentpond/core";
 import {
 	GetObjectCommand,
@@ -21,7 +25,7 @@ export type S3Config = {
 	forcePathStyle: boolean;
 };
 
-export function s3ConfigFromEnv(envFilePath?: string): S3Config {
+function s3ConfigForAgentPondEnvironment(envFilePath?: string): S3Config {
 	const fileEnv = envFilePath ? parseEnvFile(envFilePath) : {};
 	const env = envValue(fileEnv);
 	return {
@@ -39,13 +43,23 @@ export function s3ConfigFromEnv(envFilePath?: string): S3Config {
 	};
 }
 
+export function s3ConfigFromRuntimeEnv(): S3Config {
+	return s3ConfigForAgentPondEnvironment();
+}
+
 export class S3ObjectStore implements ObjectStore {
 	private readonly client: S3Client;
 
 	static fromEnvironment(
 		environment: AgentPondEnvironment | undefined,
 	): S3ObjectStore {
-		return new S3ObjectStore(s3ConfigFromEnv(environment?.envFilePath));
+		return new S3ObjectStore(
+			s3ConfigForAgentPondEnvironment(environment?.envFilePath),
+		);
+	}
+
+	static fromRuntimeEnv(): S3ObjectStore {
+		return new S3ObjectStore(s3ConfigFromRuntimeEnv());
 	}
 
 	constructor(private readonly config: S3Config) {
@@ -60,6 +74,16 @@ export class S3ObjectStore implements ObjectStore {
 							secretAccessKey: config.secretAccessKey,
 						}
 					: undefined,
+		});
+	}
+
+	toSink(options: ObjectStoreIngestionSinkOptions = {}): IngestionSink {
+		return sinkFromStore(this, {
+			prefix:
+				options.prefix ??
+				normalizePrefix(
+					process.env.AGENTPOND_PREFIX ?? process.env.AGENTPOND_S3_PREFIX ?? "",
+				),
 		});
 	}
 

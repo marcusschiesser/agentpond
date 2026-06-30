@@ -37,5 +37,7 @@ export function sinkForConfig(
 	config: AgentPondConfig,
 	factories: ConfiguredObjectStoreFactories,
 ): IngestionSink {
-	return sinkFromStore(objectStoreForConfig(config, factories));
+	return sinkFromStore(objectStoreForConfig(config, factories), {
+		prefix: config.prefix,
+	});
 }

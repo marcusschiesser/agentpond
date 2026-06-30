@@ -86,7 +86,7 @@ Environment files are stored at `.agentpond/envs/<name>.env`. If no environment 
 
 GCS environments use `AGENTPOND_GCS_BUCKET` and authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. All storage providers use `AGENTPOND_PREFIX` for an optional object key prefix.
 
-For serverless ingestion deployments, `@agentpond/aws` exports `lambdaIngestHandler` and `awsSinkForConfig` for AWS Lambda Function URLs or API Gateway HTTP API v2, and `@agentpond/google` exports `httpIngestFunction`, `createHttpIngestFunction`, and `googleSinkForConfig` for Google HTTP Cloud Functions. Firebase Functions can use `createHttpIngestFunction` with `pathPrefix` and a sink from `googleSinkForConfig`. These handlers use the same Langfuse-compatible ingestion endpoints as `agentpond dev`.
+For serverless ingestion deployments, `@agentpond/aws` exports `lambdaIngestHandler`, `createLambdaIngestHandler`, and `S3ObjectStore` for AWS Lambda Function URLs or API Gateway HTTP API v2, and `@agentpond/google` exports `httpIngestFunction`, `createHttpIngestFunction`, and `GcsObjectStore` for Google HTTP Cloud Functions. Firebase Functions can use `createHttpIngestFunction` with `pathPrefix` and `GcsObjectStore.fromRuntimeEnv().toSink()` to strip Firebase function URL prefixes and write to GCS using deployment environment variables. These handlers use the same Langfuse-compatible ingestion endpoints as `agentpond dev`.
 
 ## Dev Server
 

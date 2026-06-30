@@ -65,6 +65,21 @@ export function configFromEnv(
 	};
 }
 
+export function authFromRuntimeEnv(
+	env: NodeJS.ProcessEnv = process.env,
+): AuthConfig {
+	const projectId =
+		env.AGENTPOND_PROJECT_ID ??
+		env.GCLOUD_PROJECT ??
+		env.GCP_PROJECT ??
+		"default-project";
+	return {
+		projectId,
+		publicKey: env.LANGFUSE_PUBLIC_KEY ?? "pk-agentpond",
+		secretKey: env.LANGFUSE_SECRET_KEY ?? "sk-agentpond",
+	};
+}
+
 export function normalizePrefix(prefix: string): string {
 	if (!prefix) return "";
 	return prefix.endsWith("/") ? prefix : `${prefix}/`;

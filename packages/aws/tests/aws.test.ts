@@ -1,84 +1,72 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import test from "node:test";
 import { gzipSync } from "node:zlib";
-import { createLambdaIngestHandler, s3ConfigFromEnv } from "@agentpond/aws";
 import {
-	type AgentPondConfig,
+	createLambdaIngestHandler,
+	S3ObjectStore,
+	s3ConfigFromRuntimeEnv,
+} from "@agentpond/aws";
+import {
+	type AuthConfig,
 	eventTypes,
 	MemoryObjectStore,
 	sinkFromStore,
 } from "@agentpond/core";
 
-const config: AgentPondConfig = {
+const auth: AuthConfig = {
 	projectId: "project-a",
-	dbPath: "/tmp/agentpond-aws-test.duckdb",
-	prefix: "",
-	auth: {
-		projectId: "project-a",
-		publicKey: "pk",
-		secretKey: "sk",
-	},
+	publicKey: "pk",
+	secretKey: "sk",
 };
 
 function authHeader(): string {
 	return `Basic ${Buffer.from("pk:sk").toString("base64")}`;
 }
 
-test("S3 config reads provider settings from env files below process env", () => {
+test("S3 config reads provider settings from runtime env", () => {
+	const originalBucket = process.env.AGENTPOND_S3_BUCKET;
+	const originalEndpoint = process.env.AGENTPOND_S3_ENDPOINT;
+	const originalS3Region = process.env.AGENTPOND_S3_REGION;
 	const originalAccessKey = process.env.AWS_ACCESS_KEY_ID;
 	const originalSecretKey = process.env.AWS_SECRET_ACCESS_KEY;
 	const originalRegion = process.env.AWS_REGION;
-	const envFile = join(
-		mkdtempSync(join(tmpdir(), "agentpond-aws-")),
-		"aws.env",
-	);
-	writeFileSync(
-		envFile,
-		[
-			"AGENTPOND_S3_BUCKET=file-bucket",
-			"AGENTPOND_S3_ENDPOINT=http://localhost:9000",
-			"AGENTPOND_S3_REGION=us-east-1",
-			"AGENTPOND_S3_ACCESS_KEY_ID=file-access",
-			"AGENTPOND_S3_SECRET_ACCESS_KEY=file-secret",
-			"AGENTPOND_S3_FORCE_PATH_STYLE=false",
-			"",
-		].join("\n"),
-		"utf8",
-	);
+	const originalForcePathStyle = process.env.AGENTPOND_S3_FORCE_PATH_STYLE;
 
 	try {
-		delete process.env.AWS_ACCESS_KEY_ID;
-		delete process.env.AWS_SECRET_ACCESS_KEY;
-		delete process.env.AWS_REGION;
+		process.env.AGENTPOND_S3_BUCKET = "runtime-bucket";
+		process.env.AGENTPOND_S3_ENDPOINT = "http://localhost:9000";
+		process.env.AGENTPOND_S3_REGION = "us-east-1";
+		process.env.AWS_ACCESS_KEY_ID = "runtime-access";
+		process.env.AWS_SECRET_ACCESS_KEY = "runtime-secret";
+		process.env.AGENTPOND_S3_FORCE_PATH_STYLE = "false";
 
-		assert.deepEqual(s3ConfigFromEnv(envFile), {
-			bucket: "file-bucket",
+		assert.deepEqual(s3ConfigFromRuntimeEnv(), {
+			bucket: "runtime-bucket",
 			endpoint: "http://localhost:9000",
 			region: "us-east-1",
-			accessKeyId: "file-access",
-			secretAccessKey: "file-secret",
+			accessKeyId: "runtime-access",
+			secretAccessKey: "runtime-secret",
 			forcePathStyle: false,
 		});
 
-		process.env.AWS_ACCESS_KEY_ID = "process-access";
-		process.env.AWS_SECRET_ACCESS_KEY = "process-secret";
 		process.env.AWS_REGION = "eu-central-1";
 
-		assert.deepEqual(s3ConfigFromEnv(envFile), {
-			bucket: "file-bucket",
+		assert.deepEqual(s3ConfigFromRuntimeEnv(), {
+			bucket: "runtime-bucket",
 			endpoint: "http://localhost:9000",
 			region: "eu-central-1",
-			accessKeyId: "process-access",
-			secretAccessKey: "process-secret",
+			accessKeyId: "runtime-access",
+			secretAccessKey: "runtime-secret",
 			forcePathStyle: false,
 		});
 	} finally {
+		restoreEnv("AGENTPOND_S3_BUCKET", originalBucket);
+		restoreEnv("AGENTPOND_S3_ENDPOINT", originalEndpoint);
+		restoreEnv("AGENTPOND_S3_REGION", originalS3Region);
 		restoreEnv("AWS_ACCESS_KEY_ID", originalAccessKey);
 		restoreEnv("AWS_SECRET_ACCESS_KEY", originalSecretKey);
 		restoreEnv("AWS_REGION", originalRegion);
+		restoreEnv("AGENTPOND_S3_FORCE_PATH_STYLE", originalForcePathStyle);
 	}
 });
 
@@ -90,9 +78,47 @@ function restoreEnv(name: string, value: string | undefined): void {
 	process.env[name] = value;
 }
 
+test("S3 object store creates sink with runtime prefix", async () => {
+	const keys: string[] = [];
+	const store = new S3ObjectStore({
+		bucket: "agentpond",
+		region: "us-east-1",
+		forcePathStyle: true,
+	});
+	(
+		store as unknown as {
+			client: {
+				send: (command: { input: { Key?: string } }) => Promise<unknown>;
+			};
+		}
+	).client = {
+		send: async (command) => {
+			if (command.input.Key) keys.push(command.input.Key);
+			return {};
+		},
+	};
+
+	await store.toSink({ prefix: "prod" }).writeEvents({
+		projectId: "project-a",
+		events: [
+			{
+				id: "event-aws-sink-1",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "trace-aws-sink-1" },
+			},
+		],
+	});
+
+	assert.equal(
+		keys.every((key) => key.startsWith("prod/project-a/")),
+		true,
+	);
+});
+
 test("AWS Lambda ingest handler responds to health checks", async () => {
 	const handler = createLambdaIngestHandler({
-		config,
+		auth,
 		sink: sinkFromStore(new MemoryObjectStore()),
 	});
 	const response = await handler({
@@ -108,7 +134,7 @@ test("AWS Lambda ingest handler responds to health checks", async () => {
 test("AWS Lambda ingest handler accepts JSON ingestion batches", async () => {
 	const store = new MemoryObjectStore();
 	const handler = createLambdaIngestHandler({
-		config,
+		auth,
 		sink: sinkFromStore(store),
 	});
 	const response = await handler({
@@ -139,7 +165,7 @@ test("AWS Lambda ingest handler accepts JSON ingestion batches", async () => {
 
 test("AWS Lambda ingest handler accepts base64 gzip OTEL JSON", async () => {
 	const handler = createLambdaIngestHandler({
-		config,
+		auth,
 		sink: sinkFromStore(new MemoryObjectStore()),
 	});
 	const response = await handler({
@@ -161,7 +187,7 @@ test("AWS Lambda ingest handler accepts base64 gzip OTEL JSON", async () => {
 
 test("AWS Lambda ingest handler maps auth errors", async () => {
 	const handler = createLambdaIngestHandler({
-		config,
+		auth,
 		sink: sinkFromStore(new MemoryObjectStore()),
 	});
 	const response = await handler({
