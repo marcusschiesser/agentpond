@@ -7,6 +7,7 @@ import {
 	type AgentPondConfig,
 	eventTypes,
 	MemoryObjectStore,
+	sinkFromStore,
 } from "@agentpond/core";
 import {
 	createHttpIngestFunction,
@@ -95,7 +96,7 @@ test("GCS object store writes, reads, and lists JSON objects", async () => {
 test("Google HTTP ingest function responds to health checks", async () => {
 	const fn = createHttpIngestFunction({
 		config,
-		store: new MemoryObjectStore(),
+		sink: sinkFromStore(new MemoryObjectStore()),
 	});
 	const res = createResponse();
 
@@ -107,7 +108,7 @@ test("Google HTTP ingest function responds to health checks", async () => {
 
 test("Google HTTP ingest function accepts JSON ingestion from rawBody", async () => {
 	const store = new MemoryObjectStore();
-	const fn = createHttpIngestFunction({ config, store });
+	const fn = createHttpIngestFunction({ config, sink: sinkFromStore(store) });
 	const res = createResponse();
 
 	await fn(
@@ -145,7 +146,7 @@ test("Google HTTP ingest function strips configured path prefixes", async () => 
 	const store = new MemoryObjectStore();
 	const fn = createHttpIngestFunction({
 		config,
-		store,
+		sink: sinkFromStore(store),
 		pathPrefix: "/agentPondIngest",
 	});
 	const res = createResponse();
@@ -170,7 +171,7 @@ test("Google HTTP ingest function strips configured path prefixes", async () => 
 test("Google HTTP ingest function leaves unprefixed paths routable when path prefixes are configured", async () => {
 	const fn = createHttpIngestFunction({
 		config,
-		store: new MemoryObjectStore(),
+		sink: sinkFromStore(new MemoryObjectStore()),
 		pathPrefix: "/agentPondIngest",
 	});
 	const res = createResponse();
@@ -184,7 +185,7 @@ test("Google HTTP ingest function leaves unprefixed paths routable when path pre
 test("Google HTTP ingest function forwards OTEL headers", async () => {
 	const fn = createHttpIngestFunction({
 		config,
-		store: new MemoryObjectStore(),
+		sink: sinkFromStore(new MemoryObjectStore()),
 	});
 	const res = createResponse();
 
@@ -209,7 +210,7 @@ test("Google HTTP ingest function forwards OTEL headers", async () => {
 test("Google HTTP ingest function maps auth errors", async () => {
 	const fn = createHttpIngestFunction({
 		config,
-		store: new MemoryObjectStore(),
+		sink: sinkFromStore(new MemoryObjectStore()),
 	});
 	const res = createResponse();
 

@@ -9,6 +9,7 @@ import {
 	type AgentPondConfig,
 	eventTypes,
 	MemoryObjectStore,
+	sinkFromStore,
 } from "@agentpond/core";
 
 const config: AgentPondConfig = {
@@ -92,7 +93,7 @@ function restoreEnv(name: string, value: string | undefined): void {
 test("AWS Lambda ingest handler responds to health checks", async () => {
 	const handler = createLambdaIngestHandler({
 		config,
-		store: new MemoryObjectStore(),
+		sink: sinkFromStore(new MemoryObjectStore()),
 	});
 	const response = await handler({
 		rawPath: "/health",
@@ -106,7 +107,10 @@ test("AWS Lambda ingest handler responds to health checks", async () => {
 
 test("AWS Lambda ingest handler accepts JSON ingestion batches", async () => {
 	const store = new MemoryObjectStore();
-	const handler = createLambdaIngestHandler({ config, store });
+	const handler = createLambdaIngestHandler({
+		config,
+		sink: sinkFromStore(store),
+	});
 	const response = await handler({
 		rawPath: "/api/public/ingestion",
 		requestContext: { http: { method: "POST" } },
@@ -136,7 +140,7 @@ test("AWS Lambda ingest handler accepts JSON ingestion batches", async () => {
 test("AWS Lambda ingest handler accepts base64 gzip OTEL JSON", async () => {
 	const handler = createLambdaIngestHandler({
 		config,
-		store: new MemoryObjectStore(),
+		sink: sinkFromStore(new MemoryObjectStore()),
 	});
 	const response = await handler({
 		rawPath: "/api/public/otel/v1/traces",
@@ -158,7 +162,7 @@ test("AWS Lambda ingest handler accepts base64 gzip OTEL JSON", async () => {
 test("AWS Lambda ingest handler maps auth errors", async () => {
 	const handler = createLambdaIngestHandler({
 		config,
-		store: new MemoryObjectStore(),
+		sink: sinkFromStore(new MemoryObjectStore()),
 	});
 	const response = await handler({
 		rawPath: "/api/public/ingestion",

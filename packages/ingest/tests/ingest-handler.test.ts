@@ -5,6 +5,7 @@ import {
 	type AgentPondConfig,
 	eventTypes,
 	MemoryObjectStore,
+	sinkFromStore,
 } from "@agentpond/core";
 import { handleIngestRequest } from "@agentpond/ingest";
 
@@ -54,7 +55,7 @@ test("pure ingest handler accepts JSON ingestion batches", async () => {
 				],
 			}),
 		},
-		{ config, store },
+		{ config, sink: sinkFromStore(store) },
 	);
 
 	assert.equal(response.status, 207);
@@ -78,7 +79,7 @@ test("pure ingest handler accepts gzip OTEL JSON and underscore version headers"
 			},
 			body: gzipSync(JSON.stringify({ resourceSpans: [] })),
 		},
-		{ config, store },
+		{ config, sink: sinkFromStore(store) },
 	);
 
 	assert.equal(response.status, 200);
@@ -96,7 +97,7 @@ test("pure ingest handler rejects invalid auth", async () => {
 			},
 			body: JSON.stringify({ batch: [] }),
 		},
-		{ config, store: new MemoryObjectStore() },
+		{ config, sink: sinkFromStore(new MemoryObjectStore()) },
 	);
 
 	assert.equal(response.status, 401);

@@ -1,7 +1,7 @@
 import {
 	type AgentPondConfig,
 	configFromEnv,
-	type ObjectStore,
+	sinkForConfig,
 } from "@agentpond/core";
 import {
 	type AuthMode,
@@ -9,12 +9,10 @@ import {
 	type IngestionLogger,
 	type IngestionSink,
 } from "@agentpond/ingest";
-import { type GcsConfig, GcsObjectStore, gcsConfigFromEnv } from "./gcs.js";
+import { GcsObjectStore } from "./gcs.js";
 
 export type GoogleIngestFunctionOptions = {
 	config?: AgentPondConfig;
-	store?: ObjectStore;
-	gcs?: GcsConfig;
 	authMode?: AuthMode;
 	sink?: IngestionSink;
 	logger?: IngestionLogger;
@@ -45,14 +43,8 @@ export type GoogleHttpIngestFunction = (
 export function createHttpIngestFunction(
 	options: GoogleIngestFunctionOptions = {},
 ): GoogleHttpIngestFunction {
-	const config = options.config ?? configFromEnv();
-	const store =
-		options.store ??
-		(options.sink
-			? undefined
-			: new GcsObjectStore(
-					options.gcs ?? gcsConfigFromEnv(config.environment?.envFilePath),
-				));
+	const config = options.config ?? configFromEnv({ storeType: "gcs" });
+	const sink = options.sink ?? googleSinkForConfig(config);
 
 	return async (req, res) => {
 		const response = await handleIngestRequest(
@@ -65,11 +57,17 @@ export function createHttpIngestFunction(
 			{
 				...options,
 				config,
-				store,
+				sink,
 			},
 		);
 		res.status(response.status).set(response.headers).send(response.body);
 	};
+}
+
+export function googleSinkForConfig(config: AgentPondConfig): IngestionSink {
+	return sinkForConfig(config, {
+		gcs: GcsObjectStore.fromEnvironment,
+	});
 }
 
 function requestPath(

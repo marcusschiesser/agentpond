@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { S3ObjectStore } from "@agentpond/aws";
+import { sinkFromStore } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/fastify-ingest";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
@@ -33,7 +34,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 	logStep("confirmed S3 prefix is empty");
 
 	process.env.NODE_ENV = "test";
-	const server = buildServer({ config, store });
+	const server = buildServer({ config, sink: sinkFromStore(store) });
 	const address = await server.listen({ host: "127.0.0.1", port: 0 });
 	configureLangfuseEnv(address, args);
 	logStep(`started in-process ingestion server at ${address}`);

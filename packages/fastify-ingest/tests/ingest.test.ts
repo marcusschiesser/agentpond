@@ -9,6 +9,7 @@ import {
 	eventTypes,
 	MemoryObjectStore,
 	otelBodyToEvents,
+	sinkFromStore,
 } from "@agentpond/core";
 import { AgentPondCache, DuckDbIngestionSink } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/fastify-ingest";
@@ -35,7 +36,7 @@ async function postOtelJson(
 	payload: unknown,
 	headers: Record<string, string> = {},
 ) {
-	const server = buildServer({ config, store });
+	const server = buildServer({ config, sink: sinkFromStore(store) });
 	try {
 		return await server.inject({
 			method: "POST",
@@ -124,7 +125,7 @@ function ingestedOtelPayloadLogs(
 
 test("ingestion endpoint validates auth and returns 207 batch result", async () => {
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store });
+	const server = buildServer({ config, sink: sinkFromStore(store) });
 	const response = await server.inject({
 		method: "POST",
 		url: "/api/public/ingestion",
@@ -153,7 +154,11 @@ test("ingestion endpoint validates auth and returns 207 batch result", async () 
 test("ingestion endpoint logs each accepted event", async () => {
 	const logs: CapturedLog[] = [];
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store, logger: captureLogger(logs) });
+	const server = buildServer({
+		config,
+		sink: sinkFromStore(store),
+		logger: captureLogger(logs),
+	});
 	const response = await server.inject({
 		method: "POST",
 		url: "/api/public/ingestion",
@@ -213,7 +218,7 @@ test("ingestion endpoint logs each accepted event", async () => {
 
 test("ingestion endpoint accepts empty batches without writing a manifest", async () => {
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store });
+	const server = buildServer({ config, sink: sinkFromStore(store) });
 	const response = await server.inject({
 		method: "POST",
 		url: "/api/public/ingestion",
@@ -233,7 +238,7 @@ test("ingestion endpoint accepts empty batches without writing a manifest", asyn
 test("ingestion endpoint rejects missing or non-array batches", async () => {
 	for (const payload of [{}, { batch: {} }]) {
 		const store = new MemoryObjectStore();
-		const server = buildServer({ config, store });
+		const server = buildServer({ config, sink: sinkFromStore(store) });
 		const response = await server.inject({
 			method: "POST",
 			url: "/api/public/ingestion",
@@ -253,7 +258,11 @@ test("ingestion endpoint rejects missing or non-array batches", async () => {
 test("ingestion endpoint does not log rejected payloads", async () => {
 	const logs: CapturedLog[] = [];
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store, logger: captureLogger(logs) });
+	const server = buildServer({
+		config,
+		sink: sinkFromStore(store),
+		logger: captureLogger(logs),
+	});
 	const response = await server.inject({
 		method: "POST",
 		url: "/api/public/ingestion",
@@ -279,7 +288,7 @@ test("ingestion endpoint rejects invalid auth without writing objects", async ()
 
 	for (const headers of cases) {
 		const store = new MemoryObjectStore();
-		const server = buildServer({ config, store });
+		const server = buildServer({ config, sink: sinkFromStore(store) });
 		const response = await server.inject({
 			method: "POST",
 			url: "/api/public/ingestion",
@@ -413,7 +422,11 @@ test("otel generation costs project end-to-end into DuckDB", async () => {
 test("otel endpoint logs the ingested OTEL payload", async () => {
 	const logs: CapturedLog[] = [];
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store, logger: captureLogger(logs) });
+	const server = buildServer({
+		config,
+		sink: sinkFromStore(store),
+		logger: captureLogger(logs),
+	});
 	const response = await server.inject({
 		method: "POST",
 		url: "/api/public/otel/v1/traces",
@@ -961,7 +974,7 @@ test("otel handles id and timestamp edge cases", async () => {
 	);
 
 	const protobufStore = new MemoryObjectStore();
-	const server = buildServer({ config, store: protobufStore });
+	const server = buildServer({ config, sink: sinkFromStore(protobufStore) });
 	const protobufResponse = await server.inject({
 		method: "POST",
 		url: "/api/public/otel/v1/traces",
@@ -1022,7 +1035,7 @@ test("otel ignores malformed usage and cost attributes without rejecting the spa
 
 test("otel endpoint accepts ingestion version header in underscore format", async () => {
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store });
+	const server = buildServer({ config, sink: sinkFromStore(store) });
 	const response = await server.inject({
 		method: "POST",
 		url: "/api/public/otel/v1/traces",
@@ -1059,7 +1072,7 @@ test("otel endpoint accepts ingestion version header in underscore format", asyn
 
 test("otel endpoint accepts gzip JSON bodies", async () => {
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store });
+	const server = buildServer({ config, sink: sinkFromStore(store) });
 	const response = await server.inject({
 		method: "POST",
 		url: "/api/public/otel/v1/traces",
@@ -1100,7 +1113,7 @@ test("otel endpoint accepts gzip JSON bodies", async () => {
 
 test("otel endpoint accepts protobuf trace bodies", async () => {
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store });
+	const server = buildServer({ config, sink: sinkFromStore(store) });
 	const payload = makeOtlpTraceProtobuf();
 	const response = await server.inject({
 		method: "POST",
@@ -1120,7 +1133,10 @@ test("otel endpoint accepts protobuf trace bodies", async () => {
 });
 
 test("otel endpoint rejects invalid content types", async () => {
-	const server = buildServer({ config, store: new MemoryObjectStore() });
+	const server = buildServer({
+		config,
+		sink: sinkFromStore(new MemoryObjectStore()),
+	});
 	const response = await server.inject({
 		method: "POST",
 		url: "/api/public/otel/v1/traces",
@@ -1136,7 +1152,10 @@ test("otel endpoint rejects invalid content types", async () => {
 });
 
 test("otel endpoint rejects unsupported ingestion versions", async () => {
-	const server = buildServer({ config, store: new MemoryObjectStore() });
+	const server = buildServer({
+		config,
+		sink: sinkFromStore(new MemoryObjectStore()),
+	});
 	const response = await server.inject({
 		method: "POST",
 		url: "/api/public/otel/v1/traces",

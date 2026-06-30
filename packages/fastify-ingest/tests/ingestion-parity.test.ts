@@ -7,6 +7,7 @@ import {
 	type AgentPondConfig,
 	type BatchManifest,
 	MemoryObjectStore,
+	sinkFromStore,
 } from "@agentpond/core";
 import { buildServer } from "@agentpond/fastify-ingest";
 
@@ -65,7 +66,7 @@ function authHeader(): string {
 
 test("non-OTEL ingestion stores Langfuse-compatible event payload objects and AgentPond manifests", async () => {
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store });
+	const server = buildServer({ config, sink: sinkFromStore(store) });
 	try {
 		const response = await server.inject({
 			method: "POST",
@@ -117,7 +118,7 @@ test("non-OTEL ingestion stores Langfuse-compatible event payload objects and Ag
 
 test("OTEL ingestion stores raw Langfuse-compatible resourceSpans without an AgentPond manifest", async () => {
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store });
+	const server = buildServer({ config, sink: sinkFromStore(store) });
 	try {
 		const response = await server.inject({
 			method: "POST",
@@ -164,7 +165,7 @@ test("OTEL ingestion stores raw Langfuse-compatible resourceSpans without an Age
 
 test("protobuf OTEL ingestion stores Langfuse-compatible decoded resourceSpans without an AgentPond manifest", async () => {
 	const store = new MemoryObjectStore();
-	const server = buildServer({ config, store });
+	const server = buildServer({ config, sink: sinkFromStore(store) });
 	try {
 		const response = await server.inject({
 			method: "POST",
