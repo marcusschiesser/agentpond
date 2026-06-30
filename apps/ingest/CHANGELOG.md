@@ -1,5 +1,20 @@
 # @agentpond/ingest-service
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [faa24c2]
+- Updated dependencies [faa24c2]
+- Updated dependencies [faa24c2]
+- Updated dependencies [faa24c2]
+- Updated dependencies [faa24c2]
+- Updated dependencies [faa24c2]
+  - @agentpond/aws@0.3.0
+  - @agentpond/google@0.3.0
+  - @agentpond/fastify-ingest@0.3.0
+  - @agentpond/core@0.3.0
+
 ## 0.1.2
 
 ### Patch Changes
