@@ -1,7 +1,7 @@
 import {
 	type AgentPondConfig,
-	authFromRuntimeEnv,
 	type AuthConfig,
+	authFromRuntimeEnv,
 	sinkForConfig,
 } from "@agentpond/core";
 import {
