@@ -18,3 +18,7 @@ minimumReleaseAgeExclude:
   - '@duckdb/node-bindings-win32-arm64@1.5.4-r.1'
   - '@duckdb/node-bindings-win32-x64@1.5.4-r.1'
   - '@duckdb/node-bindings@1.5.4-r.1'
+  - uuid@11.1.1
+
+overrides:
+  uuid@<11.1.1: ^11.1.1

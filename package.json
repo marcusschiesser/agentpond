@@ -10,6 +10,7 @@
 	},
 	"scripts": {
 		"build": "tsc -b && pnpm -r --if-present build",
+		"audit:prod": "pnpm audit --prod",
 		"format": "biome format --write . --files-ignore-unknown=true",
 		"format:check": "biome format . --files-ignore-unknown=true",
 		"lint": "biome lint . --files-ignore-unknown=true",

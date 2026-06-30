@@ -4,7 +4,7 @@ import type {
 	AgentPondStoreType,
 } from "../environment.js";
 import { FileSystemObjectStore } from "./filesystem.js";
-import { sinkFromStore, type IngestionSink } from "./ingestion-handler.js";
+import { type IngestionSink, sinkFromStore } from "./ingestion-handler.js";
 import type { ObjectStore } from "./types.js";
 
 type ObjectStoreFactory = (

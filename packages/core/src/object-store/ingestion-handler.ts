@@ -1,7 +1,7 @@
-import type { IngestionEvent } from "../schemas.js";
-import { AcceptedEventWriter } from "../writer.js";
-import type { BatchManifest, OtelStorageObject } from "../writer.js";
 import { normalizePrefix } from "../config.js";
+import type { IngestionEvent } from "../schemas.js";
+import type { BatchManifest, OtelStorageObject } from "../writer.js";
+import { AcceptedEventWriter } from "../writer.js";
 import type { ObjectStore } from "./types.js";
 
 export type IngestionSink = {
