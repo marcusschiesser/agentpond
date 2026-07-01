@@ -1,5 +1,14 @@
 # @agentpond/duckdb
 
+## 0.3.1
+
+### Patch Changes
+
+- 113f5d6: Allow environment path resolution and DuckDB ingestion sinks to use detected workspace roots from nested packages.
+- 3dd8d6e: Serialize local DuckDB writes and retry transient lock conflicts during ingestion.
+- Updated dependencies [113f5d6]
+  - @agentpond/core@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes

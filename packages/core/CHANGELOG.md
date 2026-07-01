@@ -1,5 +1,11 @@
 # @agentpond/core
 
+## 0.3.1
+
+### Patch Changes
+
+- 113f5d6: Allow environment path resolution and DuckDB ingestion sinks to use detected workspace roots from nested packages.
+
 ## 0.3.0
 
 ### Minor Changes
