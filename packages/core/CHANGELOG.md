@@ -1,5 +1,11 @@
 # @agentpond/core
 
+## 0.3.2
+
+### Patch Changes
+
+- 80d86d1: Support configuring AWS SDK S3 checksum behavior for S3-compatible storage providers such as Hugging Face Storage Buckets.
+
 ## 0.3.1
 
 ### Patch Changes
