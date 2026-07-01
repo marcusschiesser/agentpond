@@ -1,5 +1,13 @@
 # agentpond
 
+## 0.3.5
+
+### Patch Changes
+
+- e06acf4: Support Hugging Face Storage Buckets by following redirected object downloads.
+- Updated dependencies [e06acf4]
+  - @agentpond/aws@0.3.3
+
 ## 0.3.4
 
 ### Patch Changes

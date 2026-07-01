@@ -1,5 +1,12 @@
 # @agentpond/perf
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [e06acf4]
+  - @agentpond/aws@0.3.3
+
 ## 0.1.4
 
 ### Patch Changes

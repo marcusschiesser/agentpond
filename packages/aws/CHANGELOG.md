@@ -1,5 +1,11 @@
 # @agentpond/aws
 
+## 0.3.3
+
+### Patch Changes
+
+- e06acf4: Support Hugging Face Storage Buckets by following redirected object downloads.
+
 ## 0.3.2
 
 ### Patch Changes
