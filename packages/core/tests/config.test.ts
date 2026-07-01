@@ -77,6 +77,15 @@ test("generated environment files document defaults and S3 settings", () => {
 		assert.match(productionFile, /AGENTPOND_S3_SECRET_ACCESS_KEY=minio123/);
 		assert.match(productionFile, /Use true for MinIO/);
 		assert.match(productionFile, /AGENTPOND_S3_FORCE_PATH_STYLE=true/);
+		assert.match(productionFile, /S3-compatible providers/);
+		assert.match(
+			productionFile,
+			/# AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION=WHEN_REQUIRED/,
+		);
+		assert.match(
+			productionFile,
+			/# AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION=WHEN_REQUIRED/,
+		);
 	} finally {
 		process.chdir(originalCwd);
 	}
@@ -95,10 +104,14 @@ test("generated environment files document local and GCS settings", () => {
 		assert.match(localFile, /AGENTPOND_STORE=local/);
 		assert.match(localFile, /AGENTPOND_PREFIX=/);
 		assert.doesNotMatch(localFile, /AGENTPOND_S3_BUCKET/);
+		assert.doesNotMatch(localFile, /AGENTPOND_S3_REQUEST_CHECKSUM/);
+		assert.doesNotMatch(localFile, /AGENTPOND_S3_RESPONSE_CHECKSUM/);
 		assert.match(gcsFile, /AGENTPOND_STORE=gcs/);
 		assert.match(gcsFile, /AGENTPOND_PREFIX=/);
 		assert.match(gcsFile, /AGENTPOND_GCS_BUCKET=agentpond/);
 		assert.doesNotMatch(gcsFile, /AGENTPOND_GCS_PREFIX=/);
+		assert.doesNotMatch(gcsFile, /AGENTPOND_S3_REQUEST_CHECKSUM/);
+		assert.doesNotMatch(gcsFile, /AGENTPOND_S3_RESPONSE_CHECKSUM/);
 		assert.match(gcsFile, /Application Default Credentials/);
 		assert.equal(configFromEnv({ envName: "local-env" }).prefix, "");
 		assert.equal(

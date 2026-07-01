@@ -82,6 +82,8 @@ npx agentpond env init staging --store local
 
 Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings. GCS environments use Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Do not ask users to paste secrets into chat.
 
+For Hugging Face Storage Buckets, use the S3-compatible endpoint and checksum settings from <https://huggingface.co/docs/hub/storage-buckets-s3>.
+
 Common inspection flow for `dev`:
 
 ```bash

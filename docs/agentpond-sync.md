@@ -2,7 +2,7 @@
 
 ## Goal
 
-AgentPond stores raw OTEL payloads and Langfuse-compatible score ingestion events in remote object storage (e.g. S3) and uses DuckDB as a local query cache. Object storage is the durable source of truth; DuckDB is the materialized analysis layer.
+AgentPond stores raw OTEL payloads and Langfuse-compatible score ingestion events in remote object storage (e.g. S3) and uses DuckDB as a local query cache. Object storage is the durable source of truth; DuckDB is the materialized analysis layer. For S3-compatible providers such as Hugging Face Storage Buckets, configure `AGENTPOND_S3_ENDPOINT` and checksum settings according to the provider docs: <https://huggingface.co/docs/hub/storage-buckets-s3>.
 
 ## Write Path
 

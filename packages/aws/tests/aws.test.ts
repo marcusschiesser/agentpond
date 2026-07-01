@@ -31,6 +31,10 @@ test("S3 config reads provider settings from runtime env", () => {
 	const originalSecretKey = process.env.AWS_SECRET_ACCESS_KEY;
 	const originalRegion = process.env.AWS_REGION;
 	const originalForcePathStyle = process.env.AGENTPOND_S3_FORCE_PATH_STYLE;
+	const originalRequestChecksum =
+		process.env.AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION;
+	const originalResponseChecksum =
+		process.env.AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION;
 
 	try {
 		process.env.AGENTPOND_S3_BUCKET = "runtime-bucket";
@@ -47,9 +51,13 @@ test("S3 config reads provider settings from runtime env", () => {
 			accessKeyId: "runtime-access",
 			secretAccessKey: "runtime-secret",
 			forcePathStyle: false,
+			requestChecksumCalculation: undefined,
+			responseChecksumValidation: undefined,
 		});
 
 		process.env.AWS_REGION = "eu-central-1";
+		process.env.AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION = "WHEN_REQUIRED";
+		process.env.AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION = "WHEN_REQUIRED";
 
 		assert.deepEqual(s3ConfigFromRuntimeEnv(), {
 			bucket: "runtime-bucket",
@@ -58,6 +66,8 @@ test("S3 config reads provider settings from runtime env", () => {
 			accessKeyId: "runtime-access",
 			secretAccessKey: "runtime-secret",
 			forcePathStyle: false,
+			requestChecksumCalculation: "WHEN_REQUIRED",
+			responseChecksumValidation: "WHEN_REQUIRED",
 		});
 	} finally {
 		restoreEnv("AGENTPOND_S3_BUCKET", originalBucket);
@@ -67,7 +77,74 @@ test("S3 config reads provider settings from runtime env", () => {
 		restoreEnv("AWS_SECRET_ACCESS_KEY", originalSecretKey);
 		restoreEnv("AWS_REGION", originalRegion);
 		restoreEnv("AGENTPOND_S3_FORCE_PATH_STYLE", originalForcePathStyle);
+		restoreEnv(
+			"AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION",
+			originalRequestChecksum,
+		);
+		restoreEnv(
+			"AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION",
+			originalResponseChecksum,
+		);
 	}
+});
+
+test("S3 config rejects invalid checksum env settings", () => {
+	const originalRequestChecksum =
+		process.env.AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION;
+	const originalResponseChecksum =
+		process.env.AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION;
+
+	try {
+		process.env.AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION = "always";
+		assert.throws(
+			() => s3ConfigFromRuntimeEnv(),
+			/AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION must be "WHEN_SUPPORTED" or "WHEN_REQUIRED"/,
+		);
+
+		delete process.env.AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION;
+		process.env.AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION = "never";
+		assert.throws(
+			() => s3ConfigFromRuntimeEnv(),
+			/AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION must be "WHEN_SUPPORTED" or "WHEN_REQUIRED"/,
+		);
+	} finally {
+		restoreEnv(
+			"AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION",
+			originalRequestChecksum,
+		);
+		restoreEnv(
+			"AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION",
+			originalResponseChecksum,
+		);
+	}
+});
+
+test("S3 object store passes checksum settings to AWS SDK client", async () => {
+	const store = new S3ObjectStore({
+		bucket: "agentpond",
+		region: "us-east-1",
+		requestChecksumCalculation: "WHEN_REQUIRED",
+		responseChecksumValidation: "WHEN_REQUIRED",
+	});
+	const client = (
+		store as unknown as {
+			client: {
+				config: {
+					requestChecksumCalculation: () => Promise<string>;
+					responseChecksumValidation: () => Promise<string>;
+				};
+			};
+		}
+	).client;
+
+	assert.equal(
+		await client.config.requestChecksumCalculation(),
+		"WHEN_REQUIRED",
+	);
+	assert.equal(
+		await client.config.responseChecksumValidation(),
+		"WHEN_REQUIRED",
+	);
 });
 
 function restoreEnv(name: string, value: string | undefined): void {

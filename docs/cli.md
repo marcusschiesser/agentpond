@@ -84,7 +84,7 @@ known environments. Scripts should keep passing an explicit name, such as
 
 Environment files are stored at `.agentpond/envs/<name>.env`. If no environment has been selected yet, AgentPond uses `dev`.
 
-GCS environments use `AGENTPOND_GCS_BUCKET` and authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. All storage providers use `AGENTPOND_PREFIX` for an optional object key prefix.
+GCS environments use `AGENTPOND_GCS_BUCKET` and authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. All storage providers use `AGENTPOND_PREFIX` for an optional object key prefix. S3-compatible providers can require provider-specific endpoint and checksum settings; for Hugging Face Storage Buckets, see <https://huggingface.co/docs/hub/storage-buckets-s3>.
 
 For serverless ingestion deployments, `@agentpond/aws` exports `lambdaIngestHandler`, `createLambdaIngestHandler`, and `S3ObjectStore` for AWS Lambda Function URLs or API Gateway HTTP API v2, and `@agentpond/google` exports `httpIngestFunction`, `createHttpIngestFunction`, and `GcsObjectStore` for Google HTTP Cloud Functions. Firebase Functions can use `createHttpIngestFunction` with `pathPrefix` and `GcsObjectStore.fromRuntimeEnv().toSink()` to strip Firebase function URL prefixes and write to GCS using deployment environment variables. These handlers use the same Langfuse-compatible ingestion endpoints as `agentpond dev`.
 

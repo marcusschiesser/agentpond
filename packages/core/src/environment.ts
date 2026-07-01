@@ -214,6 +214,9 @@ function storeEnvironmentLines(storeType: AgentPondStoreType): string[] {
 		"AGENTPOND_S3_SECRET_ACCESS_KEY=minio123",
 		"# Use true for MinIO. Use false for Amazon S3 virtual-hosted buckets.",
 		"AGENTPOND_S3_FORCE_PATH_STYLE=true",
+		"# Optional for S3-compatible providers such as Hugging Face Storage Buckets.",
+		"# AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION=WHEN_REQUIRED",
+		"# AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION=WHEN_REQUIRED",
 		"",
 	];
 }

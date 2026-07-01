@@ -18,6 +18,8 @@ export AWS_SECRET_ACCESS_KEY=minio123
 export AWS_REGION=us-east-1
 ```
 
+For Hugging Face Storage Buckets, follow the S3-compatible endpoint and checksum guidance in <https://huggingface.co/docs/hub/storage-buckets-s3>.
+
 GCS environments use:
 
 ```bash

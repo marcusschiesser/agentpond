@@ -16,6 +16,8 @@ import {
 	S3Client,
 } from "@aws-sdk/client-s3";
 
+export type S3ChecksumSetting = "WHEN_SUPPORTED" | "WHEN_REQUIRED";
+
 export type S3Config = {
 	bucket: string;
 	endpoint?: string;
@@ -23,6 +25,8 @@ export type S3Config = {
 	accessKeyId?: string;
 	secretAccessKey?: string;
 	forcePathStyle?: boolean;
+	requestChecksumCalculation?: S3ChecksumSetting;
+	responseChecksumValidation?: S3ChecksumSetting;
 };
 
 function s3ConfigForAgentPondEnvironment(envFilePath?: string): S3Config {
@@ -40,6 +44,14 @@ function s3ConfigForAgentPondEnvironment(envFilePath?: string): S3Config {
 			nonEmpty(env("AGENTPOND_S3_SECRET_ACCESS_KEY")),
 		forcePathStyle:
 			(env("AGENTPOND_S3_FORCE_PATH_STYLE") ?? "true") !== "false",
+		requestChecksumCalculation: checksumSettingFromEnv(
+			"AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION",
+			env("AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION"),
+		),
+		responseChecksumValidation: checksumSettingFromEnv(
+			"AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION",
+			env("AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION"),
+		),
 	};
 }
 
@@ -71,6 +83,8 @@ export class S3ObjectStore implements ObjectStore {
 			endpoint: config.endpoint,
 			region: config.region,
 			forcePathStyle: config.forcePathStyle ?? false,
+			requestChecksumCalculation: config.requestChecksumCalculation,
+			responseChecksumValidation: config.responseChecksumValidation,
 			credentials:
 				config.accessKeyId && config.secretAccessKey
 					? {
@@ -132,4 +146,18 @@ export class S3ObjectStore implements ObjectStore {
 		} while (ContinuationToken);
 		return keys.sort();
 	}
+}
+
+function checksumSettingFromEnv(
+	name: string,
+	value: string | undefined,
+): S3ChecksumSetting | undefined {
+	const setting = nonEmpty(value);
+	if (setting === undefined) return undefined;
+	if (setting === "WHEN_SUPPORTED" || setting === "WHEN_REQUIRED") {
+		return setting;
+	}
+	throw new Error(
+		`${name} must be "WHEN_SUPPORTED" or "WHEN_REQUIRED", got "${setting}"`,
+	);
 }
