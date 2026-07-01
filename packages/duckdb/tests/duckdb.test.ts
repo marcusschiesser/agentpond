@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -361,6 +361,43 @@ test("DuckDB ingestion sink serializes concurrent writes to the same cache", asy
 		duplicateResults.reduce((total, result) => total + result.eventsSkipped, 0),
 		1,
 	);
+});
+
+test("DuckDB ingestion sink resolves AgentPond environments from a pnpm workspace root", async () => {
+	const root = mkdtempSync(join(tmpdir(), "agentpond-duckdb-workspace-"));
+	const nested = join(root, "packages", "functions");
+	mkdirSync(nested, { recursive: true });
+	writeFileSync(
+		join(root, "pnpm-workspace.yaml"),
+		"packages:\n  - packages/*\n",
+	);
+	const sink = DuckDbIngestionSink.fromAgentPondEnv({
+		name: "dev",
+		cwd: nested,
+		resolveWorkspace: true,
+	});
+	await sink.writeEvents({
+		projectId: "project-a",
+		events: [
+			{
+				id: "workspace-env-event",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: { id: "workspace-env-trace", name: "Workspace Env Trace" },
+			},
+		],
+		source: "test-workspace-env",
+	});
+
+	const db = new AgentPondCache(
+		join(root, ".agentpond", "envs", "dev", "cache.duckdb"),
+	);
+	const rows = await db.query<{ id: string }>(
+		"select id from traces where id = 'workspace-env-trace'",
+	);
+	await db.close();
+
+	assert.deepEqual(rows, [{ id: "workspace-env-trace" }]);
 });
 
 test("DuckDB lock retry retries lock conflicts only", async () => {

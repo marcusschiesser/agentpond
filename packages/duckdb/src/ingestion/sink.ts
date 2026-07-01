@@ -10,11 +10,17 @@ import type {
 	DuckDbDirectIngestion,
 } from "./direct-ingestion.js";
 
+export type DuckDbIngestionSinkEnvParams = {
+	name: string;
+	cwd?: string;
+	resolveWorkspace?: boolean;
+};
+
 export class DuckDbIngestionSink implements IngestionSink {
-	static fromAgentPondEnv(name: string): DuckDbIngestionSink {
-		return new DuckDbIngestionSink(
-			resolveAgentPondEnvironment({ name }).dbPath,
-		);
+	static fromAgentPondEnv(
+		params: DuckDbIngestionSinkEnvParams,
+	): DuckDbIngestionSink {
+		return new DuckDbIngestionSink(resolveAgentPondEnvironment(params).dbPath);
 	}
 
 	constructor(private readonly dbPath: string) {}

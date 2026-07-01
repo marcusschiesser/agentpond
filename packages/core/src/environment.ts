@@ -6,6 +6,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { basename, join } from "node:path";
+import { agentPondWorkspaceRoot } from "./workspace.js";
 
 export type AgentPondStoreType = "local" | "s3" | "gcs";
 
@@ -21,6 +22,7 @@ export type AgentPondEnvironment = {
 export type ResolveEnvironmentOptions = {
 	name?: string;
 	cwd?: string;
+	resolveWorkspace?: boolean;
 };
 
 export type EnvFileEntry = {
@@ -74,7 +76,10 @@ export function agentPondDir(cwd = process.cwd()): string {
 export function resolveAgentPondEnvironment(
 	options: ResolveEnvironmentOptions = {},
 ): AgentPondEnvironment {
-	const root = agentPondDir(options.cwd);
+	const cwd = options.resolveWorkspace
+		? agentPondWorkspaceRoot(options.cwd)
+		: options.cwd;
+	const root = agentPondDir(cwd);
 	const name = normalizeEnvironmentName(
 		options.name ?? readSelectedEnvironment(root) ?? "dev",
 	);

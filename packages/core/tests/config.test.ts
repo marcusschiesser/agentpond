@@ -213,6 +213,97 @@ test("environment selection and explicit --env names resolve separate caches", (
 	}
 });
 
+test("environment resolution can use the pnpm workspace root from a nested package", () => {
+	const root = mkdtempSync(join(tmpdir(), "agentpond-workspace-"));
+	const nested = join(root, "packages", "functions");
+	mkdirSync(nested, { recursive: true });
+	writeFileSync(
+		join(root, "pnpm-workspace.yaml"),
+		"packages:\n  - packages/*\n",
+	);
+	const environment = resolveAgentPondEnvironment({
+		name: "dev",
+		cwd: nested,
+		resolveWorkspace: true,
+	});
+
+	assert.equal(environment.envDir, join(root, ".agentpond", "envs", "dev"));
+	assert.equal(
+		environment.dbPath,
+		join(root, ".agentpond", "envs", "dev", "cache.duckdb"),
+	);
+});
+
+test("environment resolution accepts common workspace root markers", () => {
+	const cases = [
+		{
+			name: "pnpm-yml",
+			file: "pnpm-workspace.yml",
+			content: "packages:\n  - packages/*\n",
+		},
+		{
+			name: "package-workspaces-array",
+			file: "package.json",
+			content: JSON.stringify({ workspaces: ["packages/*"] }),
+		},
+		{
+			name: "package-workspaces-object",
+			file: "package.json",
+			content: JSON.stringify({ workspaces: { packages: ["packages/*"] } }),
+		},
+		{
+			name: "turbo",
+			file: "turbo.json",
+			content: JSON.stringify({ tasks: {} }),
+		},
+	];
+
+	for (const testCase of cases) {
+		const root = mkdtempSync(join(tmpdir(), `agentpond-${testCase.name}-`));
+		const nested = join(root, "packages", "functions");
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(join(root, testCase.file), testCase.content);
+
+		assert.equal(
+			resolveAgentPondEnvironment({
+				name: "dev",
+				cwd: nested,
+				resolveWorkspace: true,
+			}).envDir,
+			join(root, ".agentpond", "envs", "dev"),
+		);
+	}
+});
+
+test("environment resolution keeps cwd behavior unless workspace root is requested", () => {
+	const root = mkdtempSync(join(tmpdir(), "agentpond-workspace-default-"));
+	const nested = join(root, "packages", "functions");
+	mkdirSync(nested, { recursive: true });
+	writeFileSync(
+		join(root, "pnpm-workspace.yaml"),
+		"packages:\n  - packages/*\n",
+	);
+
+	assert.equal(
+		resolveAgentPondEnvironment({ name: "dev", cwd: nested }).envDir,
+		join(nested, ".agentpond", "envs", "dev"),
+	);
+});
+
+test("workspace root environment resolution falls back to cwd outside a pnpm workspace", () => {
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-no-workspace-"));
+	const environment = resolveAgentPondEnvironment({
+		name: "dev",
+		cwd,
+		resolveWorkspace: true,
+	});
+
+	assert.equal(
+		environment.dbPath,
+		join(cwd, ".agentpond", "envs", "dev", "cache.duckdb"),
+	);
+});
+
 test("environment file values are loaded below process env", () => {
 	const originalCwd = process.cwd();
 	const originalProject = process.env.AGENTPOND_PROJECT_ID;

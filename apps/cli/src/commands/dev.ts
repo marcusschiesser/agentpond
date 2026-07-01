@@ -40,7 +40,7 @@ export async function startDevServer(options: DevOptions): Promise<void> {
 		throw new CliError("Missing dev environment configuration");
 	const lock = acquireDevServerLock(devEnvironment);
 	const server = buildServer({
-		sink: DuckDbIngestionSink.fromAgentPondEnv(environment.name),
+		sink: DuckDbIngestionSink.fromAgentPondEnv({ name: environment.name }),
 		auth: false,
 		logger: createDevLoggerOptions(),
 	});
