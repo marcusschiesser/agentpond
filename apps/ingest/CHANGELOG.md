@@ -1,5 +1,15 @@
 # @agentpond/ingest-service
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [80d86d1]
+  - @agentpond/aws@0.3.2
+  - @agentpond/core@0.3.2
+  - @agentpond/fastify-ingest@0.3.2
+  - @agentpond/google@0.3.2
+
 ## 0.1.4
 
 ### Patch Changes
