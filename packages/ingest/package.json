@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/ingest",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "Reusable Langfuse-compatible ingestion request handling for AgentPond",
 	"license": "MIT",
 	"type": "module",

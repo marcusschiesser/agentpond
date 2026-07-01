@@ -1,5 +1,17 @@
 # agentpond
 
+## 0.3.3
+
+### Patch Changes
+
+- Updated dependencies [113f5d6]
+- Updated dependencies [3dd8d6e]
+  - @agentpond/core@0.3.1
+  - @agentpond/duckdb@0.3.1
+  - @agentpond/aws@0.3.1
+  - @agentpond/fastify-ingest@0.3.1
+  - @agentpond/google@0.3.1
+
 ## 0.3.2
 
 ### Patch Changes
