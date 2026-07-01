@@ -2,6 +2,7 @@ import { DuckDbDirectIngestion } from "../ingestion/direct-ingestion.js";
 import { type DuckDbAccessMode, DuckDbOperations } from "./db-operations.js";
 import { DuckDbStoreSync } from "./store-sync.js";
 import type { SyncFromStoreParams, SyncResult } from "./sync-types.js";
+import { isDuckDbLockConflict, withDuckDbWriteLock } from "./write-lock.js";
 
 export type {
 	SyncFromStoreParams,
@@ -25,8 +26,10 @@ export class AgentPondCache {
 	}
 
 	async syncFromStore(params: SyncFromStoreParams): Promise<SyncResult> {
-		await this.ensureSchema();
-		return new DuckDbStoreSync(this.db).syncFromStore(params);
+		return withDuckDbWriteLock(this.dbPath, async () => {
+			await this.ensureSchema();
+			return new DuckDbStoreSync(this.db).syncFromStore(params);
+		});
 	}
 
 	async query<T = Record<string, unknown>>(sql: string): Promise<T[]> {
@@ -55,18 +58,12 @@ export class AgentPondCache {
 }
 
 export async function ensureDuckDbSchema(dbPath: string): Promise<void> {
-	const db = new AgentPondCache(dbPath);
-	try {
-		await db.ensureSchema();
-	} finally {
-		await db.close();
-	}
-}
-
-function isDuckDbLockConflict(error: unknown): boolean {
-	const message = error instanceof Error ? error.message : String(error);
-	return (
-		message.includes("Could not set lock") ||
-		message.includes("Conflicting lock")
-	);
+	return withDuckDbWriteLock(dbPath, async () => {
+		const db = new AgentPondCache(dbPath);
+		try {
+			await db.ensureSchema();
+		} finally {
+			await db.close();
+		}
+	});
 }

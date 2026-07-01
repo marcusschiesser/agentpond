@@ -9,12 +9,15 @@ import {
 	type IngestionEvent,
 	MemoryObjectStore,
 } from "@agentpond/core";
-import { AgentPondCache } from "@agentpond/duckdb";
+import { AgentPondCache, DuckDbIngestionSink } from "@agentpond/duckdb";
+import { retryDuckDbLockConflicts } from "../src/cache/write-lock.js";
+
+function createTempDbPath(): string {
+	return join(mkdtempSync(join(tmpdir(), "agentpond-")), "cache.duckdb");
+}
 
 function createTempDb(): AgentPondCache {
-	return new AgentPondCache(
-		join(mkdtempSync(join(tmpdir(), "agentpond-")), "cache.duckdb"),
-	);
+	return new AgentPondCache(createTempDbPath());
 }
 
 async function writeAndSync(
@@ -283,6 +286,102 @@ test("direct DuckDB writes skip duplicate event ids", async () => {
 
 	assert.deepEqual(second, { eventsProcessed: 0, eventsSkipped: 1 });
 	assert.deepEqual(rows, [{ id: "trace-direct", name: "Direct Trace" }]);
+});
+
+test("DuckDB ingestion sink serializes concurrent writes to the same cache", async () => {
+	const dbPath = createTempDbPath();
+	const sink = new DuckDbIngestionSink(dbPath);
+	await Promise.all(
+		Array.from({ length: 12 }, async (_, index) =>
+			sink.writeEvents({
+				projectId: "project-a",
+				events: [
+					{
+						id: `concurrent-event-${index}`,
+						timestamp: "2026-06-14T00:00:00.000Z",
+						type: eventTypes.TRACE_CREATE,
+						body: {
+							id: `concurrent-trace-${index}`,
+							name: `Concurrent Trace ${index}`,
+						},
+					},
+				],
+				source: "test-concurrent",
+			}),
+		),
+	);
+	const duplicateResults = await Promise.all([
+		sink.writeEvents({
+			projectId: "project-a",
+			events: [
+				{
+					id: "concurrent-duplicate-event",
+					timestamp: "2026-06-14T00:00:01.000Z",
+					type: eventTypes.TRACE_CREATE,
+					body: {
+						id: "concurrent-duplicate-trace",
+						name: "Concurrent Duplicate Trace",
+					},
+				},
+			],
+			source: "test-concurrent",
+		}),
+		sink.writeEvents({
+			projectId: "project-a",
+			events: [
+				{
+					id: "concurrent-duplicate-event",
+					timestamp: "2026-06-14T00:00:01.000Z",
+					type: eventTypes.TRACE_CREATE,
+					body: {
+						id: "concurrent-duplicate-trace",
+						name: "Concurrent Duplicate Trace",
+					},
+				},
+			],
+			source: "test-concurrent",
+		}),
+	]);
+
+	const db = new AgentPondCache(dbPath);
+	const rows = await db.query<{ count: bigint }>(
+		"select count(*) as count from traces where id like 'concurrent-%'",
+	);
+	await db.close();
+
+	assert.equal(Number(rows[0].count), 13);
+	assert.equal(
+		duplicateResults.reduce(
+			(total, result) => total + result.eventsProcessed,
+			0,
+		),
+		1,
+	);
+	assert.equal(
+		duplicateResults.reduce((total, result) => total + result.eventsSkipped, 0),
+		1,
+	);
+});
+
+test("DuckDB lock retry retries lock conflicts only", async () => {
+	let lockAttempts = 0;
+	const result = await retryDuckDbLockConflicts(async () => {
+		lockAttempts += 1;
+		if (lockAttempts === 1) throw new Error("Could not set lock on file");
+		return "ok";
+	});
+	assert.equal(result, "ok");
+	assert.equal(lockAttempts, 2);
+
+	let nonLockAttempts = 0;
+	await assert.rejects(
+		retryDuckDbLockConflicts(async () => {
+			nonLockAttempts += 1;
+			throw new Error("projection failed");
+		}),
+		/projection failed/,
+	);
+	assert.equal(nonLockAttempts, 1);
 });
 
 test("DuckDB projection keeps newer event when an older event syncs later", async () => {

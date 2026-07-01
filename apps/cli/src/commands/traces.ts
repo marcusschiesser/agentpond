@@ -1,10 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { AgentPondConfig } from "@agentpond/core";
-import {
-	type AgentPondCache,
-	DuckDbIngestionSink,
-	ensureDuckDbSchema,
-} from "@agentpond/duckdb";
+import { type AgentPondCache, DuckDbIngestionSink } from "@agentpond/duckdb";
 import type { Command } from "commander";
 import { CliError, limit, print, stringFlag } from "../cli-support.js";
 import {
@@ -119,7 +115,6 @@ export async function createTrace(
 	const traceId = stringFlag(options, "id") ?? createOtelTraceId();
 	const resourceSpans = manualTraceResourceSpans(options, traceId, now);
 	if (isDevEnvironment(config)) {
-		await ensureDuckDbSchema(config.dbPath);
 		const result = await new DuckDbIngestionSink(
 			config.dbPath,
 		).writeOtelResourceSpans({

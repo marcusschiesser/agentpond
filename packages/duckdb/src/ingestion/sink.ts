@@ -4,6 +4,7 @@ import {
 	resolveAgentPondEnvironment,
 } from "@agentpond/core";
 import { AgentPondCache } from "../cache/index.js";
+import { withDuckDbWriteLock } from "../cache/write-lock.js";
 import type {
 	DirectWriteResult,
 	DuckDbDirectIngestion,
@@ -51,10 +52,13 @@ async function withDirectIngestion<T>(
 	dbPath: string,
 	write: (ingestion: DuckDbDirectIngestion) => Promise<T>,
 ): Promise<T> {
-	const db = new AgentPondCache(dbPath);
-	try {
-		return await write(db.directIngestion());
-	} finally {
-		await db.close();
-	}
+	return withDuckDbWriteLock(dbPath, async () => {
+		const db = new AgentPondCache(dbPath);
+		try {
+			await db.ensureSchema();
+			return await write(db.directIngestion());
+		} finally {
+			await db.close();
+		}
+	});
 }

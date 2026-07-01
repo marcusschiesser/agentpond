@@ -4,11 +4,7 @@ import {
 	eventTypes,
 	type IngestionEvent,
 } from "@agentpond/core";
-import {
-	type AgentPondCache,
-	DuckDbIngestionSink,
-	ensureDuckDbSchema,
-} from "@agentpond/duckdb";
+import { type AgentPondCache, DuckDbIngestionSink } from "@agentpond/duckdb";
 import type { Command } from "commander";
 import { CliError, limit, print, stringFlag } from "../cli-support.js";
 import {
@@ -146,7 +142,6 @@ export async function createScore(
 	};
 
 	if (isDevEnvironment(config)) {
-		await ensureDuckDbSchema(config.dbPath);
 		const result = await new DuckDbIngestionSink(config.dbPath).writeEvents({
 			projectId: config.projectId,
 			events: [event],
