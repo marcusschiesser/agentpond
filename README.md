@@ -106,6 +106,7 @@ For the complete command reference, see [CLI usage](./docs/cli.md).
 The repository contains scenario-based examples under [examples](./examples/README.md):
 
 - [Basic traces](./examples/basic-traces/README.md): fixture-based Python and TypeScript examples that emit traces, observations, and annotation scores without calling an LLM.
+- [Hugging Face Space](./examples/huggingface-space/README.md): deploy AgentPond ingestion to a Docker Space and store traces in a Hugging Face Storage Bucket.
 - [LLM compliance workflow](./examples/llm-compliance/README.md): a Python `uv` example that calls OpenAI, parses a structured compliance score, and records the workflow in Langfuse.
 
 Each scenario README includes prerequisites and run commands.

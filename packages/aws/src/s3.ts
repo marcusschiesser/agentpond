@@ -117,12 +117,7 @@ export class S3ObjectStore implements ObjectStore {
 	}
 
 	async getJson<T>(key: string): Promise<T> {
-		const response = await this.client.send(
-			new GetObjectCommand({
-				Bucket: this.config.bucket,
-				Key: key,
-			}),
-		);
+		const response = await this.getObjectFollowingRedirect(key);
 		const body = await response.Body?.transformToString();
 		if (!body) throw new Error(`S3 object is empty: ${key}`);
 		return JSON.parse(body) as T;
@@ -146,6 +141,43 @@ export class S3ObjectStore implements ObjectStore {
 		} while (ContinuationToken);
 		return keys.sort();
 	}
+
+	private async getObjectFollowingRedirect(key: string) {
+		try {
+			return await this.client.send(
+				new GetObjectCommand({
+					Bucket: this.config.bucket,
+					Key: key,
+				}),
+			);
+		} catch (error) {
+			const location = redirectLocation(error);
+			if (!location) throw error;
+			const response = await fetch(location);
+			if (!response.ok) {
+				throw new Error(
+					`S3 object redirect failed for ${key}: ${response.status} ${response.statusText}`,
+				);
+			}
+			return {
+				Body: {
+					transformToString: () => response.text(),
+				},
+			};
+		}
+	}
+}
+
+function redirectLocation(error: unknown): string | undefined {
+	const response = (error as { $response?: unknown }).$response as
+		| {
+				statusCode?: number;
+				headers?: Record<string, string | undefined>;
+		  }
+		| undefined;
+	const statusCode = response?.statusCode;
+	if (!statusCode || statusCode < 300 || statusCode >= 400) return undefined;
+	return response.headers?.location;
 }
 
 function checksumSettingFromEnv(

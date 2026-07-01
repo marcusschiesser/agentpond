@@ -24,19 +24,10 @@ function authHeader(): string {
 }
 
 test("S3 config reads provider settings from runtime env", () => {
-	const originalBucket = process.env.AGENTPOND_S3_BUCKET;
-	const originalEndpoint = process.env.AGENTPOND_S3_ENDPOINT;
-	const originalS3Region = process.env.AGENTPOND_S3_REGION;
-	const originalAccessKey = process.env.AWS_ACCESS_KEY_ID;
-	const originalSecretKey = process.env.AWS_SECRET_ACCESS_KEY;
-	const originalRegion = process.env.AWS_REGION;
-	const originalForcePathStyle = process.env.AGENTPOND_S3_FORCE_PATH_STYLE;
-	const originalRequestChecksum =
-		process.env.AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION;
-	const originalResponseChecksum =
-		process.env.AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION;
+	const originalEnv = saveEnv(AWS_ENV_KEYS);
 
 	try {
+		clearEnv(AWS_ENV_KEYS);
 		process.env.AGENTPOND_S3_BUCKET = "runtime-bucket";
 		process.env.AGENTPOND_S3_ENDPOINT = "http://localhost:9000";
 		process.env.AGENTPOND_S3_REGION = "us-east-1";
@@ -70,31 +61,15 @@ test("S3 config reads provider settings from runtime env", () => {
 			responseChecksumValidation: "WHEN_REQUIRED",
 		});
 	} finally {
-		restoreEnv("AGENTPOND_S3_BUCKET", originalBucket);
-		restoreEnv("AGENTPOND_S3_ENDPOINT", originalEndpoint);
-		restoreEnv("AGENTPOND_S3_REGION", originalS3Region);
-		restoreEnv("AWS_ACCESS_KEY_ID", originalAccessKey);
-		restoreEnv("AWS_SECRET_ACCESS_KEY", originalSecretKey);
-		restoreEnv("AWS_REGION", originalRegion);
-		restoreEnv("AGENTPOND_S3_FORCE_PATH_STYLE", originalForcePathStyle);
-		restoreEnv(
-			"AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION",
-			originalRequestChecksum,
-		);
-		restoreEnv(
-			"AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION",
-			originalResponseChecksum,
-		);
+		restoreEnv(originalEnv);
 	}
 });
 
 test("S3 config rejects invalid checksum env settings", () => {
-	const originalRequestChecksum =
-		process.env.AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION;
-	const originalResponseChecksum =
-		process.env.AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION;
+	const originalEnv = saveEnv(AWS_ENV_KEYS);
 
 	try {
+		clearEnv(AWS_ENV_KEYS);
 		process.env.AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION = "always";
 		assert.throws(
 			() => s3ConfigFromRuntimeEnv(),
@@ -108,14 +83,7 @@ test("S3 config rejects invalid checksum env settings", () => {
 			/AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION must be "WHEN_SUPPORTED" or "WHEN_REQUIRED"/,
 		);
 	} finally {
-		restoreEnv(
-			"AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION",
-			originalRequestChecksum,
-		);
-		restoreEnv(
-			"AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION",
-			originalResponseChecksum,
-		);
+		restoreEnv(originalEnv);
 	}
 });
 
@@ -146,14 +114,6 @@ test("S3 object store passes checksum settings to AWS SDK client", async () => {
 		"WHEN_REQUIRED",
 	);
 });
-
-function restoreEnv(name: string, value: string | undefined): void {
-	if (value === undefined) {
-		delete process.env[name];
-		return;
-	}
-	process.env[name] = value;
-}
 
 test("S3 object store creates sink with runtime prefix", async () => {
 	const keys: string[] = [];
@@ -194,7 +154,53 @@ test("S3 object store creates sink with runtime prefix", async () => {
 });
 
 test("S3 object store can be created from explicit AWS config", async () => {
+	const originalEnv = saveEnv(AWS_ENV_KEYS);
 	const keys: string[] = [];
+	try {
+		clearEnv(AWS_ENV_KEYS);
+		const store = S3ObjectStore.fromConfig({
+			bucket: "configured-bucket",
+			region: "us-east-1",
+		});
+		(
+			store as unknown as {
+				client: {
+					send: (command: {
+						input: { Bucket?: string; Key?: string };
+					}) => Promise<unknown>;
+				};
+			}
+		).client = {
+			send: async (command) => {
+				assert.equal(command.input.Bucket, "configured-bucket");
+				if (command.input.Key) keys.push(command.input.Key);
+				return {};
+			},
+		};
+
+		await store.toSink().writeEvents({
+			projectId: "project-a",
+			events: [
+				{
+					id: "event-aws-config-1",
+					timestamp: "2026-06-14T00:00:00.000Z",
+					type: eventTypes.TRACE_CREATE,
+					body: { id: "trace-aws-config-1" },
+				},
+			],
+		});
+
+		assert.equal(
+			keys.every((key) => key.startsWith("project-a/")),
+			true,
+		);
+	} finally {
+		restoreEnv(originalEnv);
+	}
+});
+
+test("S3 object store follows GetObject redirects", async () => {
+	const originalFetch = globalThis.fetch;
 	const store = S3ObjectStore.fromConfig({
 		bucket: "configured-bucket",
 		region: "us-east-1",
@@ -202,35 +208,31 @@ test("S3 object store can be created from explicit AWS config", async () => {
 	(
 		store as unknown as {
 			client: {
-				send: (command: {
-					input: { Bucket?: string; Key?: string };
-				}) => Promise<unknown>;
+				send: () => Promise<unknown>;
 			};
 		}
 	).client = {
-		send: async (command) => {
-			assert.equal(command.input.Bucket, "configured-bucket");
-			if (command.input.Key) keys.push(command.input.Key);
-			return {};
+		send: async () => {
+			throw {
+				$response: {
+					statusCode: 302,
+					headers: {
+						location: "https://cdn.example.test/object.json",
+					},
+				},
+			};
 		},
 	};
+	globalThis.fetch = async (input) => {
+		assert.equal(input, "https://cdn.example.test/object.json");
+		return new Response(JSON.stringify({ ok: true }));
+	};
 
-	await store.toSink().writeEvents({
-		projectId: "project-a",
-		events: [
-			{
-				id: "event-aws-config-1",
-				timestamp: "2026-06-14T00:00:00.000Z",
-				type: eventTypes.TRACE_CREATE,
-				body: { id: "trace-aws-config-1" },
-			},
-		],
-	});
-
-	assert.equal(
-		keys.every((key) => key.startsWith("project-a/")),
-		true,
-	);
+	try {
+		assert.deepEqual(await store.getJson("object.json"), { ok: true });
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
 });
 
 test("AWS Lambda ingest handler responds to health checks", async () => {
@@ -320,3 +322,42 @@ test("AWS Lambda ingest handler maps auth errors", async () => {
 	assert.equal(response.statusCode, 401);
 	assert.equal(JSON.parse(response.body).error, "UnauthorizedError");
 });
+
+const AWS_ENV_KEYS = [
+	"AGENTPOND_PREFIX",
+	"AGENTPOND_S3_BUCKET",
+	"AGENTPOND_S3_ENDPOINT",
+	"AGENTPOND_S3_REGION",
+	"AGENTPOND_S3_ACCESS_KEY_ID",
+	"AGENTPOND_S3_SECRET_ACCESS_KEY",
+	"AGENTPOND_S3_FORCE_PATH_STYLE",
+	"AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION",
+	"AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION",
+	"AGENTPOND_S3_PREFIX",
+	"AWS_ACCESS_KEY_ID",
+	"AWS_SECRET_ACCESS_KEY",
+	"AWS_REGION",
+] as const;
+
+type AwsEnvKey = (typeof AWS_ENV_KEYS)[number];
+type EnvSnapshot = Map<AwsEnvKey, string | undefined>;
+
+function saveEnv(keys: readonly AwsEnvKey[]): EnvSnapshot {
+	return new Map(keys.map((key) => [key, process.env[key]]));
+}
+
+function clearEnv(keys: readonly AwsEnvKey[]): void {
+	for (const key of keys) {
+		delete process.env[key];
+	}
+}
+
+function restoreEnv(snapshot: EnvSnapshot): void {
+	for (const [key, value] of snapshot) {
+		if (value === undefined) {
+			delete process.env[key];
+			continue;
+		}
+		process.env[key] = value;
+	}
+}

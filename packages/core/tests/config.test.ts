@@ -23,11 +23,11 @@ import {
 
 test("config defaults to the dev environment DuckDB cache", () => {
 	const originalCwd = process.cwd();
-	const originalStore = process.env.AGENTPOND_STORE;
+	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
 
 	try {
-		delete process.env.AGENTPOND_STORE;
+		clearEnv(CONFIG_ENV_KEYS);
 		process.chdir(cwd);
 
 		assert.equal(
@@ -38,11 +38,7 @@ test("config defaults to the dev environment DuckDB cache", () => {
 		assert.equal(configFromEnv().environment?.storeType, "s3");
 	} finally {
 		process.chdir(originalCwd);
-		if (originalStore === undefined) {
-			delete process.env.AGENTPOND_STORE;
-		} else {
-			process.env.AGENTPOND_STORE = originalStore;
-		}
+		restoreEnv(originalEnv);
 	}
 });
 
@@ -93,8 +89,10 @@ test("generated environment files document defaults and S3 settings", () => {
 
 test("generated environment files document local and GCS settings", () => {
 	const originalCwd = process.cwd();
+	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
 	try {
+		clearEnv(CONFIG_ENV_KEYS);
 		process.chdir(cwd);
 		const local = initAgentPondEnvironment("local-env", { storeType: "local" });
 		const gcs = initAgentPondEnvironment("gcs-env", { storeType: "gcs" });
@@ -121,14 +119,16 @@ test("generated environment files document local and GCS settings", () => {
 		assert.equal(configFromEnv({ envName: "gcs-env" }).prefix, "");
 	} finally {
 		process.chdir(originalCwd);
+		restoreEnv(originalEnv);
 	}
 });
 
 test("config accepts GCS store values and rejects unknown stores", () => {
 	const originalCwd = process.cwd();
-	const originalStore = process.env.AGENTPOND_STORE;
+	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
 	try {
+		clearEnv(CONFIG_ENV_KEYS);
 		process.chdir(cwd);
 		const env = initAgentPondEnvironment("production", { storeType: "gcs" });
 		writeFileSync(
@@ -153,18 +153,16 @@ test("config accepts GCS store values and rejects unknown stores", () => {
 		);
 	} finally {
 		process.chdir(originalCwd);
-		if (originalStore === undefined) {
-			delete process.env.AGENTPOND_STORE;
-		} else {
-			process.env.AGENTPOND_STORE = originalStore;
-		}
+		restoreEnv(originalEnv);
 	}
 });
 
 test("config reads legacy provider-specific prefixes as fallbacks", () => {
 	const originalCwd = process.cwd();
+	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
 	try {
+		clearEnv(CONFIG_ENV_KEYS);
 		process.chdir(cwd);
 		const s3Env = initAgentPondEnvironment("s3-env");
 		writeFileSync(
@@ -183,13 +181,16 @@ test("config reads legacy provider-specific prefixes as fallbacks", () => {
 		assert.equal(configFromEnv({ envName: "gcs-env" }).prefix, "legacy-gcs/");
 	} finally {
 		process.chdir(originalCwd);
+		restoreEnv(originalEnv);
 	}
 });
 
 test("local environments use the shared object-store prefix", () => {
 	const originalCwd = process.cwd();
+	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
 	try {
+		clearEnv(CONFIG_ENV_KEYS);
 		process.chdir(cwd);
 		const env = initAgentPondEnvironment("local-env", { storeType: "local" });
 		writeFileSync(
@@ -202,6 +203,7 @@ test("local environments use the shared object-store prefix", () => {
 		assert.equal(config.prefix, "local-prefix/");
 	} finally {
 		process.chdir(originalCwd);
+		restoreEnv(originalEnv);
 	}
 });
 
@@ -319,10 +321,10 @@ test("workspace root environment resolution falls back to cwd outside a pnpm wor
 
 test("environment file values are loaded below process env", () => {
 	const originalCwd = process.cwd();
-	const originalProject = process.env.AGENTPOND_PROJECT_ID;
+	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
 	try {
-		delete process.env.AGENTPOND_PROJECT_ID;
+		clearEnv(CONFIG_ENV_KEYS);
 		process.chdir(cwd);
 		const env = initAgentPondEnvironment("production");
 		writeFileSync(
@@ -351,11 +353,7 @@ test("environment file values are loaded below process env", () => {
 		);
 	} finally {
 		process.chdir(originalCwd);
-		if (originalProject === undefined) {
-			delete process.env.AGENTPOND_PROJECT_ID;
-		} else {
-			process.env.AGENTPOND_PROJECT_ID = originalProject;
-		}
+		restoreEnv(originalEnv);
 	}
 });
 
@@ -419,11 +417,13 @@ test("sinkFromStore writes accepted ingestion events to object storage", async (
 
 test("sinkForConfig wraps the configured object store factory", async () => {
 	const originalCwd = process.cwd();
+	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-sink-config-"));
 	const store = new FileSystemObjectStore(
 		mkdtempSync(join(tmpdir(), "agentpond-sink-factory-")),
 	);
 	try {
+		clearEnv(CONFIG_ENV_KEYS);
 		process.chdir(cwd);
 		const env = initAgentPondEnvironment("gcs-env", { storeType: "gcs" });
 		writeFileSync(
@@ -447,5 +447,55 @@ test("sinkForConfig wraps the configured object store factory", async () => {
 		assert.equal((await store.listKeys("otel/project-a/")).length, 1);
 	} finally {
 		process.chdir(originalCwd);
+		restoreEnv(originalEnv);
 	}
 });
+
+const CONFIG_ENV_KEYS = [
+	"AGENTPOND_PROJECT_ID",
+	"AGENTPOND_PREFIX",
+	"AGENTPOND_STORE",
+	"AGENTPOND_S3_BUCKET",
+	"AGENTPOND_S3_ENDPOINT",
+	"AGENTPOND_S3_REGION",
+	"AGENTPOND_S3_ACCESS_KEY_ID",
+	"AGENTPOND_S3_SECRET_ACCESS_KEY",
+	"AGENTPOND_S3_FORCE_PATH_STYLE",
+	"AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION",
+	"AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION",
+	"AGENTPOND_S3_PREFIX",
+	"AGENTPOND_GCS_BUCKET",
+	"AGENTPOND_GCS_PREFIX",
+	"LANGFUSE_BASE_URL",
+	"LANGFUSE_PUBLIC_KEY",
+	"LANGFUSE_SECRET_KEY",
+	"AWS_ACCESS_KEY_ID",
+	"AWS_SECRET_ACCESS_KEY",
+	"AWS_REGION",
+	"GOOGLE_CLOUD_PROJECT",
+	"GCLOUD_PROJECT",
+	"GCP_PROJECT",
+] as const;
+
+type ConfigEnvKey = (typeof CONFIG_ENV_KEYS)[number];
+type EnvSnapshot = Map<ConfigEnvKey, string | undefined>;
+
+function saveEnv(keys: readonly ConfigEnvKey[]): EnvSnapshot {
+	return new Map(keys.map((key) => [key, process.env[key]]));
+}
+
+function clearEnv(keys: readonly ConfigEnvKey[]): void {
+	for (const key of keys) {
+		delete process.env[key];
+	}
+}
+
+function restoreEnv(snapshot: EnvSnapshot): void {
+	for (const [key, value] of snapshot) {
+		if (value === undefined) {
+			delete process.env[key];
+			continue;
+		}
+		process.env[key] = value;
+	}
+}
