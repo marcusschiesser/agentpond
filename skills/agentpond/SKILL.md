@@ -23,7 +23,7 @@ allowed-tools:
 
 # AgentPond
 
-AgentPond is a data pond for AI agent traces with an agent-native CLI for local analytics. It accepts Langfuse-compatible ingestion, stores staging/production events in local, S3-compatible, or Google Cloud Storage object storage, and uses a local DuckDB cache for inspection. The dev server writes directly to the dev DuckDB cache.
+AgentPond is a data pond for AI agent traces with an agent-native CLI for local analytics. It accepts Langfuse-compatible ingestion, stores staging/production events in local, S3-compatible, Google Cloud Storage, or Vercel Blob object storage, and uses a local DuckDB cache for inspection. The dev server writes directly to the dev DuckDB cache.
 
 ## Core Principles
 
@@ -77,10 +77,11 @@ In an interactive terminal, choose the requested object store when prompted. In 
 ```bash
 npx agentpond env init staging --store s3
 npx agentpond env init staging --store gcs
+npx agentpond env init staging --store vercel
 npx agentpond env init staging --store local
 ```
 
-Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings. GCS environments use Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Do not ask users to paste secrets into chat.
+Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings. GCS environments use Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Vercel environments use `AGENTPOND_STORE=vercel`, `AGENTPOND_BLOB_ACCESS=private`, and Vercel Blob credentials from `BLOB_READ_WRITE_TOKEN` or OIDC (`BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`). Do not ask users to paste secrets into chat.
 
 For Hugging Face Storage Buckets, use the S3-compatible endpoint and checksum settings from <https://huggingface.co/docs/hub/storage-buckets-s3>.
 
@@ -138,4 +139,4 @@ export LANGFUSE_SECRET_KEY=sk-agentpond-dev
 
 These variables configure SDK ingestion. They are not credentials for using the AgentPond CLI to query Langfuse Cloud. The AgentPond CLI reads from object storage and the local DuckDB cache.
 
-For serverless deployments, AWS infrastructure can use `lambdaIngestHandler` and `S3ObjectStore.fromRuntimeEnv().toSink()` from `@agentpond/aws`, and Google infrastructure can use `httpIngestFunction`, `createHttpIngestFunction`, and `GcsObjectStore.fromRuntimeEnv().toSink()` from `@agentpond/google`. Firebase Functions should use `createHttpIngestFunction` with `pathPrefix` and a GCS sink to strip Firebase function URL prefixes and write to the configured object store. These handlers expose the same Langfuse-compatible ingestion endpoints.
+For serverless deployments, AWS infrastructure can use `lambdaIngestHandler` and `S3ObjectStore.fromRuntimeEnv().toSink()` from `@agentpond/aws`, Google infrastructure can use `httpIngestFunction`, `createHttpIngestFunction`, and `GcsObjectStore.fromRuntimeEnv().toSink()` from `@agentpond/google`, and Vercel infrastructure can use `VercelBlobObjectStore.fromRuntimeEnv().toSink()` from `@agentpond/vercel`. Firebase Functions should use `createHttpIngestFunction` with `pathPrefix` and a GCS sink to strip Firebase function URL prefixes and write to the configured object store. These handlers expose the same Langfuse-compatible ingestion endpoints.

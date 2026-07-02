@@ -1,6 +1,6 @@
 # CLI Usage
 
-AgentPond ships a CLI named `agentpond` for syncing traces and scores from local, S3-compatible, or Google Cloud Storage object storage into a local DuckDB cache, so you can analyze production agent data with SQL and focused trace commands. It can also create manual traces and scores for local testing.
+AgentPond ships a CLI named `agentpond` for syncing traces and scores from an object storage (local, S3, GCS, or Vercel Blob) into a local DuckDB cache, so you can analyze production agent data with SQL and focused trace commands. It can also create manual traces and scores for local testing.
 
 ## Install
 
@@ -39,11 +39,12 @@ agentpond env init production
 agentpond env use production
 ```
 
-`agentpond env init` prompts for S3, GCS, or local object storage in an interactive terminal. Scripts should pass the store explicitly:
+`agentpond env init` prompts for S3, GCS, Vercel Blob, or local object storage in an interactive terminal. Scripts should pass the store explicitly:
 
 ```sh
 agentpond env init production --store s3
 agentpond env init production --store gcs
+agentpond env init production --store vercel
 agentpond env init production --store local
 ```
 
@@ -84,9 +85,9 @@ known environments. Scripts should keep passing an explicit name, such as
 
 Environment files are stored at `.agentpond/envs/<name>.env`. If no environment has been selected yet, AgentPond uses `dev`.
 
-GCS environments use `AGENTPOND_GCS_BUCKET` and authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. All storage providers use `AGENTPOND_PREFIX` for an optional object key prefix. S3-compatible providers can require provider-specific endpoint and checksum settings; for Hugging Face Storage Buckets, see <https://huggingface.co/docs/hub/storage-buckets-s3>.
+GCS environments use `AGENTPOND_GCS_BUCKET` and authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Vercel environments use `AGENTPOND_STORE=vercel`, `AGENTPOND_BLOB_ACCESS=private`, and Vercel Blob credentials from `BLOB_READ_WRITE_TOKEN` or OIDC (`BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`). All storage providers use `AGENTPOND_PREFIX` for an optional object key prefix. S3-compatible providers can require provider-specific endpoint and checksum settings; for Hugging Face Storage Buckets, see <https://huggingface.co/docs/hub/storage-buckets-s3>.
 
-For serverless ingestion deployments, `@agentpond/aws` exports `lambdaIngestHandler`, `createLambdaIngestHandler`, and `S3ObjectStore` for AWS Lambda Function URLs or API Gateway HTTP API v2, and `@agentpond/google` exports `httpIngestFunction`, `createHttpIngestFunction`, and `GcsObjectStore` for Google HTTP Cloud Functions. Firebase Functions can use `createHttpIngestFunction` with `pathPrefix` and `GcsObjectStore.fromRuntimeEnv().toSink()` to strip Firebase function URL prefixes and write to GCS using deployment environment variables. These handlers use the same Langfuse-compatible ingestion endpoints as `agentpond dev`.
+For serverless and container ingestion deployments, see [Deployment](./deployment.md).
 
 ## Dev Server
 

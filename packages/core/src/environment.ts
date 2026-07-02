@@ -8,7 +8,7 @@ import {
 import { basename, join } from "node:path";
 import { agentPondWorkspaceRoot } from "./workspace.js";
 
-export type AgentPondStoreType = "local" | "s3" | "gcs";
+export type AgentPondStoreType = "local" | "s3" | "gcs" | "vercel";
 
 export type AgentPondEnvironment = {
 	name: string;
@@ -195,6 +195,21 @@ function storeEnvironmentLines(storeType: AgentPondStoreType): string[] {
 			"# Google Cloud Storage bucket containing AgentPond ingestion objects.",
 			"AGENTPOND_GCS_BUCKET=agentpond",
 			"# Authenticate with Google Application Default Credentials or GOOGLE_APPLICATION_CREDENTIALS.",
+			"",
+		];
+	}
+	if (storeType === "vercel") {
+		return [
+			"# Storage backend for this environment. Vercel-backed environments sync from Vercel Blob.",
+			"AGENTPOND_STORE=vercel",
+			"",
+			"# Vercel Blob access mode. Use private for trace data unless you intentionally created a public Blob store.",
+			"AGENTPOND_BLOB_ACCESS=private",
+			"# Static read-write token for local or non-Vercel runtimes. Prefer Vercel OIDC on Vercel deployments.",
+			"BLOB_READ_WRITE_TOKEN=",
+			"# Optional Vercel OIDC credentials. VERCEL_OIDC_TOKEN is populated automatically on Vercel deployments.",
+			"# BLOB_STORE_ID=",
+			"# VERCEL_OIDC_TOKEN=",
 			"",
 		];
 	}

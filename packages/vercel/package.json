@@ -1,0 +1,30 @@
+{
+	"name": "@agentpond/vercel",
+	"version": "0.3.2",
+	"description": "Vercel Blob storage adapter for AgentPond",
+	"license": "MIT",
+	"type": "module",
+	"files": [
+		"dist"
+	],
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/marcusschiesser/agentpond.git",
+		"directory": "packages/vercel"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"dependencies": {
+		"@agentpond/core": "workspace:*",
+		"@agentpond/ingest": "workspace:*",
+		"@vercel/blob": "^2.5.0"
+	}
+}

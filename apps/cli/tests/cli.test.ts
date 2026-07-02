@@ -1038,6 +1038,44 @@ test("CLI env init writes GCS store files from --store", async () => {
 	}
 });
 
+test("CLI env init writes Vercel store files from --store", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-vercel-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"staging",
+				"--store",
+				"vercel",
+				"--json",
+			]),
+		);
+		const result = JSON.parse(output) as {
+			store: string;
+			envFile: string;
+		};
+		const envFile = readFileSync(result.envFile, "utf8");
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.store, "vercel");
+		assert.match(envFile, /AGENTPOND_STORE=vercel/);
+		assert.match(envFile, /AGENTPOND_BLOB_ACCESS=private/);
+		assert.match(envFile, /BLOB_READ_WRITE_TOKEN=/);
+		assert.match(envFile, /BLOB_STORE_ID=/);
+		assert.match(envFile, /VERCEL_OIDC_TOKEN=/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI env init writes S3 and local store files from --store", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-stores-"));
@@ -1103,7 +1141,7 @@ test("CLI env init rejects invalid stores", async () => {
 		);
 
 		assert.equal(process.exitCode, 2);
-		assert.match(stderr, /--store must be s3, gcs, or local/);
+		assert.match(stderr, /--store must be s3, gcs, vercel, or local/);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -1177,7 +1215,7 @@ test("CLI env init can select a store interactively", async () => {
 				selectStore: async ({ choices }) => {
 					assert.deepEqual(
 						choices.map((choice) => choice.value),
-						["s3", "gcs", "local"],
+						["s3", "gcs", "vercel", "local"],
 					);
 					return "local";
 				},

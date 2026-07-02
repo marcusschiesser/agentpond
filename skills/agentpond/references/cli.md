@@ -4,7 +4,7 @@ Use `npx agentpond` for AgentPond data access unless the user has installed the 
 
 ## Configuration
 
-AgentPond reads object storage settings from the selected environment file under `.agentpond/envs/<name>.env`, then process environment variables, then flags. Environments can use `local`, `s3`, or `gcs` storage:
+AgentPond reads object storage settings from the selected environment file under `.agentpond/envs/<name>.env`, then process environment variables, then flags. Environments can use `local`, `s3`, `gcs`, or `vercel` storage:
 
 ```bash
 export AGENTPOND_PROJECT_ID=default-project
@@ -30,6 +30,16 @@ export AGENTPOND_PREFIX=
 
 Authenticate GCS with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`; do not ask users to paste service-account JSON into chat.
 
+Vercel Blob environments use:
+
+```bash
+export AGENTPOND_STORE=vercel
+export AGENTPOND_BLOB_ACCESS=private
+export AGENTPOND_PREFIX=
+export BLOB_READ_WRITE_TOKEN=
+# Or use Vercel OIDC with BLOB_STORE_ID and VERCEL_OIDC_TOKEN.
+```
+
 Provider package serverless ingestion exports:
 
 ```ts
@@ -39,6 +49,7 @@ import {
 	GcsObjectStore,
 	httpIngestFunction,
 } from "@agentpond/google";
+import { VercelBlobObjectStore } from "@agentpond/vercel";
 ```
 
 Use `lambdaIngestHandler` for AWS Lambda Function URLs or API Gateway HTTP API v2, `httpIngestFunction` for Google HTTP Cloud Functions, and `createHttpIngestFunction` with `pathPrefix` and `GcsObjectStore.fromRuntimeEnv().toSink()` for Firebase Functions.
@@ -59,6 +70,7 @@ Initialize environments interactively, or pass the object store explicitly in sc
 npx agentpond env init staging
 npx agentpond env init staging --store s3
 npx agentpond env init staging --store gcs
+npx agentpond env init staging --store vercel
 npx agentpond env init staging --store local
 ```
 

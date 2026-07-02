@@ -30,6 +30,7 @@
 		"@agentpond/duckdb": "workspace:*",
 		"@agentpond/fastify-ingest": "workspace:*",
 		"@agentpond/google": "workspace:*",
+		"@agentpond/vercel": "workspace:*",
 		"@duckdb/node-api": "^1.5.4-r.1",
 		"@inquirer/prompts": "8.5.2",
 		"commander": "15.0.0",

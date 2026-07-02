@@ -87,7 +87,7 @@ test("generated environment files document defaults and S3 settings", () => {
 	}
 });
 
-test("generated environment files document local and GCS settings", () => {
+test("generated environment files document local, GCS, and Vercel settings", () => {
 	const originalCwd = process.cwd();
 	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
@@ -96,8 +96,12 @@ test("generated environment files document local and GCS settings", () => {
 		process.chdir(cwd);
 		const local = initAgentPondEnvironment("local-env", { storeType: "local" });
 		const gcs = initAgentPondEnvironment("gcs-env", { storeType: "gcs" });
+		const vercel = initAgentPondEnvironment("vercel-env", {
+			storeType: "vercel",
+		});
 		const localFile = readFileSync(local.envFilePath, "utf8");
 		const gcsFile = readFileSync(gcs.envFilePath, "utf8");
+		const vercelFile = readFileSync(vercel.envFilePath, "utf8");
 
 		assert.match(localFile, /AGENTPOND_STORE=local/);
 		assert.match(localFile, /AGENTPOND_PREFIX=/);
@@ -111,10 +115,22 @@ test("generated environment files document local and GCS settings", () => {
 		assert.doesNotMatch(gcsFile, /AGENTPOND_S3_REQUEST_CHECKSUM/);
 		assert.doesNotMatch(gcsFile, /AGENTPOND_S3_RESPONSE_CHECKSUM/);
 		assert.match(gcsFile, /Application Default Credentials/);
+		assert.match(vercelFile, /AGENTPOND_STORE=vercel/);
+		assert.match(vercelFile, /AGENTPOND_PREFIX=/);
+		assert.match(vercelFile, /AGENTPOND_BLOB_ACCESS=private/);
+		assert.match(vercelFile, /BLOB_READ_WRITE_TOKEN=/);
+		assert.match(vercelFile, /BLOB_STORE_ID=/);
+		assert.match(vercelFile, /VERCEL_OIDC_TOKEN=/);
+		assert.doesNotMatch(vercelFile, /AGENTPOND_S3_BUCKET/);
+		assert.doesNotMatch(vercelFile, /AGENTPOND_GCS_BUCKET/);
 		assert.equal(configFromEnv({ envName: "local-env" }).prefix, "");
 		assert.equal(
 			configFromEnv({ envName: "gcs-env" }).environment?.storeType,
 			"gcs",
+		);
+		assert.equal(
+			configFromEnv({ envName: "vercel-env" }).environment?.storeType,
+			"vercel",
 		);
 		assert.equal(configFromEnv({ envName: "gcs-env" }).prefix, "");
 	} finally {
@@ -123,7 +139,7 @@ test("generated environment files document local and GCS settings", () => {
 	}
 });
 
-test("config accepts GCS store values and rejects unknown stores", () => {
+test("config accepts cloud store values and rejects unknown stores", () => {
 	const originalCwd = process.cwd();
 	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
@@ -146,10 +162,25 @@ test("config accepts GCS store values and rejects unknown stores", () => {
 		assert.equal(config.environment?.storeType, "gcs");
 		assert.equal(config.prefix, "prod/");
 
+		writeFileSync(
+			env.envFilePath,
+			[
+				"AGENTPOND_STORE=vercel",
+				"AGENTPOND_BLOB_ACCESS=private",
+				"AGENTPOND_PREFIX=prod",
+				"",
+			].join("\n"),
+			"utf8",
+		);
+		assert.equal(
+			configFromEnv({ envName: "production" }).environment?.storeType,
+			"vercel",
+		);
+
 		process.env.AGENTPOND_STORE = "azure";
 		assert.throws(
 			() => configFromEnv({ envName: "production" }),
-			/AGENTPOND_STORE must be "local", "s3", or "gcs"/,
+			/AGENTPOND_STORE must be "local", "s3", "gcs", or "vercel"/,
 		);
 	} finally {
 		process.chdir(originalCwd);
@@ -466,6 +497,7 @@ const CONFIG_ENV_KEYS = [
 	"AGENTPOND_S3_PREFIX",
 	"AGENTPOND_GCS_BUCKET",
 	"AGENTPOND_GCS_PREFIX",
+	"AGENTPOND_BLOB_ACCESS",
 	"LANGFUSE_BASE_URL",
 	"LANGFUSE_PUBLIC_KEY",
 	"LANGFUSE_SECRET_KEY",
@@ -475,6 +507,9 @@ const CONFIG_ENV_KEYS = [
 	"GOOGLE_CLOUD_PROJECT",
 	"GCLOUD_PROJECT",
 	"GCP_PROJECT",
+	"BLOB_READ_WRITE_TOKEN",
+	"BLOB_STORE_ID",
+	"VERCEL_OIDC_TOKEN",
 ] as const;
 
 type ConfigEnvKey = (typeof CONFIG_ENV_KEYS)[number];

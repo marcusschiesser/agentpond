@@ -31,6 +31,7 @@
 		"@agentpond/duckdb": "workspace:*",
 		"@agentpond/fastify-ingest": "workspace:*",
 		"@agentpond/google": "workspace:*",
+		"@agentpond/vercel": "workspace:*",
 		"@agentpond/ingest": "workspace:*",
 		"@biomejs/biome": "^2.5.0",
 		"@changesets/cli": "^2.29.7",

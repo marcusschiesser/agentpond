@@ -91,8 +91,15 @@ function storeTypeFromValue(
 	value: string | undefined,
 ): AgentPondStoreType | undefined {
 	if (value === undefined) return undefined;
-	if (value === "local" || value === "s3" || value === "gcs") return value;
+	if (
+		value === "local" ||
+		value === "s3" ||
+		value === "gcs" ||
+		value === "vercel"
+	) {
+		return value;
+	}
 	throw new Error(
-		`AGENTPOND_STORE must be "local", "s3", or "gcs", got "${value}"`,
+		`AGENTPOND_STORE must be "local", "s3", "gcs", or "vercel", got "${value}"`,
 	);
 }

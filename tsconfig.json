@@ -4,6 +4,7 @@
 		{ "path": "./packages/core" },
 		{ "path": "./packages/aws" },
 		{ "path": "./packages/google" },
+		{ "path": "./packages/vercel" },
 		{ "path": "./packages/ingest" },
 		{ "path": "./packages/fastify-ingest" },
 		{ "path": "./packages/duckdb" },

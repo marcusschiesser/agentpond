@@ -79,7 +79,7 @@ export function registerEnvCommand(
 
 	addGlobalOptions(env.command("init <name>"))
 		.description("initialize an environment")
-		.option("--store <store>", "object store: s3, gcs, or local")
+		.option("--store <store>", "object store: s3, gcs, vercel, or local")
 		.action(
 			async (name: string, commandOptions: EnvOptions, command: Command) => {
 				const store =
@@ -123,8 +123,17 @@ function storeFromValue(
 	value: string | undefined,
 ): AgentPondInitStore | undefined {
 	if (value === undefined) return undefined;
-	if (value === "s3" || value === "gcs" || value === "local") return value;
-	throw new CliError(`--store must be s3, gcs, or local, got "${value}"`);
+	if (
+		value === "s3" ||
+		value === "gcs" ||
+		value === "vercel" ||
+		value === "local"
+	) {
+		return value;
+	}
+	throw new CliError(
+		`--store must be s3, gcs, vercel, or local, got "${value}"`,
+	);
 }
 
 async function promptForStore(
@@ -138,6 +147,7 @@ async function promptForStore(
 		choices: [
 			{ name: "AWS S3 (or compatible)", value: "s3" },
 			{ name: "Google Cloud Storage (GCS)", value: "gcs" },
+			{ name: "Vercel Blob", value: "vercel" },
 			{ name: "Local filesystem", value: "local" },
 		],
 	});

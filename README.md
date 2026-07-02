@@ -38,7 +38,7 @@ This gives you durable remote storage without requiring an always-on analytical 
 ## Features
 
 - Langfuse-compatible ingestion endpoints for SDK and OTLP traces
-- Use AWS S3, Google Cloud Storage or local filesystem as raw event storage
+- Use AWS S3, Google Cloud Storage, Vercel Blob or local filesystem as raw event storage
 - UTC bucket discovery and incremental synchronization
 - Local DuckDB cache containing:
   - `events_raw`
@@ -137,7 +137,7 @@ eval "$(agentpond env get dev)"
 
 #### Staging and production
 
-For staging and production services, you need to deploy the AgentPond ingestion service together with an object store in your infrastructure. Release images are published to `ghcr.io/marcusschiesser/agentpond`, and [docker-compose.yml](./docker-compose.yml) provides a template that you can run locally with `docker compose up`. AWS deployments can use `lambdaIngestHandler` from `@agentpond/aws` for Lambda Function URLs or API Gateway HTTP API v2, and Google deployments can use `httpIngestFunction` from `@agentpond/google` for HTTP Cloud Functions.
+For staging and production services, deploy the AgentPond ingestion service together with an object store in your infrastructure. Docker images are published to `ghcr.io/marcusschiesser/agentpond`, and [docker-compose.yml](./docker-compose.yml) provides a template that you can run locally with `docker compose up`. See [Deployment](./docs/deployment.md) for real AWS, Google Cloud, Vercel Blob, and other infrastructure options.
 
 To point AgentPond to this service, call the `env init` command in your project:
 
@@ -145,7 +145,7 @@ To point AgentPond to this service, call the `env init` command in your project:
 agentpond env init <env-name>
 ```
 
-The command prompts for an object store (S3, GCS, or local filesystem) in an interactive terminal.
+The command prompts for an object store (S3, GCS, Vercel Blob, or local filesystem) in an interactive terminal.
 
 Using `staging` for `env-name`, this generates a `.agentpond/envs/staging.env` file that you need to update with the ingestion and object-store settings for your deployed AgentPond services.
 
