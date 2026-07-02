@@ -4,6 +4,7 @@ import {
 	sinkForConfig,
 } from "@agentpond/core";
 import {
+	createIngestRequest,
 	handleIngestRequest,
 	type IngestionLogger,
 	type IngestionSink,
@@ -48,26 +49,14 @@ export function createLambdaIngestHandler(
 	const sink = options.sink ?? S3ObjectStore.fromRuntimeEnv().toSink();
 
 	return async (event) => {
-		const body = event.body
-			? Buffer.from(event.body, event.isBase64Encoded ? "base64" : "utf8")
-			: undefined;
-		const response = await handleIngestRequest(
-			{
-				method: event.requestContext?.http?.method ?? "GET",
-				path: event.rawPath ?? event.requestContext?.http?.path ?? "/",
-				query: event.rawQueryString,
-				headers: event.headers,
-				body,
-			},
-			{
-				...options,
-				sink,
-			},
-		);
+		const response = await handleIngestRequest(requestForLambda(event), {
+			...options,
+			sink,
+		});
 		return {
 			statusCode: response.status,
-			headers: response.headers,
-			body: response.body,
+			headers: responseHeaders(response),
+			body: await response.text(),
 			isBase64Encoded: false,
 		};
 	};
@@ -77,6 +66,26 @@ export function awsSinkForConfig(config: AgentPondConfig): IngestionSink {
 	return sinkForConfig(config, {
 		s3: S3ObjectStore.fromEnvironment,
 	});
+}
+
+function requestForLambda(event: LambdaHttpApiV2Event): Request {
+	const method = event.requestContext?.http?.method ?? "GET";
+	const path = event.rawPath ?? event.requestContext?.http?.path ?? "/";
+	const body = event.body
+		? Buffer.from(event.body, event.isBase64Encoded ? "base64" : "utf8")
+		: undefined;
+
+	return createIngestRequest({
+		method,
+		path,
+		query: event.rawQueryString,
+		headers: event.headers,
+		body,
+	});
+}
+
+function responseHeaders(response: Response): Record<string, string> {
+	return Object.fromEntries(response.headers.entries());
 }
 
 export const lambdaIngestHandler = createLambdaIngestHandler();

@@ -5,6 +5,7 @@ import {
 	sinkForConfig,
 } from "@agentpond/core";
 import {
+	createIngestRequest,
 	handleIngestRequest,
 	type IngestionLogger,
 	type IngestionSink,
@@ -46,20 +47,16 @@ export function createHttpIngestFunction(
 	const auth = options.auth ?? googleAuthFromRuntimeEnv();
 
 	return async (req, res) => {
-		const response = await handleIngestRequest(
-			{
-				method: req.method ?? "GET",
-				path: requestPath(req, options.pathPrefix),
-				headers: req.headers,
-				body: requestBody(req),
-			},
-			{
-				...options,
-				auth,
-				sink,
-			},
-		);
-		res.status(response.status).set(response.headers).send(response.body);
+		const path = requestPath(req, options.pathPrefix);
+		const response = await handleIngestRequest(requestForGoogle(req, path), {
+			...options,
+			auth,
+			sink,
+		});
+		res
+			.status(response.status)
+			.set(Object.fromEntries(response.headers.entries()))
+			.send(await response.text());
 	};
 }
 
@@ -124,6 +121,15 @@ function requestBody(
 		return body;
 	}
 	return JSON.stringify(body);
+}
+
+function requestForGoogle(req: GoogleHttpRequest, path: string): Request {
+	return createIngestRequest({
+		method: req.method ?? "GET",
+		path,
+		headers: req.headers,
+		body: requestBody(req),
+	});
 }
 
 export const httpIngestFunction = createHttpIngestFunction();

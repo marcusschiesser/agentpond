@@ -235,7 +235,7 @@ test("S3 object store follows GetObject redirects", async () => {
 	}
 });
 
-test("AWS Lambda ingest handler responds to health checks", async () => {
+test("AWS Lambda ingest handler leaves health checks unrouted", async () => {
 	const handler = createLambdaIngestHandler({
 		auth,
 		sink: sinkFromStore(new MemoryObjectStore()),
@@ -245,8 +245,8 @@ test("AWS Lambda ingest handler responds to health checks", async () => {
 		requestContext: { http: { method: "GET" } },
 	});
 
-	assert.equal(response.statusCode, 200);
-	assert.deepEqual(JSON.parse(response.body), { ok: true });
+	assert.equal(response.statusCode, 404);
+	assert.deepEqual(JSON.parse(response.body), { error: "Not Found" });
 	assert.equal(response.isBase64Encoded, false);
 });
 

@@ -149,7 +149,7 @@ test("Google auth reads Google Cloud project fallbacks from runtime env", () => 
 	);
 });
 
-test("Google HTTP ingest function responds to health checks", async () => {
+test("Google HTTP ingest function leaves health checks unrouted", async () => {
 	const fn = createHttpIngestFunction({
 		auth,
 		sink: sinkFromStore(new MemoryObjectStore()),
@@ -158,8 +158,8 @@ test("Google HTTP ingest function responds to health checks", async () => {
 
 	await fn({ method: "GET", url: "/health" }, res);
 
-	assert.equal(res.statusCode, 200);
-	assert.deepEqual(JSON.parse(res.body), { ok: true });
+	assert.equal(res.statusCode, 404);
+	assert.deepEqual(JSON.parse(res.body), { error: "Not Found" });
 });
 
 test("Google HTTP ingest function accepts JSON ingestion from rawBody", async () => {
@@ -224,7 +224,7 @@ test("Google HTTP ingest function strips configured path prefixes", async () => 
 	assert.deepEqual(JSON.parse(res.body), { successes: [], errors: [] });
 });
 
-test("Google HTTP ingest function leaves unprefixed paths routable when path prefixes are configured", async () => {
+test("Google HTTP ingest function leaves unprefixed health unrouted when path prefixes are configured", async () => {
 	const fn = createHttpIngestFunction({
 		auth,
 		sink: sinkFromStore(new MemoryObjectStore()),
@@ -234,8 +234,8 @@ test("Google HTTP ingest function leaves unprefixed paths routable when path pre
 
 	await fn({ method: "GET", url: "/health?ready=1" }, res);
 
-	assert.equal(res.statusCode, 200);
-	assert.deepEqual(JSON.parse(res.body), { ok: true });
+	assert.equal(res.statusCode, 404);
+	assert.deepEqual(JSON.parse(res.body), { error: "Not Found" });
 });
 
 test("Google HTTP ingest function forwards OTEL headers", async () => {

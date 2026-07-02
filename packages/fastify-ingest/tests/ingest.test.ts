@@ -126,6 +126,21 @@ function ingestedOtelPayloadLogs(
 		}));
 }
 
+test("server responds to health checks", async () => {
+	const server = buildServer({
+		auth: config.auth,
+		sink: sinkFromStore(new MemoryObjectStore()),
+	});
+	const response = await server.inject({
+		method: "GET",
+		url: "/health?ready=1",
+	});
+
+	assert.equal(response.statusCode, 200);
+	assert.deepEqual(response.json(), { ok: true });
+	await server.close();
+});
+
 test("ingestion endpoint validates auth and returns 207 batch result", async () => {
 	const store = new MemoryObjectStore();
 	const server = buildServer({

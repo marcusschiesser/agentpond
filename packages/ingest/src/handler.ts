@@ -24,127 +24,133 @@ export type IngestHandlerOptions = {
 	logger?: IngestionLogger;
 };
 
-export type IngestHttpRequest = {
-	method: string;
-	path: string;
-	query?: string;
-	headers?: Record<string, unknown>;
-	body?: Buffer | Uint8Array | string;
-};
-
-export type IngestHttpResponse = {
-	status: number;
-	headers: Record<string, string>;
-	body: string;
-};
-
 const jsonHeaders = { "content-type": "application/json" };
 
 export async function handleIngestRequest(
-	request: IngestHttpRequest,
-	options?: IngestHandlerOptions,
-): Promise<IngestHttpResponse> {
+	request: Request,
+	options: IngestHandlerOptions,
+): Promise<Response> {
 	const method = request.method.toUpperCase();
-	const path = request.path.split("?", 1)[0];
-
-	if (method === "GET" && path === "/health") {
-		return jsonResponse(200, { ok: true });
-	}
 	if (method !== "POST") return jsonResponse(404, { error: "Not Found" });
 
-	const requestAuth =
-		options?.auth === undefined ? authFromRuntimeEnv() : options.auth;
-	const sink = sinkForOptions(options);
-	const logger = options?.logger ?? noopLogger;
-
+	const path = new URL(request.url).pathname;
 	if (path === "/api/public/ingestion") {
-		try {
-			const auth = authenticateRequest(
-				readHeader(request.headers ?? {}, "authorization"),
-				requestAuth,
-			);
-			const payload = parseJsonBody(
-				request.body,
-				readHeader(request.headers ?? {}, "content-encoding"),
-			);
-			const parsed = ingestionBatchSchema.safeParse(payload);
-
-			if (!parsed.success) {
-				return jsonResponse(400, {
-					message: "Invalid request data",
-					errors: parsed.error.issues.map((issue) => issue.message),
-				});
-			}
-
-			const { events, errors } = parseIngestionEvents(parsed.data.batch);
-			if (events.length > 0) {
-				await sink.writeEvents({
-					projectId: auth.projectId,
-					events,
-				});
-				logIngestedEvents(logger, {
-					source: "ingestion",
-					projectId: auth.projectId,
-					events,
-				});
-			}
-			return jsonResponse(207, {
-				successes: events.map((event) => ({ id: event.id, status: 201 })),
-				errors,
-			});
-		} catch (error) {
-			return errorResponse(error);
-		}
+		return handleIngestionRequest(request, options);
 	}
-
 	if (path === "/api/public/otel/v1/traces") {
-		try {
-			const auth = authenticateRequest(
-				readHeader(request.headers ?? {}, "authorization"),
-				requestAuth,
-			);
-			const ingestionVersion = readHeader(
-				request.headers ?? {},
-				"x-langfuse-ingestion-version",
-			);
-			if (ingestionVersion) {
-				const parsedVersion = Number.parseInt(ingestionVersion, 10);
-				if (Number.isNaN(parsedVersion) || parsedVersion > 4) {
-					return jsonResponse(400, {
-						error: `Unsupported x-langfuse-ingestion-version: "${ingestionVersion}". Maximum supported: "4".`,
-					});
-				}
-			}
-
-			const resourceSpans = await otelBodyToResourceSpans({
-				body: request.body,
-				contentType: readHeader(request.headers ?? {}, "content-type"),
-				contentEncoding: readHeader(request.headers ?? {}, "content-encoding"),
-				projectId: auth.projectId,
-			});
-			if (resourceSpans.length === 0) return jsonResponse(200, {});
-
-			await sink.writeOtelResourceSpans({
-				projectId: auth.projectId,
-				resourceSpans,
-			});
-			logIngestedOtelPayload(logger, {
-				projectId: auth.projectId,
-				resourceSpanCount: resourceSpans.length,
-			});
-			return jsonResponse(200, {});
-		} catch (error) {
-			return errorResponse(error);
-		}
+		return handleOtelTracesRequest(request, options);
 	}
 
 	return jsonResponse(404, { error: "Not Found" });
 }
 
-function sinkForOptions(
-	options: IngestHandlerOptions | undefined,
-): IngestionSink {
-	if (options?.sink) return options.sink;
+export async function handleIngestionRequest(
+	request: Request,
+	options: IngestHandlerOptions,
+): Promise<Response> {
+	if (request.method.toUpperCase() !== "POST") {
+		return jsonResponse(404, { error: "Not Found" });
+	}
+
+	const requestAuth =
+		options.auth === undefined ? authFromRuntimeEnv() : options.auth;
+	const sink = sinkForOptions(options);
+	const logger = options.logger ?? noopLogger;
+
+	try {
+		const auth = authenticateRequest(
+			readHeader(request.headers, "authorization"),
+			requestAuth,
+		);
+		const payload = parseJsonBody(
+			await requestBody(request),
+			readHeader(request.headers, "content-encoding"),
+		);
+		const parsed = ingestionBatchSchema.safeParse(payload);
+
+		if (!parsed.success) {
+			return jsonResponse(400, {
+				message: "Invalid request data",
+				errors: parsed.error.issues.map((issue) => issue.message),
+			});
+		}
+
+		const { events, errors } = parseIngestionEvents(parsed.data.batch);
+		if (events.length > 0) {
+			await sink.writeEvents({
+				projectId: auth.projectId,
+				events,
+			});
+			logIngestedEvents(logger, {
+				source: "ingestion",
+				projectId: auth.projectId,
+				events,
+			});
+		}
+		return jsonResponse(207, {
+			successes: events.map((event) => ({ id: event.id, status: 201 })),
+			errors,
+		});
+	} catch (error) {
+		return errorResponse(error);
+	}
+}
+
+export async function handleOtelTracesRequest(
+	request: Request,
+	options: IngestHandlerOptions,
+): Promise<Response> {
+	if (request.method.toUpperCase() !== "POST") {
+		return jsonResponse(404, { error: "Not Found" });
+	}
+
+	const requestAuth =
+		options.auth === undefined ? authFromRuntimeEnv() : options.auth;
+	const sink = sinkForOptions(options);
+	const logger = options.logger ?? noopLogger;
+
+	try {
+		const auth = authenticateRequest(
+			readHeader(request.headers, "authorization"),
+			requestAuth,
+		);
+		const ingestionVersion = readHeader(
+			request.headers,
+			"x-langfuse-ingestion-version",
+		);
+		if (ingestionVersion) {
+			const parsedVersion = Number.parseInt(ingestionVersion, 10);
+			if (Number.isNaN(parsedVersion) || parsedVersion > 4) {
+				return jsonResponse(400, {
+					error: `Unsupported x-langfuse-ingestion-version: "${ingestionVersion}". Maximum supported: "4".`,
+				});
+			}
+		}
+
+		const resourceSpans = await otelBodyToResourceSpans({
+			body: await requestBody(request),
+			contentType: readHeader(request.headers, "content-type"),
+			contentEncoding: readHeader(request.headers, "content-encoding"),
+			projectId: auth.projectId,
+		});
+		if (resourceSpans.length === 0) return jsonResponse(200, {});
+
+		await sink.writeOtelResourceSpans({
+			projectId: auth.projectId,
+			resourceSpans,
+		});
+		logIngestedOtelPayload(logger, {
+			projectId: auth.projectId,
+			resourceSpanCount: resourceSpans.length,
+		});
+		return jsonResponse(200, {});
+	} catch (error) {
+		return errorResponse(error);
+	}
+}
+
+function sinkForOptions(options: IngestHandlerOptions): IngestionSink {
+	if (options.sink) return options.sink;
 	throw new Error("AgentPond ingest requires a sink");
 }
 
@@ -232,7 +238,11 @@ function parseJsonBody(
 	return JSON.parse(buffer.toString("utf8"));
 }
 
-function errorResponse(error: unknown): IngestHttpResponse {
+async function requestBody(request: Request): Promise<Buffer> {
+	return Buffer.from(await request.arrayBuffer());
+}
+
+function errorResponse(error: unknown): Response {
 	if (error instanceof AuthError) {
 		return jsonResponse(error.status, {
 			error: error.name,
@@ -256,21 +266,9 @@ function errorResponse(error: unknown): IngestHttpResponse {
 	return jsonResponse(500, { error: "Internal Server Error", message });
 }
 
-function readHeader(
-	headers: Record<string, unknown>,
-	name: string,
-): string | undefined {
-	const lowerName = name.toLowerCase();
-	for (const [key, value] of Object.entries(headers)) {
-		if (key.toLowerCase() === lowerName) return headerToString(value);
-	}
-	const underscoreName = name.replaceAll("-", "_").toLowerCase();
-	for (const [key, value] of Object.entries(headers)) {
-		if (key.toLowerCase() === underscoreName) return headerToString(value);
-	}
+function readHeader(headers: Headers, name: string): string | undefined {
 	return (
-		headerToString(headers[name]) ??
-		headerToString(headers[name.replaceAll("-", "_")])
+		headers.get(name) ?? headers.get(name.replaceAll("-", "_")) ?? undefined
 	);
 }
 
@@ -280,12 +278,11 @@ function headerToString(value: unknown): string | undefined {
 	return undefined;
 }
 
-function jsonResponse(status: number, body: unknown): IngestHttpResponse {
-	return {
+function jsonResponse(status: number, body: unknown): Response {
+	return new Response(JSON.stringify(body), {
 		status,
 		headers: jsonHeaders,
-		body: JSON.stringify(body),
-	};
+	});
 }
 
 function requestLogSafe(error: unknown): void {
