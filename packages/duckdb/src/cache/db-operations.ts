@@ -66,10 +66,10 @@ export type ScoreAppendRow = {
 	observationId: string | undefined;
 	sessionId: string | undefined;
 	name: string | undefined;
-	value: number | null;
-	stringValue: string | null;
-	dataType: string;
-	source: string;
+	value: number | null | undefined;
+	stringValue: string | null | undefined;
+	dataType: string | undefined;
+	source: string | undefined;
 	comment: string | undefined;
 	metadataJson: string | undefined;
 	timestamp: string | undefined;

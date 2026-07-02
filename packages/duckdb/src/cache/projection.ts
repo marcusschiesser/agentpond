@@ -79,49 +79,24 @@ export class BatchProjection {
 		for (const traceId of existingKeys.costTraceIds) {
 			work.costTraceIds.add(traceId);
 		}
-		const traceRows = [
-			...latestBatchRowsByKey(
-				this.rawRows,
-				"traceId",
-				withoutExistingKeys(work.traceIds, existingKeys.traceIds),
-				(row) => row.eventType === "trace-create",
-			),
-			...(await this.latestRawRowsByKey(
+		const traceRows = await this.rawRowsByKey(
 				projectId,
 				"trace_id",
-				existingKeys.traceIds,
+			work.traceIds,
 				"event_type = 'trace-create'",
-			)),
-		];
-		const observationRows = [
-			...latestBatchRowsByKey(
-				this.rawRows,
-				"observationId",
-				withoutExistingKeys(work.observationIds, existingKeys.observationIds),
-				(row) =>
-					row.eventType !== "trace-create" && row.eventType !== "score-create",
-			),
-			...(await this.latestRawRowsByKey(
+		);
+		const observationRows = await this.rawRowsByKey(
 				projectId,
 				"observation_id",
-				existingKeys.observationIds,
+			work.observationIds,
 				"event_type <> 'trace-create' AND event_type <> 'score-create'",
-			)),
-		];
-		const scoreRows = [
-			...latestBatchRowsByKey(
-				this.rawRows,
-				"scoreId",
-				withoutExistingKeys(work.scoreIds, existingKeys.scoreIds),
-				(row) => row.eventType === "score-create",
-			),
-			...(await this.latestRawRowsByKey(
+		);
+		const scoreRows = await this.rawRowsByKey(
 				projectId,
 				"score_id",
-				existingKeys.scoreIds,
+			work.scoreIds,
 				"event_type = 'score-create'",
-			)),
-		];
+		);
 		for (const row of observationRows) {
 			if (row.traceId) work.costTraceIds.add(row.traceId);
 		}
@@ -198,13 +173,13 @@ export class BatchProjection {
 		return rows;
 	}
 
-	private async latestRawRowsByKey(
+	private async rawRowsByKey(
 		projectId: string,
 		keyColumn: "trace_id" | "observation_id" | "score_id",
 		keys: Set<string>,
 		filter: string,
 	): Promise<RawEventRow[]> {
-		const latest = new Map<string, RawEventRow>();
+		const result: RawEventRow[] = [];
 		for (const keyChunk of chunks([...keys], FILTER_CHUNK_SIZE)) {
 			if (keyChunk.length === 0) continue;
 			const rows = await this.db.all<{
@@ -221,30 +196,28 @@ export class BatchProjection {
 				observation_id: string | null;
 				score_id: string | null;
 			}>(`
-        SELECT
-          event_id,
+	        SELECT
+	          event_id,
           project_id,
           manifest_key,
           object_key,
-          event_type,
-          event_timestamp,
+	          event_type,
+	          event_timestamp,
           entity_id,
-          body_json,
+	          body_json,
           event_json,
-          trace_id,
-          observation_id,
-          score_id
-        FROM events_raw
-        WHERE project_id = ${sql(projectId)}
-          AND ${filter}
-          AND ${keyColumn} IN (${keyChunk.map(sql).join(", ")})
-        ORDER BY ${keyColumn} ASC, event_timestamp DESC, event_id DESC
-      `);
+	          trace_id,
+	          observation_id,
+	          score_id
+	        FROM events_raw
+	        WHERE project_id = ${sql(projectId)}
+	          AND ${filter}
+	          AND ${keyColumn} IN (${keyChunk.map(sql).join(", ")})
+	        ORDER BY ${keyColumn} ASC, event_timestamp ASC, event_id ASC
+	      `);
 			for (const row of rows) {
-				const key = stringValue(row[keyColumn]);
-				if (!key || latest.has(key)) continue;
 				const event = JSON.parse(row.event_json) as IngestionEvent;
-				latest.set(key, {
+				result.push({
 					eventId: row.event_id,
 					projectId: row.project_id,
 					manifestKey: row.manifest_key,
@@ -261,7 +234,7 @@ export class BatchProjection {
 				});
 			}
 		}
-		return [...latest.values()];
+		return result;
 	}
 
 	private async rebuildTraces(
@@ -270,8 +243,8 @@ export class BatchProjection {
 		rawRows: RawEventRow[],
 	): Promise<void> {
 		await this.deleteByIds("traces", traceIds);
-		const rows = rawRows
-			.map((row) => buildTraceAppendRow(projectId, row.event))
+		const rows = groupedRowsByKey(rawRows, "traceId")
+			.map((rows) => buildMergedTraceAppendRow(projectId, rows))
 			.filter((row) => row !== undefined);
 		await this.db.appendTraces(rows);
 	}
@@ -282,8 +255,8 @@ export class BatchProjection {
 		rawRows: RawEventRow[],
 	): Promise<void> {
 		await this.deleteByIds("observations", observationIds);
-		const rows = rawRows
-			.map((row) => buildObservationAppendRow(projectId, row.event))
+		const rows = groupedRowsByKey(rawRows, "observationId")
+			.map((rows) => buildMergedObservationAppendRow(projectId, rows))
 			.filter((row) => row !== undefined);
 		await this.db.appendObservations(rows);
 	}
@@ -295,7 +268,9 @@ export class BatchProjection {
 	): Promise<void> {
 		await this.deleteByIds("scores", scoreIds);
 		await this.db.appendScores(
-			rawRows.map((row) => buildScoreAppendRow(projectId, row.event)),
+			groupedRowsByKey(rawRows, "scoreId").map((rows) =>
+				buildMergedScoreAppendRow(projectId, rows),
+			),
 		);
 	}
 
@@ -405,34 +380,22 @@ function addProjectionWork(work: ProjectionWork, row: RawEventRow): void {
 	if (row.observationId) work.observationIds.add(row.observationId);
 }
 
-function latestBatchRowsByKey(
+function groupedRowsByKey(
 	rows: RawEventRow[],
 	key: "traceId" | "observationId" | "scoreId",
-	keys: Set<string>,
-	filter: (row: RawEventRow) => boolean,
-): RawEventRow[] {
-	const latest = new Map<string, RawEventRow>();
+): RawEventRow[][] {
+	const groups = new Map<string, RawEventRow[]>();
 	for (const row of rows) {
 		const value = row[key];
-		if (!value || !keys.has(value) || !filter(row)) continue;
-		const current = latest.get(value);
-		if (!current || compareRawRows(row, current) > 0) {
-			latest.set(value, row);
+		if (!value) continue;
+		const group = groups.get(value);
+		if (group) {
+			group.push(row);
+		} else {
+			groups.set(value, [row]);
 		}
 	}
-	return [...latest.values()];
-}
-
-function withoutExistingKeys(
-	keys: Set<string>,
-	existingKeys: Set<string>,
-): Set<string> {
-	if (existingKeys.size === 0) return keys;
-	const result = new Set<string>();
-	for (const key of keys) {
-		if (!existingKeys.has(key)) result.add(key);
-	}
-	return result;
+	return [...groups.values()].map((group) => group.sort(compareRawRows));
 }
 
 function compareRawRows(left: RawEventRow, right: RawEventRow): number {
@@ -462,6 +425,36 @@ function eventsRawAppendRow(row: RawEventRow): EventsRawAppendRow {
 	};
 }
 
+function buildMergedTraceAppendRow(
+	projectId: string,
+	rows: RawEventRow[],
+): TraceAppendRow | undefined {
+	const first = rows[0];
+	const id = first?.traceId;
+	if (!id) return undefined;
+	const merged: TraceAppendRow = {
+		id,
+		projectId,
+		name: undefined,
+		userId: undefined,
+		sessionId: undefined,
+		startTime: undefined,
+		endTime: undefined,
+		metadataJson: undefined,
+		inputJson: undefined,
+		outputJson: undefined,
+		totalCost: undefined,
+		updatedAt: undefined,
+	};
+	for (const row of rows) {
+		const appendRow = buildTraceAppendRow(projectId, row.event);
+		if (!appendRow) continue;
+		mergeDefinedFields(merged, appendRow, ["id", "projectId", "totalCost"]);
+	}
+	mergeLatestIo(merged, rows);
+	return merged;
+}
+
 function buildTraceAppendRow(
 	projectId: string,
 	event: IngestionEvent,
@@ -469,14 +462,47 @@ function buildTraceAppendRow(
 	const body = event.body as Record<string, unknown>;
 	const id = stringValue(body.id ?? body.traceId);
 	if (!id) return undefined;
-	return {
+	return mergeUndefinedValues({
 		id,
 		projectId,
 		userId: stringValue(body.userId),
 		sessionId: stringValue(body.sessionId),
 		...appendRowBodyFields(body, event),
 		totalCost: undefined,
+	});
+}
+
+function buildMergedObservationAppendRow(
+	projectId: string,
+	rows: RawEventRow[],
+): ObservationAppendRow | undefined {
+	const first = rows[0];
+	const id = first?.observationId;
+	if (!id) return undefined;
+	const merged: ObservationAppendRow = {
+		id,
+		projectId,
+		traceId: undefined,
+		parentObservationId: undefined,
+		type: first.eventType,
+		name: undefined,
+		startTime: undefined,
+		endTime: undefined,
+		metadataJson: undefined,
+		inputJson: undefined,
+		outputJson: undefined,
+		usageDetailsJson: undefined,
+		costDetailsJson: undefined,
+		totalCost: undefined,
+		updatedAt: undefined,
 	};
+	for (const row of rows) {
+		const appendRow = buildObservationAppendRow(projectId, row.event);
+		if (!appendRow) continue;
+		mergeDefinedFields(merged, appendRow, ["id", "projectId"]);
+	}
+	mergeLatestIo(merged, rows);
+	return merged;
 }
 
 function buildObservationAppendRow(
@@ -488,7 +514,7 @@ function buildObservationAppendRow(
 	const costDetails = objectValue(body.costDetails);
 	const totalCost =
 		numericValue(body.totalCost) ?? costDetailsTotal(costDetails);
-	return {
+	return mergeUndefinedValues({
 		id,
 		projectId,
 		traceId: stringValue(body.traceId),
@@ -498,7 +524,7 @@ function buildObservationAppendRow(
 		usageDetailsJson: jsonString(body.usageDetails),
 		costDetailsJson: jsonString(costDetails),
 		totalCost,
-	};
+	});
 }
 
 function appendRowBodyFields(
@@ -527,6 +553,31 @@ function appendRowBodyFields(
 	};
 }
 
+function buildMergedScoreAppendRow(
+	projectId: string,
+	rows: RawEventRow[],
+): ScoreAppendRow {
+	const first = rows[0];
+	const merged = buildScoreAppendRow(
+		projectId,
+		first?.event ?? {
+			id: "",
+			timestamp: new Date(0).toISOString(),
+			type: "score-create",
+			body: {},
+		},
+	);
+	for (const row of rows.slice(1)) {
+		mergeDefinedFields(merged, buildScoreAppendRow(projectId, row.event), [
+			"id",
+			"projectId",
+			"timestamp",
+		]);
+	}
+	if (merged.source === undefined) merged.source = "API";
+	return merged;
+}
+
 function buildScoreAppendRow(
 	projectId: string,
 	event: IngestionEvent,
@@ -538,7 +589,7 @@ function buildScoreAppendRow(
 		stringValue: scoreStringValue,
 		dataType,
 	} = scoreValue(body.value, stringValue(body.dataType));
-	return {
+	return mergeUndefinedValues({
 		id,
 		projectId,
 		traceId: stringValue(body.traceId),
@@ -553,7 +604,69 @@ function buildScoreAppendRow(
 		metadataJson: jsonString(body.metadata),
 		timestamp: timestampValue(body.createdAt ?? event.timestamp),
 		updatedAt: timestampValue(event.timestamp),
-	};
+	});
+}
+
+function mergeDefinedFields<T extends Record<string, unknown>>(
+	target: T,
+	source: T,
+	immutableKeys: Array<keyof T>,
+): void {
+	for (const key of Object.keys(source) as Array<keyof T>) {
+		if (immutableKeys.includes(key)) continue;
+		const value = source[key];
+		if (value === undefined || isEmptyObjectJson(value)) continue;
+		if (key === "metadataJson") {
+			target[key] = mergeMetadataJson(target[key], value) as T[typeof key];
+			continue;
+		}
+		target[key] = value;
+	}
+		}
+
+function mergeLatestIo(
+	target: Pick<TraceAppendRow, "inputJson" | "outputJson">,
+	rows: RawEventRow[],
+): void {
+	for (const row of rows) {
+		const body = row.event.body as Record<string, unknown>;
+		const inputJson = jsonString(body.input);
+		if (inputJson !== undefined) target.inputJson = inputJson;
+		const outputJson = jsonString(body.output);
+		if (outputJson !== undefined) target.outputJson = outputJson;
+	}
+}
+
+function mergeMetadataJson(left: unknown, right: unknown): string | undefined {
+	const leftObject = objectFromJsonString(left);
+	const rightObject = objectFromJsonString(right);
+	if (!leftObject) return stringValue(right);
+	if (!rightObject) return stringValue(left);
+	return JSON.stringify({ ...leftObject, ...rightObject });
+}
+
+function objectFromJsonString(
+	value: unknown,
+): Record<string, unknown> | undefined {
+	const raw = stringValue(value);
+	if (!raw) return undefined;
+	try {
+		return objectValue(JSON.parse(raw));
+	} catch {
+		return undefined;
+	}
+}
+
+function isEmptyObjectJson(value: unknown): boolean {
+	const object = objectFromJsonString(value);
+	return object !== undefined && Object.keys(object).length === 0;
+}
+
+function mergeUndefinedValues<T extends Record<string, unknown>>(value: T): T {
+	for (const key of Object.keys(value)) {
+		if (value[key] === undefined) delete value[key];
+	}
+	return value;
 }
 
 function chunks<T>(values: T[], size: number): T[][] {
@@ -617,7 +730,7 @@ function costDetailsTotal(
 	return hasCost ? total : undefined;
 }
 
-function scoreSource(body: Record<string, unknown>): string {
+function scoreSource(body: Record<string, unknown>): string | undefined {
 	const explicit = stringValue(body.source);
 	if (isScoreSource(explicit)) return explicit;
 	const metadata = body.metadata;
@@ -627,7 +740,7 @@ function scoreSource(body: Record<string, unknown>): string {
 		);
 		if (isScoreSource(metadataSource)) return metadataSource;
 	}
-	return "API";
+	return undefined;
 }
 
 function isScoreSource(
@@ -640,10 +753,16 @@ function scoreValue(
 	value: unknown,
 	declaredDataType: string | undefined,
 ): {
-	numberValue: number | null;
-	stringValue: string | null;
-	dataType: string;
+	numberValue: number | null | undefined;
+	stringValue: string | null | undefined;
+	dataType: string | undefined;
 } {
+	if (value === undefined || value === null)
+		return {
+			numberValue: undefined,
+			stringValue: undefined,
+			dataType: declaredDataType,
+		};
 	if (typeof value === "number")
 		return {
 			numberValue: value,

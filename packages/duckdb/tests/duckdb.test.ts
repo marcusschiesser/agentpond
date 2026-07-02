@@ -9,8 +9,8 @@ import {
 	type IngestionEvent,
 	MemoryObjectStore,
 } from "@agentpond/core";
-import { AgentPondCache, DuckDbIngestionSink } from "@agentpond/duckdb";
 import { retryDuckDbLockConflicts } from "../src/cache/write-lock.js";
+import { AgentPondCache, DuckDbIngestionSink } from "../src/index.js";
 
 function createTempDbPath(): string {
 	return join(mkdtempSync(join(tmpdir(), "agentpond-")), "cache.duckdb");
@@ -575,7 +575,7 @@ test("DuckDB projection breaks equal timestamps by event id", async () => {
 	assert.deepEqual(observations, [{ name: "event b" }]);
 });
 
-test("DuckDB projection keeps whole-row replacement semantics for partial updates", async () => {
+test("DuckDB projection merges observation updates with existing projected rows", async () => {
 	const store = new MemoryObjectStore();
 	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
 	const db = createTempDb();
@@ -597,6 +597,7 @@ test("DuckDB projection keeps whole-row replacement semantics for partial update
 					traceId: "trace-1",
 					name: "created observation",
 					input: { prompt: "older input" },
+					output: "to overwrite",
 					costDetails: { total: 0.4 },
 				},
 			},
@@ -613,6 +614,7 @@ test("DuckDB projection keeps whole-row replacement semantics for partial update
 				type: eventTypes.GENERATION_UPDATE,
 				body: {
 					id: "observation-1",
+					name: "updated observation",
 					output: { answer: "newer output" },
 				},
 			},
@@ -626,12 +628,13 @@ test("DuckDB projection keeps whole-row replacement semantics for partial update
 	});
 
 	const observations = await db.query<{
+		name: string | null;
 		trace_id: string | null;
 		input_json: string | null;
 		output_json: string | null;
 		total_cost: number | null;
 	}>(
-		"select trace_id, input_json, output_json, total_cost from observations where id = 'observation-1'",
+		"select name, trace_id, input_json, output_json, total_cost from observations where id = 'observation-1'",
 	);
 	const traces = await db.query<{ total_cost: number | null }>(
 		"select total_cost from traces where id = 'trace-1'",
@@ -646,15 +649,298 @@ test("DuckDB projection keeps whole-row replacement semantics for partial update
 	assert.equal(second.eventsProcessed, 1);
 	assert.deepEqual(observations, [
 		{
-			trace_id: null,
-			input_json: null,
+			name: "updated observation",
+			trace_id: "trace-1",
+			input_json: JSON.stringify({ prompt: "older input" }),
 			output_json: JSON.stringify({ answer: "newer output" }),
-			total_cost: null,
+			total_cost: 0.4,
 		},
 	]);
-	assert.deepEqual(traces, [{ total_cost: null }]);
+	assert.deepEqual(traces, [{ total_cost: 0.4 }]);
 	assert.equal(noop.objectsProcessed, 0);
 	assert.equal(noop.eventsProcessed, 0);
+});
+
+test("DuckDB projection preserves rich trace fields when later trace events are shallow", async () => {
+	const store = new MemoryObjectStore();
+	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
+	const db = createTempDb();
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "rich-trace-event",
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: {
+					id: "trace-1",
+					name: "rich trace",
+					input: { question: "hello" },
+					output: { answer: "world" },
+				},
+			},
+		],
+		"batch-1",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "shallow-trace-event",
+				timestamp: "2026-06-14T00:00:01.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: {
+					id: "trace-1",
+				},
+			},
+		],
+		"batch-2",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	const traces = await db.query<{
+		name: string | null;
+		input_json: string | null;
+		output_json: string | null;
+	}>("select name, input_json, output_json from traces where id = 'trace-1'");
+	await db.close();
+
+	assert.deepEqual(traces, [
+		{
+			name: "rich trace",
+			input_json: JSON.stringify({ question: "hello" }),
+			output_json: JSON.stringify({ answer: "world" }),
+		},
+	]);
+});
+
+test("DuckDB projection applies observation updates after creates with the same timestamp", async () => {
+	const { db } = await writeAndSync([
+		{
+			id: "b-update-observation-event",
+			timestamp: "2026-06-14T00:00:01.000Z",
+			type: eventTypes.GENERATION_UPDATE,
+			body: {
+				id: "observation-1",
+				output: { answer: "updated output" },
+			},
+		},
+		{
+			id: "a-create-observation-event",
+			timestamp: "2026-06-14T00:00:01.000Z",
+			type: eventTypes.GENERATION_CREATE,
+			body: {
+				id: "observation-1",
+				traceId: "trace-1",
+				name: "created observation",
+				input: { prompt: "created input" },
+				output: "stale output",
+				metadata: { model: "gpt-test" },
+			},
+		},
+	]);
+
+	const observations = await db.query<{
+		trace_id: string | null;
+		name: string | null;
+		input_json: string | null;
+		output_json: string | null;
+		metadata_json: string | null;
+	}>(
+		"select trace_id, name, input_json, output_json, metadata_json from observations where id = 'observation-1'",
+	);
+	await db.close();
+
+	assert.deepEqual(observations, [
+		{
+			trace_id: "trace-1",
+			name: "created observation",
+			input_json: JSON.stringify({ prompt: "created input" }),
+			output_json: JSON.stringify({ answer: "updated output" }),
+			metadata_json: JSON.stringify({ model: "gpt-test" }),
+		},
+	]);
+});
+
+test("DuckDB projection merges trace and observation metadata like Langfuse", async () => {
+	const cases: Array<{
+		name: string;
+		first?: Record<string, unknown>;
+		second?: Record<string, unknown>;
+		expected: Record<string, unknown>;
+	}> = [
+		{
+			name: "adds disjoint keys",
+			first: { a: "a" },
+			second: { b: "b" },
+			expected: { a: "a", b: "b" },
+		},
+		{
+			name: "keeps first when second is absent",
+			first: { a: "a" },
+			expected: { a: "a" },
+		},
+		{
+			name: "uses second when first is absent",
+			second: { b: "b" },
+			expected: { b: "b" },
+		},
+		{
+			name: "overwrites duplicate keys with later values",
+			first: { foo: "old", bar: "baz" },
+			second: { foo: "new" },
+			expected: { foo: "new", bar: "baz" },
+		},
+	];
+
+	for (const testCase of cases) {
+		const traceId = `trace-metadata-${testCase.name.replaceAll(" ", "-")}`;
+		const observationId = `observation-metadata-${testCase.name.replaceAll(" ", "-")}`;
+		const { db } = await writeAndSync([
+			{
+				id: `${traceId}-a`,
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: {
+					id: traceId,
+					name: "trace",
+					metadata: testCase.first,
+				},
+			},
+			{
+				id: `${traceId}-b`,
+				timestamp: "2026-06-14T00:00:01.000Z",
+				type: eventTypes.TRACE_CREATE,
+				body: {
+					id: traceId,
+					metadata: testCase.second,
+				},
+			},
+			{
+				id: `${observationId}-a`,
+				timestamp: "2026-06-14T00:00:00.000Z",
+				type: eventTypes.GENERATION_CREATE,
+				body: {
+					id: observationId,
+					traceId,
+					name: "generation",
+					metadata: testCase.first,
+				},
+			},
+			{
+				id: `${observationId}-b`,
+				timestamp: "2026-06-14T00:00:01.000Z",
+				type: eventTypes.GENERATION_UPDATE,
+				body: {
+					id: observationId,
+					metadata: testCase.second,
+				},
+			},
+		]);
+
+		const traces = await db.query<{ metadata_json: string | null }>(
+			`select metadata_json from traces where id = '${traceId}'`,
+		);
+		const observations = await db.query<{ metadata_json: string | null }>(
+			`select metadata_json from observations where id = '${observationId}'`,
+		);
+		await db.close();
+
+		assert.deepEqual(
+			JSON.parse(traces[0]?.metadata_json ?? "{}"),
+			testCase.expected,
+		);
+		assert.deepEqual(
+			JSON.parse(observations[0]?.metadata_json ?? "{}"),
+			testCase.expected,
+		);
+	}
+});
+
+test("DuckDB projection merges partial score updates", async () => {
+	const store = new MemoryObjectStore();
+	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });
+	const db = createTempDb();
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "score-create-event",
+				timestamp: "2026-06-14T00:00:01.000Z",
+				type: eventTypes.SCORE_CREATE,
+				body: {
+					id: "score-1",
+					traceId: "trace-1",
+					observationId: "observation-1",
+					sessionId: "session-1",
+					name: "quality",
+					value: 0.1,
+					source: "EVAL",
+				},
+			},
+		],
+		"batch-1",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "score-update-event",
+				timestamp: "2026-06-14T00:00:02.000Z",
+				type: eventTypes.SCORE_CREATE,
+				body: {
+					id: "score-1",
+					value: 0.9,
+					comment: "reviewed",
+				},
+			},
+		],
+		"batch-2",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	await writer.writeAcceptedEvents(
+		[
+			{
+				id: "score-comment-event",
+				timestamp: "2026-06-14T00:00:03.000Z",
+				type: eventTypes.SCORE_CREATE,
+				body: {
+					id: "score-1",
+					comment: "confirmed",
+				},
+			},
+		],
+		"batch-3",
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+
+	const scores = await db.query<{
+		trace_id: string | null;
+		observation_id: string | null;
+		session_id: string | null;
+		name: string | null;
+		value: number | null;
+		source: string | null;
+		comment: string | null;
+	}>(
+		"select trace_id, observation_id, session_id, name, value, source, comment from scores where id = 'score-1'",
+	);
+	await db.close();
+
+	assert.deepEqual(scores, [
+		{
+			trace_id: "trace-1",
+			observation_id: "observation-1",
+			session_id: "session-1",
+			name: "quality",
+			value: 0.9,
+			source: "EVAL",
+			comment: "confirmed",
+		},
+	]);
 });
 
 test("DuckDB score projection uses latest timestamp for the same score", async () => {
