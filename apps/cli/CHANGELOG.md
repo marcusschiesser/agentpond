@@ -1,5 +1,13 @@
 # agentpond
 
+## 0.3.6
+
+### Patch Changes
+
+- @agentpond/aws@0.3.4
+- @agentpond/fastify-ingest@0.3.3
+- @agentpond/google@0.3.3
+
 ## 0.3.5
 
 ### Patch Changes

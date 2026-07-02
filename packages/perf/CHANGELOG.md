@@ -1,5 +1,14 @@
 # @agentpond/perf
 
+## 0.1.6
+
+### Patch Changes
+
+- Updated dependencies [da32a31]
+  - @agentpond/ingest@0.3.3
+  - @agentpond/aws@0.3.4
+  - @agentpond/fastify-ingest@0.3.3
+
 ## 0.1.5
 
 ### Patch Changes
