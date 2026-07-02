@@ -1,5 +1,11 @@
 # @agentpond/ingest
 
+## 0.3.3
+
+### Patch Changes
+
+- da32a31: Expose Fetch-native ingestion handlers for direct Next.js and web runtime routing.
+
 ## 0.3.2
 
 ### Patch Changes

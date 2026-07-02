@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/google",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"description": "Google Cloud Storage and HTTP ingestion adapters for AgentPond",
 	"license": "MIT",
 	"type": "module",

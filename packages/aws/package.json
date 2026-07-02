@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/aws",
-	"version": "0.3.3",
+	"version": "0.3.4",
 	"description": "AWS S3 storage and Lambda ingestion adapters for AgentPond",
 	"license": "MIT",
 	"type": "module",

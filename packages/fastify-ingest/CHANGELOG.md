@@ -1,5 +1,12 @@
 # @agentpond/fastify-ingest
 
+## 0.3.3
+
+### Patch Changes
+
+- Updated dependencies [da32a31]
+  - @agentpond/ingest@0.3.3
+
 ## 0.3.2
 
 ### Patch Changes
