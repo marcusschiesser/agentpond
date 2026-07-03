@@ -699,7 +699,7 @@ function mergeMetadataJson(left: unknown, right: unknown): string | undefined {
 	const rightObject = objectFromJsonString(right);
 	if (!leftObject) return rightRaw;
 	if (!rightObject) return leftRaw;
-	return JSON.stringify({ ...leftObject, ...rightObject });
+	return JSON.stringify(mergeObjects(leftObject, rightObject));
 }
 
 function objectFromJsonString(
@@ -716,6 +716,26 @@ function objectFromJsonString(
 
 function isEmptyObjectJson(value: unknown): boolean {
 	return stringValue(value) === "{}";
+}
+
+function mergeObjects(
+	left: Record<string, unknown>,
+	right: Record<string, unknown>,
+): Record<string, unknown> {
+	const result: Record<string, unknown> = { ...left };
+	for (const [key, rightValue] of Object.entries(right)) {
+		const leftValue = result[key];
+		if (isPlainObject(leftValue) && isPlainObject(rightValue)) {
+			result[key] = mergeObjects(leftValue, rightValue);
+		} else {
+			result[key] = rightValue;
+		}
+	}
+	return result;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function mergeUndefinedValues<T extends Record<string, unknown>>(value: T): T {

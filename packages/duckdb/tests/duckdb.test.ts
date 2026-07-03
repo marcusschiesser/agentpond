@@ -763,7 +763,7 @@ test("DuckDB projection applies observation updates after creates with the same 
 	]);
 });
 
-test("DuckDB projection merges trace and observation metadata like Langfuse", async () => {
+test("DuckDB projection recursively merges trace and observation metadata like Langfuse", async () => {
 	const cases: Array<{
 		name: string;
 		first?: Record<string, unknown>;
@@ -791,6 +791,38 @@ test("DuckDB projection merges trace and observation metadata like Langfuse", as
 			first: { foo: "old", bar: "baz" },
 			second: { foo: "new" },
 			expected: { foo: "new", bar: "baz" },
+		},
+		{
+			name: "recursively merges nested objects with later nested values winning",
+			first: {
+				outer: { keep: "first", overwrite: "old" },
+				top: "first",
+			},
+			second: {
+				outer: { overwrite: "new", add: "second" },
+			},
+			expected: {
+				outer: { keep: "first", overwrite: "new", add: "second" },
+				top: "first",
+			},
+		},
+		{
+			name: "later scalar replaces existing nested object",
+			first: { outer: { keep: "first" }, top: "first" },
+			second: { outer: "second" },
+			expected: { outer: "second", top: "first" },
+		},
+		{
+			name: "later nested object replaces existing scalar",
+			first: { outer: "first", top: "first" },
+			second: { outer: { add: "second" } },
+			expected: { outer: { add: "second" }, top: "first" },
+		},
+		{
+			name: "empty metadata does not clear existing nested metadata",
+			first: { outer: { keep: "first" }, top: "first" },
+			second: {},
+			expected: { outer: { keep: "first" }, top: "first" },
 		},
 	];
 
