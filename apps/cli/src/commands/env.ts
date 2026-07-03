@@ -13,9 +13,9 @@ import { CliError, parsePort, print } from "../cli-support.js";
 import { addGlobalOptions, type GlobalOptions } from "../command-support.js";
 import {
 	devSdkEnvironment,
-	filterEnvEntries,
 	type EnvFamily,
 	type EnvVar,
+	filterEnvEntries,
 } from "../dev-env.js";
 
 export type SelectPrompt<T extends string> = (config: {

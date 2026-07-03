@@ -17,5 +17,7 @@ export type ObservationMapperContext = {
 
 export type ObservationTypeMapper = {
 	name: string;
-	map: (context: ObservationMapperContext) => ObservationCreateEventType | undefined;
+	map: (
+		context: ObservationMapperContext,
+	) => ObservationCreateEventType | undefined;
 };

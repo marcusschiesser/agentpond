@@ -729,15 +729,7 @@ test("CLI env get rejects conflicting env family flags", async () => {
 	try {
 		process.chdir(root);
 		const stderr = await captureStderr(() =>
-			main([
-				"node",
-				"agentpond",
-				"env",
-				"get",
-				"dev",
-				"--otel",
-				"--langfuse",
-			]),
+			main(["node", "agentpond", "env", "get", "dev", "--otel", "--langfuse"]),
 		);
 
 		assert.equal(process.exitCode, 2);

@@ -1,5 +1,5 @@
-import { eventTypes } from "../schemas.js";
 import { stringValue } from "../otel-parsers.js";
+import { eventTypes } from "../schemas.js";
 import type { ObservationTypeMapper } from "./types.js";
 
 const openInferenceSpanKinds = new Map([

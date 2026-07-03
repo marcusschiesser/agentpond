@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import protobuf from "protobufjs";
+import { mapOtelObservationEventType } from "./otel-mappers/registry.js";
 import {
 	arrayValue,
 	booleanValue,
@@ -10,7 +11,6 @@ import {
 	stringValue,
 	unwrapOtelValue,
 } from "./otel-parsers.js";
-import { mapOtelObservationEventType } from "./otel-mappers/registry.js";
 import { eventTypes, type IngestionEvent } from "./schemas.js";
 
 type RawOtelRequest = {

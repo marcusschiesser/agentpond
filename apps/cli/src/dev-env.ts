@@ -20,7 +20,10 @@ export function devSdkEnvironment(
 	);
 }
 
-export function filterEnvEntries(entries: EnvVar[], family: EnvFamily): EnvVar[] {
+export function filterEnvEntries(
+	entries: EnvVar[],
+	family: EnvFamily,
+): EnvVar[] {
 	if (family === "all") return entries;
 	return entries.filter((entry) =>
 		family === "otel"
