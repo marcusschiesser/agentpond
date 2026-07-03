@@ -1,5 +1,11 @@
 # agentpond
 
+## 0.4.1
+
+### Patch Changes
+
+- 0943439: Add CLI version output and an interactive startup prompt for newer AgentPond releases.
+
 ## 0.4.0
 
 ### Minor Changes
