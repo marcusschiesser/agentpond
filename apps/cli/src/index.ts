@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
+import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Command, CommanderError } from "commander";
 import { CliError } from "./cli-support.js";
@@ -16,12 +17,21 @@ import { registerSessionsCommand } from "./commands/sessions.js";
 import { registerSqlCommand } from "./commands/sql.js";
 import { registerSyncCommand } from "./commands/sync.js";
 import { registerTracesCommand } from "./commands/traces.js";
+import {
+	type CliUpdateCheckOptions,
+	checkForCliUpdate,
+} from "./update-check.js";
 
 export { createOtelTraceId } from "./commands/traces.js";
+
+const require = createRequire(import.meta.url);
+const packageJson = require("../package.json") as { version: string };
+export const CLI_VERSION = packageJson.version;
 
 export type ProgramOptions = {
 	selectEnvironment?: SelectEnvironmentPrompt;
 	selectStore?: SelectStorePrompt;
+	updateCheck?: CliUpdateCheckOptions | false;
 };
 
 export function createProgram(options: ProgramOptions = {}): Command {
@@ -29,6 +39,7 @@ export function createProgram(options: ProgramOptions = {}): Command {
 	program
 		.name("agentpond")
 		.description("local Langfuse-compatible trace analytics")
+		.version(CLI_VERSION)
 		.showHelpAfterError()
 		.showSuggestionAfterError()
 		.exitOverride()
@@ -63,6 +74,7 @@ export async function main(
 ): Promise<void> {
 	const program = createProgram(options);
 	try {
+		await checkForCliUpdate(argv, CLI_VERSION, options.updateCheck);
 		await program.parseAsync(argv, { from: "node" });
 	} catch (error) {
 		if (error instanceof CommanderError) {

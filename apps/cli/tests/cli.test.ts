@@ -13,9 +13,14 @@ import {
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
 import { createDevLoggerOptions } from "../src/commands/dev.js";
-import { createOtelTraceId, main } from "../src/index.js";
+import { CLI_VERSION, createOtelTraceId, main } from "../src/index.js";
 import { manualTraceResourceSpans } from "../src/otel-trace.js";
 import { writeEventsAndSyncCache } from "../src/sync-write.js";
+import {
+	checkForCliUpdate,
+	isNewerVersion,
+	shouldCheckForUpdates,
+} from "../src/update-check.js";
 
 async function captureStdout(fn: () => Promise<void>): Promise<string> {
 	const consoleLog = console.log;
@@ -154,6 +159,74 @@ test("CLI trace creation builds a Langfuse-compatible OTEL root span", () => {
 
 test("CLI default trace ids are OTEL trace ids", () => {
 	assert.match(createOtelTraceId(), /^[0-9a-f]{32}$/);
+});
+
+test("CLI exposes package version", async () => {
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		const output = await captureProcessStdout(() =>
+			main(["node", "agentpond", "--version"]),
+		);
+
+		assert.equal(process.exitCode, 0);
+		assert.equal(output.trim(), CLI_VERSION);
+	} finally {
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI update check compares semver versions", () => {
+	assert.equal(isNewerVersion("0.3.6", "0.3.5"), true);
+	assert.equal(isNewerVersion("0.4.0", "0.3.5"), true);
+	assert.equal(isNewerVersion("1.0.0", "0.3.5"), true);
+	assert.equal(isNewerVersion("0.3.5", "0.3.5"), false);
+	assert.equal(isNewerVersion("0.3.4", "0.3.5"), false);
+	assert.equal(isNewerVersion("not-a-version", "0.3.5"), false);
+});
+
+test("CLI update check skips automation-friendly modes", () => {
+	assert.equal(shouldCheckForUpdates(["node", "agentpond", "--json"]), false);
+	assert.equal(shouldCheckForUpdates(["node", "agentpond", "--help"]), false);
+	assert.equal(
+		shouldCheckForUpdates(["node", "agentpond", "--version"]),
+		false,
+	);
+	assert.equal(
+		shouldCheckForUpdates(["node", "agentpond", "traces", "list"], {
+			force: true,
+		}),
+		true,
+	);
+});
+
+test("CLI update check asks before updating when a newer version exists", async () => {
+	const root = mkdtempSync(join(tmpdir(), "agentpond-update-check-"));
+	const calls: string[] = [];
+
+	await captureStderr(() =>
+		checkForCliUpdate(["node", "agentpond", "traces", "list"], "0.3.5", {
+			cachePath: join(root, "update-check.json"),
+			force: true,
+			fetch: async () =>
+				new Response(JSON.stringify({ version: "0.3.6" }), { status: 200 }),
+			confirmUpdate: async (config) => {
+				calls.push(config.message);
+				calls.push(`default:${config.default}`);
+				return true;
+			},
+			runUpdate: async (version) => {
+				calls.push(`update:${version}`);
+				return 0;
+			},
+		}),
+	);
+
+	assert.deepEqual(calls, [
+		"AgentPond 0.3.6 is available. Update now with npm install -g agentpond@latest?",
+		"default:false",
+		"update:0.3.6",
+	]);
 });
 
 test("CLI trace creation preserves nested metadata values", async () => {

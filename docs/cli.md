@@ -14,7 +14,10 @@ Verify the executable is available:
 
 ```sh
 agentpond --help
+agentpond --version
 ```
+
+In interactive terminals, AgentPond checks npm for a newer CLI version on startup and asks whether to update with `npm install -g agentpond@latest`. The check is skipped for CI, non-TTY runs, `--json`, help, and version commands. Set `AGENTPOND_NO_UPDATE_CHECK=1` or `AGENTPOND_UPDATE_CHECK=0` to disable it.
 
 ## Configure
 
@@ -67,6 +70,7 @@ By default, AgentPond stores one DuckDB cache per environment at `./.agentpond/e
 --s3-prefix <prefix>  Use a specific S3 key prefix
 --s3-endpoint <url>   Use a custom S3 endpoint, such as MinIO
 --json                Print machine-readable JSON output
+--version             Print the installed CLI version
 ```
 
 ## Environments
@@ -217,6 +221,7 @@ agentpond sql "select * from traces limit 10" --json
 ```sh
 agentpond sync
 agentpond dev
+agentpond --version
 agentpond env current
 agentpond env get dev
 agentpond traces create --name "manual trace" --userId user_42 --sessionId session_42

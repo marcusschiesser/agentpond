@@ -3,6 +3,7 @@ name: agentpond
 description: Work with AgentPond trace analytics. Use when needing to inspect traces, observations, sessions, or scores (e.g. annotations), run local SQL analysis, switch AgentPond environments, start the local dev ingestion server, or configure Langfuse-compatible SDK ingestion into AgentPond.
 allowed-tools:
   - Bash(npx agentpond --help *)
+  - Bash(npx agentpond --version *)
   - Bash(npx agentpond dev *)
   - Bash(npx agentpond env current *)
   - Bash(npx agentpond env get *)
@@ -49,7 +50,10 @@ Run AgentPond through `npx` unless the user has installed it globally:
 
 ```bash
 npx agentpond --help
+npx agentpond --version
 ```
+
+In interactive terminals, the CLI checks npm for a newer `agentpond` version on startup and asks whether to update with `npm install -g agentpond@latest`. The check is skipped for CI, non-TTY, `--json`, help, and version commands.
 
 Use AgentPond environments to separate dev, staging, and production caches and configuration:
 

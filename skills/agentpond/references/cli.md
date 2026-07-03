@@ -2,6 +2,14 @@
 
 Use `npx agentpond` for AgentPond data access unless the user has installed the package globally.
 
+Print the installed CLI version with:
+
+```bash
+npx agentpond --version
+```
+
+In interactive terminals, AgentPond checks npm for a newer CLI version on startup and asks whether to update with `npm install -g agentpond@latest`. The update check is skipped for CI, non-TTY runs, `--json`, help, and version commands. Set `AGENTPOND_NO_UPDATE_CHECK=1` or `AGENTPOND_UPDATE_CHECK=0` to disable it.
+
 ## Configuration
 
 AgentPond reads object storage settings from the selected environment file under `.agentpond/envs/<name>.env`, then process environment variables, then flags. Environments can use `local`, `s3`, `gcs`, or `vercel` storage:
