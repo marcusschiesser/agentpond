@@ -124,23 +124,6 @@ For a fresh cache, projection tables are empty. In that case sync can skip:
 Some of this is already avoided by projecting new IDs from memory, but an
 explicit empty-cache branch would make the first-sync path simpler and cheaper.
 
-### Pre-Split Metadata Patches
-
-Metadata shallow-merge can become expensive for update-heavy workloads. A future
-projection representation could store metadata patches as key-level deltas:
-
-```sql
-entity_kind
-entity_id
-event_timestamp
-event_id
-metadata_key
-metadata_value_json
-```
-
-Final metadata then becomes latest-value-per-key. This is more useful for
-update-heavy data than for the current 10k trace benchmark.
-
 ## Suggested Order
 
 1. Pipeline object loading and conversion with serialized DuckDB commits.
