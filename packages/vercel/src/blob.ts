@@ -56,7 +56,11 @@ type BlobListResult = {
 };
 
 export type VercelBlobClient = {
-	put(pathname: string, body: string, options: BlobPutOptions): Promise<unknown>;
+	put(
+		pathname: string,
+		body: string,
+		options: BlobPutOptions,
+	): Promise<unknown>;
 	get(pathname: string, options: BlobGetOptions): Promise<BlobGetResult | null>;
 	list(options: BlobListOptions): Promise<BlobListResult>;
 };
@@ -109,8 +113,7 @@ export class VercelBlobObjectStore implements ObjectStore {
 	toSink(options: ObjectStoreIngestionSinkOptions = {}): IngestionSink {
 		return sinkFromStore(this, {
 			prefix:
-				options.prefix ??
-				normalizePrefix(process.env.AGENTPOND_PREFIX ?? ""),
+				options.prefix ?? normalizePrefix(process.env.AGENTPOND_PREFIX ?? ""),
 		});
 	}
 

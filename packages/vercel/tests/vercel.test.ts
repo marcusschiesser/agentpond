@@ -1,13 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { type AuthConfig, eventTypes, sinkFromStore } from "@agentpond/core";
 import {
-	type AuthConfig,
-	eventTypes,
-	sinkFromStore,
-} from "@agentpond/core";
-import {
-	VercelBlobObjectStore,
 	type VercelBlobClient,
+	VercelBlobObjectStore,
 	vercelBlobConfigFromRuntimeEnv,
 } from "@agentpond/vercel";
 
