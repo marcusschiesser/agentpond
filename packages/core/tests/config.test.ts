@@ -54,6 +54,11 @@ test("generated environment files document defaults and S3 settings", () => {
 		assert.equal(existsSync(dev.envFilePath), false);
 
 		assert.match(productionFile, /# Storage backend/);
+		assert.match(
+			productionFile,
+			/OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/localhost:4318\/api\/public\/otel/,
+		);
+		assert.match(productionFile, /OTEL_EXPORTER_OTLP_PROTOCOL=http\/json/);
 		assert.match(productionFile, /LANGFUSE_BASE_URL=http:\/\/localhost:4318/);
 		assert.match(productionFile, /AGENTPOND_STORE=s3/);
 		assert.match(productionFile, /AGENTPOND_PREFIX=/);

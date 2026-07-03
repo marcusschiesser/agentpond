@@ -129,13 +129,17 @@ If the user asks for the env values without running `eval`, use:
 npx agentpond env get dev
 ```
 
-AgentPond ingestion uses Langfuse-compatible endpoints. Applications can use normal Langfuse SDK configuration while pointing at an AgentPond ingestion service:
+AgentPond ingestion uses Langfuse-compatible endpoints and accepts standard OTLP HTTP JSON exports. Applications can use normal Langfuse SDK configuration while pointing at an AgentPond ingestion service:
 
 ```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318/api/public/otel
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export LANGFUSE_BASE_URL=http://127.0.0.1:4318
 export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev
 export LANGFUSE_SECRET_KEY=sk-agentpond-dev
 ```
+
+Use `npx agentpond env get dev --otel` for only OpenTelemetry variables and `npx agentpond env get dev --langfuse` for only Langfuse-compatible variables.
 
 These variables configure SDK ingestion. They are not credentials for using the AgentPond CLI to query Langfuse Cloud. The AgentPond CLI reads from object storage and the local DuckDB cache.
 

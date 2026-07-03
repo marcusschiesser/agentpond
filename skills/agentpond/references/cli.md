@@ -9,6 +9,11 @@ AgentPond reads object storage settings from the selected environment file under
 ```bash
 export AGENTPOND_PROJECT_ID=default-project
 export AGENTPOND_PREFIX=
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/api/public/otel
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export LANGFUSE_BASE_URL=http://localhost:4318
+export LANGFUSE_PUBLIC_KEY=pk-agentpond
+export LANGFUSE_SECRET_KEY=sk-agentpond
 export AGENTPOND_STORE=s3
 export AGENTPOND_S3_BUCKET=agentpond
 export AGENTPOND_S3_ENDPOINT=http://localhost:9000
@@ -73,6 +78,8 @@ npx agentpond env init staging --store gcs
 npx agentpond env init staging --store vercel
 npx agentpond env init staging --store local
 ```
+
+For local development, `npx agentpond env get dev` prints both OpenTelemetry and Langfuse-compatible SDK variables. Use `--otel` for only `OTEL_EXPORTER_OTLP_*` variables and `--langfuse` for only Langfuse-compatible variables.
 
 ## Sync
 

@@ -7,6 +7,7 @@ import { gzipSync } from "node:zlib";
 import {
 	type AgentPondConfig,
 	eventTypes,
+	type IngestionEvent,
 	MemoryObjectStore,
 	otelBodyToEvents,
 	sinkFromStore,
@@ -85,6 +86,15 @@ function attr(key: string, value: unknown): Record<string, unknown> {
 			},
 		};
 	return { key, value: { stringValue: JSON.stringify(value) } };
+}
+
+function observationEvent(events: IngestionEvent[]): IngestionEvent {
+	const event = events.find(
+		(event) =>
+			event.type.endsWith("-create") && event.type !== eventTypes.TRACE_CREATE,
+	);
+	assert.ok(event);
+	return event;
 }
 
 type CapturedLog = Record<string, unknown>;
@@ -548,6 +558,163 @@ test("otel maps Langfuse SDK observation attributes to raw events", async () => 
 	assert.equal(observationEvent.body.statusMessage, "review needed");
 	assert.equal(observationEvent.body.version, "2026-06-15");
 	assert.equal(observationEvent.body.environment, "production");
+});
+
+test("otel maps OpenInference span kinds to supported observation event types", async () => {
+	const cases: Array<[string, IngestionEvent["type"]]> = [
+		["CHAIN", "chain-create"],
+		["RETRIEVER", "retriever-create"],
+		["LLM", "generation-create"],
+		["EMBEDDING", "embedding-create"],
+		["AGENT", "agent-create"],
+		["TOOL", "tool-create"],
+		["GUARDRAIL", "guardrail-create"],
+		["EVALUATOR", "span-create"],
+		["", "span-create"],
+		["UnknownKind", "span-create"],
+	];
+
+	for (const [spanKind, expectedType] of cases) {
+		const events = await convertOtelJson(
+			otelPayload([
+				{
+					traceId: `trace-openinference-${spanKind || "empty"}`,
+					spanId: `span-openinference-${spanKind || "empty"}`,
+					name: `openinference ${spanKind || "empty"}`,
+					startTimeUnixNano: "1781395200000000000",
+					attributes: [attr("openinference.span.kind", spanKind)],
+				},
+			]),
+		);
+
+		assert.equal(observationEvent(events).type, expectedType);
+	}
+});
+
+test("otel trusts Langfuse observation type over OpenInference and Vercel AI mappers", async () => {
+	const events = await convertOtelJson(
+		otelPayload([
+			{
+				traceId: "trace-mapper-priority",
+				spanId: "span-mapper-priority",
+				name: "mapper priority",
+				startTimeUnixNano: "1781395200000000000",
+				attributes: [
+					attr("langfuse.observation.type", "tool"),
+					attr("openinference.span.kind", "LLM"),
+					attr("operation.name", "ai.generateText.doGenerate"),
+					attr("gen_ai.response.model", "gpt-4"),
+				],
+			},
+		]),
+	);
+
+	assert.equal(observationEvent(events).type, "tool-create");
+});
+
+test("otel maps Vercel AI SDK tool calls to tool observations", async () => {
+	const withOperationName = await convertOtelJson(
+		otelPayload([
+			{
+				traceId: "trace-vercel-tool-operation-name",
+				spanId: "span-vercel-tool-operation-name",
+				name: "ai.toolCall",
+				startTimeUnixNano: "1781395200000000000",
+				attributes: [
+					attr("operation.name", "ai.toolCall MyAgent.MyLLM.myFunction"),
+					attr("resource.name", "MyAgent.MyLLM.myFunction"),
+					attr("ai.operationId", "ai.toolCall"),
+					attr("ai.toolCall.name", "myTool"),
+					attr("ai.toolCall.id", "call_abc123"),
+				],
+			},
+		]),
+	);
+	const withOperationId = await convertOtelJson(
+		otelPayload([
+			{
+				traceId: "trace-vercel-tool-operation-id",
+				spanId: "span-vercel-tool-operation-id",
+				name: "tool-execution",
+				startTimeUnixNano: "1781395200000000000",
+				attributes: [attr("ai.operationId", "ai.toolCall")],
+			},
+		]),
+	);
+
+	assert.equal(observationEvent(withOperationName).type, "tool-create");
+	assert.equal(observationEvent(withOperationId).type, "tool-create");
+});
+
+test("otel maps Vercel AI SDK generation operations only when model info is present", async () => {
+	const withModel = await convertOtelJson(
+		otelPayload([
+			{
+				traceId: "trace-vercel-generation-model",
+				spanId: "span-vercel-generation-model",
+				name: "text-generation",
+				startTimeUnixNano: "1781395200000000000",
+				attributes: [
+					attr("operation.name", "ai.generateText.doGenerate"),
+					attr("gen_ai.response.model", "gpt-4"),
+				],
+			},
+		]),
+	);
+	const withoutModel = await convertOtelJson(
+		otelPayload([
+			{
+				traceId: "trace-vercel-generation-no-model",
+				spanId: "span-vercel-generation-no-model",
+				name: "text-generation",
+				startTimeUnixNano: "1781395200000000000",
+				attributes: [attr("operation.name", "ai.generateText.doGenerate")],
+			},
+		]),
+	);
+
+	assert.equal(observationEvent(withModel).type, "generation-create");
+	assert.equal(observationEvent(withoutModel).type, "span-create");
+});
+
+test("otel maps base Vercel AI SDK generation operation names when model info is present", async () => {
+	for (const operationName of ["ai.generateText", "ai.generateObject"]) {
+		const events = await convertOtelJson(
+			otelPayload([
+				{
+					traceId: `trace-vercel-${operationName}`,
+					spanId: `span-vercel-${operationName}`,
+					name: operationName,
+					startTimeUnixNano: "1781395200000000000",
+					attributes: [
+						attr("operation.name", operationName),
+						attr("gen_ai.response.model", "gpt-4"),
+					],
+				},
+			]),
+		);
+
+		assert.equal(observationEvent(events).type, "generation-create");
+	}
+});
+
+test("otel maps Vercel AI SDK embedding operations when model info is present", async () => {
+	const events = await convertOtelJson(
+		otelPayload([
+			{
+				traceId: "trace-vercel-embedding",
+				spanId: "span-vercel-embedding",
+				name: "embedding",
+				startTimeUnixNano: "1781395200000000000",
+				attributes: [
+					attr("ai.operationId", "ai.embed.doEmbed"),
+					attr("ai.model.id", "text-embedding-3-small"),
+				],
+			},
+		]),
+	);
+
+	assert.equal(observationEvent(events).type, "embedding-create");
 });
 
 test("otel trace fields come from trace attributes", async () => {

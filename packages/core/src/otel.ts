@@ -10,16 +10,13 @@ import {
 	stringValue,
 	unwrapOtelValue,
 } from "./otel-parsers.js";
+import { mapOtelObservationEventType } from "./otel-mappers/registry.js";
 import { eventTypes, type IngestionEvent } from "./schemas.js";
 
 type RawOtelRequest = {
 	resourceSpans?: unknown[];
 };
 
-type ObservationEventType = Exclude<
-	IngestionEvent["type"],
-	typeof eventTypes.TRACE_CREATE | typeof eventTypes.SCORE_CREATE
->;
 type TraceCreateBody = Extract<
 	IngestionEvent,
 	{ type: typeof eventTypes.TRACE_CREATE }
@@ -192,14 +189,11 @@ export function otelResourceSpansToEvents(
 				);
 				const langfuse = langfuseAttributes(attributes);
 				const name = stringField(span, "name") ?? "otel-span";
-				const observationType = stringValue(
-					attributes["langfuse.observation.type"],
-				);
 				const level = stringValue(attributes["langfuse.observation.level"]);
 				const observationEvent = {
 					id: randomUUID(),
 					timestamp,
-					type: observationTypeToEventType(observationType),
+					type: mapOtelObservationEventType(attributes),
 					metadata: { source: "otel" },
 					body: {
 						id: spanId,
@@ -329,20 +323,6 @@ function createTraceEvent(params: {
 		metadata: { source: "otel" },
 		body,
 	};
-}
-
-function observationTypeToEventType(
-	observationType: string | undefined,
-): ObservationEventType {
-	if (observationType === "generation") return eventTypes.GENERATION_CREATE;
-	if (observationType === "event") return eventTypes.EVENT_CREATE;
-	if (observationType === "agent") return eventTypes.AGENT_CREATE;
-	if (observationType === "tool") return eventTypes.TOOL_CREATE;
-	if (observationType === "chain") return eventTypes.CHAIN_CREATE;
-	if (observationType === "retriever") return eventTypes.RETRIEVER_CREATE;
-	if (observationType === "embedding") return eventTypes.EMBEDDING_CREATE;
-	if (observationType === "guardrail") return eventTypes.GUARDRAIL_CREATE;
-	return eventTypes.SPAN_CREATE;
 }
 
 function getArray(value: unknown, key: string): unknown[] | undefined {

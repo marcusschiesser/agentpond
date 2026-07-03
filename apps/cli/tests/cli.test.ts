@@ -642,6 +642,8 @@ test("CLI env get dev prints generated shell exports without creating dev env fi
 		assert.equal(
 			output,
 			[
+				"export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318/api/public/otel",
+				"export OTEL_EXPORTER_OTLP_PROTOCOL=http/json",
 				"export LANGFUSE_BASE_URL=http://127.0.0.1:4318",
 				"export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev",
 				"export LANGFUSE_SECRET_KEY=sk-agentpond-dev",
@@ -652,6 +654,94 @@ test("CLI env get dev prints generated shell exports without creating dev env fi
 			existsSync(join(root, ".agentpond", "envs", "dev.env")),
 			false,
 		);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env get dev --otel prints only OTEL exports", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-otel-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "get", "dev", "--otel"]),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(
+			output,
+			[
+				"export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318/api/public/otel",
+				"export OTEL_EXPORTER_OTLP_PROTOCOL=http/json",
+				"",
+			].join("\n"),
+		);
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "dev.env")),
+			false,
+		);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env get dev --langfuse prints only Langfuse-compatible exports", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-langfuse-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "get", "dev", "--langfuse"]),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(
+			output,
+			[
+				"export LANGFUSE_BASE_URL=http://127.0.0.1:4318",
+				"export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev",
+				"export LANGFUSE_SECRET_KEY=sk-agentpond-dev",
+				"",
+			].join("\n"),
+		);
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "dev.env")),
+			false,
+		);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env get rejects conflicting env family flags", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-conflict-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const stderr = await captureStderr(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"get",
+				"dev",
+				"--otel",
+				"--langfuse",
+			]),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /--langfuse and --otel cannot be used together/);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -680,6 +770,10 @@ test("CLI env get dev honors custom host and port", async () => {
 		);
 
 		assert.equal(process.exitCode, undefined);
+		assert.match(
+			output,
+			/export OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/0\.0\.0\.0:9999\/api\/public\/otel/,
+		);
 		assert.match(output, /export LANGFUSE_BASE_URL=http:\/\/0\.0\.0\.0:9999/);
 		assert.match(output, /export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev/);
 	} finally {

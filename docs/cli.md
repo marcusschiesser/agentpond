@@ -74,6 +74,8 @@ By default, AgentPond stores one DuckDB cache per environment at `./.agentpond/e
 ```sh
 agentpond env current
 agentpond env get dev
+agentpond env get dev --otel
+agentpond env get dev --langfuse
 agentpond env list
 agentpond env init staging --store s3
 agentpond env use production
@@ -97,7 +99,7 @@ Start a local Langfuse SDK-compatible ingestion server:
 agentpond dev
 ```
 
-The dev server writes directly to `.agentpond/envs/dev/cache.duckdb` and does not enforce credential matching. Langfuse SDKs should still be configured with the dummy keys printed by the command because SDKs expect public and secret keys to be present.
+The dev server writes directly to `.agentpond/envs/dev/cache.duckdb` and does not enforce credential matching. `agentpond env get dev` prints both standard OTLP HTTP exporter variables and Langfuse-compatible SDK variables. Use `--otel` for only `OTEL_EXPORTER_OTLP_*` variables or `--langfuse` for only Langfuse-compatible variables. Langfuse SDKs should still be configured with the dummy keys printed by the command because SDKs expect public and secret keys to be present.
 
 ```sh
 eval "$(agentpond env get dev)"

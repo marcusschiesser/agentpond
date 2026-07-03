@@ -11,7 +11,12 @@ import { select } from "@inquirer/prompts";
 import type { Command } from "commander";
 import { CliError, parsePort, print } from "../cli-support.js";
 import { addGlobalOptions, type GlobalOptions } from "../command-support.js";
-import { devSdkEnvironment, type EnvVar } from "../dev-env.js";
+import {
+	devSdkEnvironment,
+	filterEnvEntries,
+	type EnvFamily,
+	type EnvVar,
+} from "../dev-env.js";
 
 export type SelectPrompt<T extends string> = (config: {
 	message: string;
@@ -24,6 +29,8 @@ export type SelectStorePrompt = SelectPrompt<AgentPondInitStore>;
 
 type EnvOptions = GlobalOptions & {
 	host?: string;
+	langfuse?: boolean;
+	otel?: boolean;
 	port?: string;
 	store?: string;
 };
@@ -57,6 +64,8 @@ export function registerEnvCommand(
 	addGlobalOptions(env.command("get <name>"))
 		.description("print shell exports for an environment")
 		.option("--host <host>", "dev host", "127.0.0.1")
+		.option("--langfuse", "print only Langfuse-compatible SDK exports")
+		.option("--otel", "print only OpenTelemetry SDK exports")
 		.option("--port <port>", "dev port", "4318")
 		.action((name: string, commandOptions: EnvOptions) => {
 			printEnvironmentExports(name, commandOptions);
@@ -172,16 +181,27 @@ async function promptForEnvironmentName(
 }
 
 function printEnvironmentExports(name: string, options: EnvOptions): void {
+	const family = envFamilyFromOptions(options);
 	const entries =
 		name === "dev"
 			? devSdkEnvironment(
 					options.host ?? "127.0.0.1",
 					parsePort(options.port ?? "4318"),
+					family,
 				)
-			: readEnvironmentFileExports(name);
+			: filterEnvEntries(readEnvironmentFileExports(name), family);
 	for (const entry of entries) {
 		console.log(`export ${entry.key}=${shellValue(entry.value)}`);
 	}
+}
+
+function envFamilyFromOptions(options: EnvOptions): EnvFamily {
+	if (options.langfuse && options.otel) {
+		throw new CliError("--langfuse and --otel cannot be used together");
+	}
+	if (options.langfuse) return "langfuse";
+	if (options.otel) return "otel";
+	return "all";
 }
 
 function readEnvironmentFileExports(name: string): EnvVar[] {
