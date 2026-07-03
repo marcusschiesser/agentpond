@@ -1,5 +1,15 @@
 # @agentpond/aws
 
+## 0.3.4
+
+### Patch Changes
+
+- Updated dependencies [da32a31]
+- Updated dependencies [8ffc5dd]
+- Updated dependencies [cb018d2]
+  - @agentpond/ingest@0.3.3
+  - @agentpond/core@0.4.0
+
 ## 0.3.3
 
 ### Patch Changes

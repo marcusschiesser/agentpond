@@ -1,5 +1,16 @@
 # @agentpond/duckdb
 
+## 0.3.3
+
+### Patch Changes
+
+- b81bac2: Merge projected trace, observation, and score fields across partial Langfuse events.
+- 8c73e70: Reduce DuckDB sync write amplification by storing raw event bodies once and exposing compatible raw event JSON through a view.
+- 75e592d: Match Langfuse recursive metadata merge semantics for projected traces and observations.
+- Updated dependencies [8ffc5dd]
+- Updated dependencies [cb018d2]
+  - @agentpond/core@0.4.0
+
 ## 0.3.2
 
 ### Patch Changes
