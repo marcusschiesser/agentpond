@@ -20,7 +20,6 @@ export type EventsRawAppendRow = {
 	eventTimestamp: string | undefined;
 	entityId: string;
 	bodyJson: string;
-	eventJson: string;
 	traceId: string | undefined;
 	observationId: string | undefined;
 	scoreId: string | undefined;
@@ -102,6 +101,13 @@ export class DuckDbOperations {
 	}
 
 	async createSchema(): Promise<void> {
+		const eventsRawRelation = await this.tableType("events_raw");
+		if (eventsRawRelation === "BASE TABLE") {
+			await this.exec("DROP TABLE events_raw");
+			await this.exec("DROP TABLE IF EXISTS events_raw_storage");
+		} else {
+			await this.exec("DROP VIEW IF EXISTS events_raw");
+		}
 		await this.exec(`
       CREATE TABLE IF NOT EXISTS processed_manifests (
         key TEXT PRIMARY KEY,
@@ -117,7 +123,7 @@ export class DuckDbOperations {
         last_finalized_bucket TEXT,
         updated_at TIMESTAMP DEFAULT current_timestamp
       );
-      CREATE TABLE IF NOT EXISTS events_raw (
+      CREATE TABLE IF NOT EXISTS events_raw_storage (
         event_id TEXT PRIMARY KEY,
         project_id TEXT,
         manifest_key TEXT,
@@ -126,11 +132,30 @@ export class DuckDbOperations {
         event_timestamp TIMESTAMP,
         entity_id TEXT,
         body_json TEXT,
-        event_json TEXT,
         trace_id TEXT,
         observation_id TEXT,
         score_id TEXT
       );
+      CREATE OR REPLACE VIEW events_raw AS
+        SELECT
+          event_id,
+          project_id,
+          manifest_key,
+          object_key,
+          event_type,
+          event_timestamp,
+          entity_id,
+          body_json,
+          CAST(json_object(
+            'id', event_id,
+            'timestamp', strftime(event_timestamp, '%Y-%m-%dT%H:%M:%S.%gZ'),
+            'type', event_type,
+            'body', CAST(body_json AS JSON)
+          ) AS TEXT) AS event_json,
+          trace_id,
+          observation_id,
+          score_id
+        FROM events_raw_storage;
       CREATE TABLE IF NOT EXISTS traces (
         id TEXT PRIMARY KEY,
         project_id TEXT,
@@ -191,6 +216,15 @@ export class DuckDbOperations {
     `);
 	}
 
+	private async tableType(name: string): Promise<string | undefined> {
+		const rows = await this.all<{ table_type: string }>(`
+      SELECT table_type
+      FROM information_schema.tables
+      WHERE table_schema = 'main' AND table_name = ${sql(name)}
+    `);
+		return rows[0]?.table_type;
+	}
+
 	async processedKeys(
 		table: ProcessedTable,
 		keys: string[],
@@ -205,7 +239,7 @@ export class DuckDbOperations {
 	async existingRawEventIds(eventIds: string[]): Promise<Set<string>> {
 		if (eventIds.length === 0) return new Set();
 		const rows = await this.all<{ event_id: string }>(
-			`SELECT event_id FROM events_raw WHERE event_id IN (${eventIds.map(sql).join(", ")})`,
+			`SELECT event_id FROM events_raw_storage WHERE event_id IN (${eventIds.map(sql).join(", ")})`,
 		);
 		return new Set(rows.map((row) => row.event_id));
 	}
@@ -236,7 +270,7 @@ export class DuckDbOperations {
 	async appendEventsRaw(rows: EventsRawAppendRow[]): Promise<void> {
 		if (rows.length === 0) return;
 		const appender = await (await this.getConnection()).createAppender(
-			"events_raw",
+			"events_raw_storage",
 		);
 		try {
 			for (const row of rows) {
@@ -248,7 +282,6 @@ export class DuckDbOperations {
 				appendTimestampOrNull(appender, row.eventTimestamp);
 				appendVarcharOrNull(appender, row.entityId);
 				appendVarcharOrNull(appender, row.bodyJson);
-				appendVarcharOrNull(appender, row.eventJson);
 				appendVarcharOrNull(appender, row.traceId);
 				appendVarcharOrNull(appender, row.observationId);
 				appendVarcharOrNull(appender, row.scoreId);

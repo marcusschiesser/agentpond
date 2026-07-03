@@ -27,8 +27,8 @@ type ProcessedObject = {
 };
 
 // Keeps the 100k-trace perf fixture (~650k events) below the default V8 heap
-// limit by flushing raw JSON strings and projection maps about 33 times.
-const MAX_PENDING_EVENTS_PER_COMMIT = 20_000;
+// limit while avoiding repeated projection rebuilds for the 10k-trace fixture.
+const MAX_PENDING_EVENTS_PER_COMMIT = 120_000;
 
 export class DuckDbStoreSync {
 	constructor(private readonly db: DuckDbOperations) {}
