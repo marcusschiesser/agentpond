@@ -46,6 +46,22 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Determine release PR title
+        id: release-pr-title
+        if: github.event_name == 'push'
+        run: |
+          export STATUS_FILE="${RUNNER_TEMP:-/tmp}/changeset-status.json"
+          pnpm changeset status --output "$STATUS_FILE" || true
+          VERSION="$(
+            jq -r '(.releases[] | select(.name == "agentpond") | .newVersion) // .releases[0].newVersion // empty' "$STATUS_FILE"
+          )"
+
+          if [ -n "$VERSION" ]; then
+            echo "title=Release: agentpond $VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "title=Release: agentpond" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create release PR or publish
         id: changesets
         if: github.event_name == 'push'
@@ -53,7 +69,8 @@ jobs:
         with:
           version: pnpm version-packages
           publish: pnpm release
-          title: "Release: agentpond"
+          title: ${{ steps.release-pr-title.outputs.title }}
+          commit: ${{ steps.release-pr-title.outputs.title }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -99,11 +116,3 @@ jobs:
           docker logout ghcr.io
           docker image rm ghcr.io/marcusschiesser/agentpond:${{ steps.image-version.outputs.version }} || true
           docker pull ghcr.io/marcusschiesser/agentpond:${{ steps.image-version.outputs.version }}
-
-      - name: Rename release PR
-        if: steps.changesets.outputs.hasChangesets == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="$(node -p "require('./apps/cli/package.json').version")"
-          gh pr edit changeset-release/main --title "Release: agentpond ${VERSION}"
