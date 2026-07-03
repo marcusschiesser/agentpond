@@ -1,5 +1,26 @@
 # agentpond
 
+## 0.4.0
+
+### Minor Changes
+
+- cb018d2: Add Vercel Blob object storage support with `AGENTPOND_STORE=vercel`.
+
+### Patch Changes
+
+- 8ffc5dd: Print OpenTelemetry env vars by default and map OpenInference and Vercel AI SDK OTEL spans to AgentPond observation types.
+- Updated dependencies [b81bac2]
+- Updated dependencies [8ffc5dd]
+- Updated dependencies [8c73e70]
+- Updated dependencies [75e592d]
+- Updated dependencies [cb018d2]
+  - @agentpond/duckdb@0.3.3
+  - @agentpond/core@0.4.0
+  - @agentpond/vercel@0.4.0
+  - @agentpond/aws@0.3.4
+  - @agentpond/fastify-ingest@0.3.3
+  - @agentpond/google@0.3.3
+
 ## 0.3.5
 
 ### Patch Changes
