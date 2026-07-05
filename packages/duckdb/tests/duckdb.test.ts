@@ -421,6 +421,40 @@ test("DuckDB lock retry retries lock conflicts only", async () => {
 	assert.equal(nonLockAttempts, 1);
 });
 
+test("DuckDB readonly cache query retries transient lock conflicts", async () => {
+	const db = new AgentPondCache(createTempDbPath(), { accessMode: "readonly" });
+	let attempts = 0;
+	(db as unknown as { db: { all<T>(sql: string): Promise<T[]> } }).db = {
+		async all<T>(_sql: string): Promise<T[]> {
+			attempts += 1;
+			if (attempts === 1) throw new Error("Could not set lock on file");
+			return [{ id: "trace-1" }] as T[];
+		},
+	};
+
+	const rows = await db.query<{ id: string }>("SELECT id FROM traces");
+
+	assert.equal(attempts, 2);
+	assert.deepEqual(rows, [{ id: "trace-1" }]);
+});
+
+test("DuckDB readonly cache query does not retry non-lock failures", async () => {
+	const db = new AgentPondCache(createTempDbPath(), { accessMode: "readonly" });
+	let attempts = 0;
+	(db as unknown as { db: { all<T>(sql: string): Promise<T[]> } }).db = {
+		async all<T>(_sql: string): Promise<T[]> {
+			attempts += 1;
+			throw new Error("projection failed");
+		},
+	};
+
+	await assert.rejects(
+		db.query("SELECT id FROM traces"),
+		/projection failed/,
+	);
+	assert.equal(attempts, 1);
+});
+
 test("DuckDB projection keeps newer event when an older event syncs later", async () => {
 	const store = new MemoryObjectStore();
 	const writer = new AcceptedEventWriter({ store, projectId: "project-a" });

@@ -2,7 +2,10 @@ import { DuckDbDirectIngestion } from "../ingestion/direct-ingestion.js";
 import { type DuckDbAccessMode, DuckDbOperations } from "./db-operations.js";
 import { DuckDbStoreSync } from "./store-sync.js";
 import type { SyncFromStoreParams, SyncResult } from "./sync-types.js";
-import { isDuckDbLockConflict, withDuckDbWriteLock } from "./write-lock.js";
+import {
+	retryDuckDbLockConflicts,
+	withDuckDbWriteLock,
+} from "./write-lock.js";
 
 export type {
 	SyncFromStoreParams,
@@ -33,19 +36,10 @@ export class AgentPondCache {
 	}
 
 	async query<T = Record<string, unknown>>(sql: string): Promise<T[]> {
-		try {
-			return await this.db.all<T>(sql);
-		} catch (error) {
-			if (
-				this.options.accessMode === "readonly" &&
-				isDuckDbLockConflict(error)
-			) {
-				throw new Error(
-					"DuckDB is currently locked by the dev server while it is writing; retry the read command.",
-				);
-			}
-			throw error;
+		if (this.options.accessMode === "readonly") {
+			return retryDuckDbLockConflicts(() => this.db.all<T>(sql));
 		}
+		return this.db.all<T>(sql);
 	}
 
 	directIngestion(): DuckDbDirectIngestion {
