@@ -87,7 +87,7 @@ npx agentpond env init staging --store vercel
 npx agentpond env init staging --store local
 ```
 
-For local development, `npx agentpond env get dev` prints both OpenTelemetry and Langfuse-compatible SDK variables. Use `--otel` for only `OTEL_EXPORTER_OTLP_*` variables and `--langfuse` for only Langfuse-compatible variables.
+For local development, `npx agentpond env get dev` prints both OpenTelemetry and Langfuse-compatible SDK variables for the running dev server in this AgentPond directory, and fails if no dev server is running. Use `--otel` for only `OTEL_EXPORTER_OTLP_*` variables and `--langfuse` for only Langfuse-compatible variables.
 
 ## Sync
 

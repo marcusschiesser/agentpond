@@ -169,6 +169,8 @@ function defaultEnvironmentFile(
 		"",
 		"# OpenTelemetry exporter endpoint used by standard OTLP HTTP exporters.",
 		"OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/api/public/otel",
+		"# Signal-specific OTLP trace endpoint used by exporters that expect the full traces URL.",
+		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/api/public/otel/v1/traces",
 		"# OpenTelemetry exporter protocol for OTLP HTTP JSON.",
 		"OTEL_EXPORTER_OTLP_PROTOCOL=http/json",
 		"",

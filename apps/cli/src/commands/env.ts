@@ -4,12 +4,13 @@ import {
 	initAgentPondEnvironment,
 	listAgentPondEnvironments,
 	parseEnvFileEntries,
+	readDevServerLock,
 	resolveAgentPondEnvironment,
 	selectAgentPondEnvironment,
 } from "@agentpond/core";
 import { select } from "@inquirer/prompts";
 import type { Command } from "commander";
-import { CliError, parsePort, print } from "../cli-support.js";
+import { CliError, print } from "../cli-support.js";
 import { addGlobalOptions, type GlobalOptions } from "../command-support.js";
 import {
 	devSdkEnvironment,
@@ -28,10 +29,8 @@ export type AgentPondInitStore = AgentPondStoreType;
 export type SelectStorePrompt = SelectPrompt<AgentPondInitStore>;
 
 type EnvOptions = GlobalOptions & {
-	host?: string;
 	langfuse?: boolean;
 	otel?: boolean;
-	port?: string;
 	store?: string;
 };
 
@@ -63,10 +62,8 @@ export function registerEnvCommand(
 
 	addGlobalOptions(env.command("get <name>"))
 		.description("print shell exports for an environment")
-		.option("--host <host>", "dev host", "127.0.0.1")
 		.option("--langfuse", "print only Langfuse-compatible SDK exports")
 		.option("--otel", "print only OpenTelemetry SDK exports")
-		.option("--port <port>", "dev port", "4318")
 		.action((name: string, commandOptions: EnvOptions) => {
 			printEnvironmentExports(name, commandOptions);
 		});
@@ -184,15 +181,22 @@ function printEnvironmentExports(name: string, options: EnvOptions): void {
 	const family = envFamilyFromOptions(options);
 	const entries =
 		name === "dev"
-			? devSdkEnvironment(
-					options.host ?? "127.0.0.1",
-					parsePort(options.port ?? "4318"),
-					family,
-				)
+			? devSdkEnvironmentForCurrentServer(family)
 			: filterEnvEntries(readEnvironmentFileExports(name), family);
 	for (const entry of entries) {
 		console.log(`export ${entry.key}=${shellValue(entry.value)}`);
 	}
+}
+
+function devSdkEnvironmentForCurrentServer(family: EnvFamily): EnvVar[] {
+	const environment = resolveAgentPondEnvironment({ name: "dev" });
+	const lock = readDevServerLock(environment);
+	if (!lock?.host || !lock.port) {
+		throw new CliError(
+			"dev server is not running; start it with agentpond dev",
+		);
+	}
+	return devSdkEnvironment(lock.host, lock.port, family);
 }
 
 function envFamilyFromOptions(options: EnvOptions): EnvFamily {

@@ -27,9 +27,9 @@ For local development without MinIO, start the built-in dev ingestion server:
 agentpond dev
 ```
 
-The command selects the `dev` environment, listens on `127.0.0.1:4318`, and prints the `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY` values to use with Langfuse SDKs.
+The command selects the `dev` environment, listens on `127.0.0.1:4318`, and prints the `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, and `LANGFUSE_SECRET_KEY` values to use with Langfuse SDKs. If port `4318` is already in use, it automatically tries the next open port. Only one dev server can run per AgentPond directory.
 
-You can print the same SDK environment for a shell with:
+While the dev server is running, you can print the same SDK environment for a shell with:
 
 ```sh
 eval "$(agentpond env get dev)"
@@ -103,7 +103,7 @@ Start a local Langfuse SDK-compatible ingestion server:
 agentpond dev
 ```
 
-The dev server writes directly to `.agentpond/envs/dev/cache.duckdb` and does not enforce credential matching. `agentpond env get dev` prints both standard OTLP HTTP exporter variables and Langfuse-compatible SDK variables. Use `--otel` for only `OTEL_EXPORTER_OTLP_*` variables or `--langfuse` for only Langfuse-compatible variables. Langfuse SDKs should still be configured with the dummy keys printed by the command because SDKs expect public and secret keys to be present.
+The dev server writes directly to `.agentpond/envs/dev/cache.duckdb` and does not enforce credential matching. If the requested port is already in use, it automatically tries the next open port. `agentpond env get dev` prints both standard OTLP HTTP exporter variables and Langfuse-compatible SDK variables for the running dev server in this AgentPond directory, and errors if no dev server is running. Use `--otel` for only `OTEL_EXPORTER_OTLP_*` variables or `--langfuse` for only Langfuse-compatible variables. Langfuse SDKs should still be configured with the dummy keys printed by the command because SDKs expect public and secret keys to be present.
 
 ```sh
 eval "$(agentpond env get dev)"

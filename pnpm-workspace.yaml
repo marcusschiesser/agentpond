@@ -1,7 +1,10 @@
 packages:
   - "apps/*"
   - "examples/basic-traces/typescript"
+  - "examples/openinference-openai/typescript"
   - "packages/*"
+
+reporter: silent
 
 allowBuilds:
   esbuild: true

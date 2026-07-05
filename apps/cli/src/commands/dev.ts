@@ -7,7 +7,7 @@ import {
 import { DuckDbIngestionSink, ensureDuckDbSchema } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/fastify-ingest";
 import type { Command } from "commander";
-import type { FastifyLoggerOptions } from "fastify";
+import type { FastifyInstance, FastifyLoggerOptions } from "fastify";
 import { CliError, parsePort } from "../cli-support.js";
 import { addGlobalOptions } from "../command-support.js";
 import { devSdkEnvironment } from "../dev-env.js";
@@ -29,7 +29,7 @@ export function registerDevCommand(program: Command): void {
 
 export async function startDevServer(options: DevOptions): Promise<void> {
 	const host = options.host ?? "127.0.0.1";
-	const port = parsePort(options.port ?? "4318");
+	const startPort = parsePort(options.port ?? "4318");
 	const environment = initAgentPondEnvironment("dev");
 	selectAgentPondEnvironment(environment.name);
 	const devConfig = configFromEnv({
@@ -39,28 +39,44 @@ export async function startDevServer(options: DevOptions): Promise<void> {
 	if (!devEnvironment)
 		throw new CliError("Missing dev environment configuration");
 	const lock = acquireDevServerLock(devEnvironment);
-	const server = buildServer({
-		sink: DuckDbIngestionSink.fromAgentPondEnv({ name: environment.name }),
-		auth: false,
-		logger: createDevLoggerOptions(),
-	});
-	const shutdown = async () => {
-		await server.close();
-	};
-	server.addHook("onClose", async () => {
-		lock.release();
-	});
-	process.once("SIGINT", shutdown);
-	process.once("SIGTERM", shutdown);
+	let server: FastifyInstance | undefined;
+	let port = startPort;
 	try {
 		await ensureDuckDbSchema(devConfig.dbPath);
-		await server.listen({ host, port });
+		const result = await listenOnAvailablePort({
+			host,
+			startPort,
+			createServer: () => {
+				const candidate = buildServer({
+					sink: DuckDbIngestionSink.fromAgentPondEnv({
+						name: environment.name,
+					}),
+					auth: false,
+					logger: createDevLoggerOptions(),
+				});
+				candidate.addHook("onClose", async () => {
+					if (server === candidate) lock.release();
+				});
+				return candidate;
+			},
+		});
+		server = result.server;
+		port = result.port;
+		lock.update({
+			host,
+			port,
+			url: `http://${host}:${port}`,
+		});
 	} catch (error) {
-		process.off("SIGINT", shutdown);
-		process.off("SIGTERM", shutdown);
 		lock.release();
 		throw error;
 	}
+	if (!server) throw new CliError("Dev server failed to start");
+	const shutdown = async () => {
+		await server.close();
+	};
+	process.once("SIGINT", shutdown);
+	process.once("SIGTERM", shutdown);
 	const baseUrl = `http://${host}:${port}`;
 	console.log(`AgentPond dev server listening at ${baseUrl}`);
 	console.log("");
@@ -75,6 +91,35 @@ export async function startDevServer(options: DevOptions): Promise<void> {
 	console.log("");
 	console.log(
 		'Or call `eval "$(agentpond env get dev)"` before calling your dev server.',
+	);
+}
+
+export async function listenOnAvailablePort(params: {
+	host: string;
+	startPort: number;
+	createServer: () => FastifyInstance;
+}): Promise<{ server: FastifyInstance; port: number }> {
+	const maxAttempts = 100;
+	for (let offset = 0; offset < maxAttempts; offset++) {
+		const port = params.startPort + offset;
+		const server = params.createServer();
+		try {
+			await server.listen({ host: params.host, port });
+			if (port !== params.startPort) {
+				console.error(
+					`Port ${params.startPort} is in use, using ${port} instead.`,
+				);
+			}
+			return { server, port };
+		} catch (error) {
+			await server.close().catch(() => undefined);
+			if (!isAddressInUse(error)) throw error;
+		}
+	}
+	throw new CliError(
+		`No open port found from ${params.startPort} to ${
+			params.startPort + maxAttempts - 1
+		}`,
 	);
 }
 
@@ -98,4 +143,13 @@ function isServerListenLog(line: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function isAddressInUse(error: unknown): boolean {
+	return (
+		typeof error === "object" &&
+		error !== null &&
+		"code" in error &&
+		(error as { code?: unknown }).code === "EADDRINUSE"
+	);
 }

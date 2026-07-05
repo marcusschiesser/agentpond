@@ -129,7 +129,9 @@ AgentPond provides a local Langfuse-compatible ingestion server for development.
 agentpond dev
 ```
 
-Your project can then use `agentpond env get dev` to get the environment values needed to use this ingestion server with standard OpenTelemetry exporters or the Langfuse SDK. Use `--otel` or `--langfuse` when you only want one family of variables. You can copy those values to your project's `.env` file or call this before running the dev server:
+If the default port `4318` is already in use, `agentpond dev` automatically tries the next open port. Only one dev server can run per AgentPond directory.
+
+While that server is running, your project can use `agentpond env get dev` to get the environment values needed to use the running server for this AgentPond directory with standard OpenTelemetry exporters or the Langfuse SDK. Use `--otel` or `--langfuse` when you only want one family of variables. You can copy those values to your project's `.env` file or call this before running your app:
 
 ```sh
 eval "$(agentpond env get dev)"

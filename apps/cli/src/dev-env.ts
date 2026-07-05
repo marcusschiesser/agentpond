@@ -11,6 +11,10 @@ export function devSdkEnvironment(
 				key: "OTEL_EXPORTER_OTLP_ENDPOINT",
 				value: otelEndpoint(`http://${host}:${port}`),
 			},
+			{
+				key: "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+				value: otelTracesEndpoint(`http://${host}:${port}`),
+			},
 			{ key: "OTEL_EXPORTER_OTLP_PROTOCOL", value: "http/json" },
 			{ key: "LANGFUSE_BASE_URL", value: `http://${host}:${port}` },
 			{ key: "LANGFUSE_PUBLIC_KEY", value: "pk-agentpond-dev" },
@@ -34,6 +38,10 @@ export function filterEnvEntries(
 
 export function otelEndpoint(baseUrl: string): string {
 	return `${baseUrl.replace(/\/+$/, "")}/api/public/otel`;
+}
+
+export function otelTracesEndpoint(baseUrl: string): string {
+	return `${otelEndpoint(baseUrl)}/v1/traces`;
 }
 
 export type EnvVar = {

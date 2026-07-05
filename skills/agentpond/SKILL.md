@@ -121,6 +121,8 @@ npx agentpond dev
 
 This selects the `dev` environment and writes directly to `.agentpond/envs/dev/cache.duckdb`. Keep the process running while SDKs send traces.
 
+If the default port `4318` is already in use, `npx agentpond dev` automatically tries the next open port. Only one dev server can run per AgentPond directory, and `npx agentpond env get dev` returns SDK environment values for that running server. If no dev server is running, `env get dev` fails.
+
 To configure an app to send traces to the dev server, use:
 
 ```bash

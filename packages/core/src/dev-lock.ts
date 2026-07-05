@@ -18,10 +18,14 @@ export type DevServerLock = {
 	startedAt: string;
 	dbPath: string;
 	command: string;
+	host?: string;
+	port?: number;
+	url?: string;
 };
 
 export type AcquiredDevServerLock = {
 	path: string;
+	update: (values: Pick<DevServerLock, "host" | "port" | "url">) => void;
 	release: () => void;
 };
 
@@ -47,11 +51,21 @@ export function acquireDevServerLock(
 	let released = false;
 	return {
 		path,
+		update: (values) => {
+			if (released) return;
+			const current = readDevServerLockFile(path);
+			if (current?.pid !== process.pid) return;
+			writeFileSync(
+				path,
+				`${JSON.stringify({ ...current, ...values }, null, 2)}\n`,
+				"utf8",
+			);
+		},
 		release: () => {
 			if (released) return;
 			released = true;
 			try {
-				const current = readDevServerLock(path);
+				const current = readDevServerLockFile(path);
 				if (current?.pid === process.pid) unlinkSync(path);
 			} catch {
 				// Best-effort cleanup during process shutdown.
@@ -63,11 +77,19 @@ export function acquireDevServerLock(
 export function isDevServerRunning(environment: AgentPondEnvironment): boolean {
 	const path = devServerLockPath(environment);
 	removeStaleDevServerLock(path);
-	return readDevServerLock(path) !== undefined;
+	return readDevServerLockFile(path) !== undefined;
+}
+
+export function readDevServerLock(
+	environment: AgentPondEnvironment,
+): DevServerLock | undefined {
+	const path = devServerLockPath(environment);
+	removeStaleDevServerLock(path);
+	return readDevServerLockFile(path);
 }
 
 function removeStaleDevServerLock(path: string): void {
-	const lock = readDevServerLock(path);
+	const lock = readDevServerLockFile(path);
 	if (!lock) {
 		if (existsSync(path)) {
 			try {
@@ -86,7 +108,7 @@ function removeStaleDevServerLock(path: string): void {
 	}
 }
 
-function readDevServerLock(path: string): DevServerLock | undefined {
+function readDevServerLockFile(path: string): DevServerLock | undefined {
 	if (!existsSync(path)) return undefined;
 	try {
 		const parsed = JSON.parse(
@@ -98,6 +120,9 @@ function readDevServerLock(path: string): DevServerLock | undefined {
 			startedAt: String(parsed.startedAt ?? ""),
 			dbPath: String(parsed.dbPath ?? ""),
 			command: String(parsed.command ?? ""),
+			host: typeof parsed.host === "string" ? parsed.host : undefined,
+			port: typeof parsed.port === "number" ? parsed.port : undefined,
+			url: typeof parsed.url === "string" ? parsed.url : undefined,
 		};
 	} catch {
 		return undefined;

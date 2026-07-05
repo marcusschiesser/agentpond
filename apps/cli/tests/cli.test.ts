@@ -12,7 +12,10 @@ import {
 	MemoryObjectStore,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
-import { createDevLoggerOptions } from "../src/commands/dev.js";
+import {
+	createDevLoggerOptions,
+	listenOnAvailablePort,
+} from "../src/commands/dev.js";
 import { CLI_VERSION, createOtelTraceId, main } from "../src/index.js";
 import { manualTraceResourceSpans } from "../src/otel-trace.js";
 import { writeEventsAndSyncCache } from "../src/sync-write.js";
@@ -700,28 +703,21 @@ test("CLI scores create writes directly to the dev DuckDB", async () => {
 	}
 });
 
-test("CLI env get dev prints generated shell exports without creating dev env file", async () => {
+test("CLI env get dev requires a running dev server", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
 		process.chdir(root);
-		const output = await captureStdout(() =>
+		const stderr = await captureStderr(() =>
 			main(["node", "agentpond", "env", "get", "dev"]),
 		);
 
-		assert.equal(process.exitCode, undefined);
-		assert.equal(
-			output,
-			[
-				"export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318/api/public/otel",
-				"export OTEL_EXPORTER_OTLP_PROTOCOL=http/json",
-				"export LANGFUSE_BASE_URL=http://127.0.0.1:4318",
-				"export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev",
-				"export LANGFUSE_SECRET_KEY=sk-agentpond-dev",
-				"",
-			].join("\n"),
+		assert.equal(process.exitCode, 2);
+		assert.match(
+			stderr,
+			/dev server is not running; start it with agentpond dev/,
 		);
 		assert.equal(
 			existsSync(join(root, ".agentpond", "envs", "dev.env")),
@@ -740,15 +736,24 @@ test("CLI env get dev --otel prints only OTEL exports", async () => {
 	process.exitCode = undefined;
 	try {
 		process.chdir(root);
+		const environment = initAgentPondEnvironment("dev");
+		const lock = acquireDevServerLock(environment);
+		lock.update({
+			host: "127.0.0.1",
+			port: 4319,
+			url: "http://127.0.0.1:4319",
+		});
 		const output = await captureStdout(() =>
 			main(["node", "agentpond", "env", "get", "dev", "--otel"]),
 		);
+		lock.release();
 
 		assert.equal(process.exitCode, undefined);
 		assert.equal(
 			output,
 			[
-				"export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318/api/public/otel",
+				"export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4319/api/public/otel",
+				"export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4319/api/public/otel/v1/traces",
 				"export OTEL_EXPORTER_OTLP_PROTOCOL=http/json",
 				"",
 			].join("\n"),
@@ -770,15 +775,23 @@ test("CLI env get dev --langfuse prints only Langfuse-compatible exports", async
 	process.exitCode = undefined;
 	try {
 		process.chdir(root);
+		const environment = initAgentPondEnvironment("dev");
+		const lock = acquireDevServerLock(environment);
+		lock.update({
+			host: "127.0.0.1",
+			port: 4319,
+			url: "http://127.0.0.1:4319",
+		});
 		const output = await captureStdout(() =>
 			main(["node", "agentpond", "env", "get", "dev", "--langfuse"]),
 		);
+		lock.release();
 
 		assert.equal(process.exitCode, undefined);
 		assert.equal(
 			output,
 			[
-				"export LANGFUSE_BASE_URL=http://127.0.0.1:4318",
+				"export LANGFUSE_BASE_URL=http://127.0.0.1:4319",
 				"export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev",
 				"export LANGFUSE_SECRET_KEY=sk-agentpond-dev",
 				"",
@@ -813,34 +826,55 @@ test("CLI env get rejects conflicting env family flags", async () => {
 	}
 });
 
-test("CLI env get dev honors custom host and port", async () => {
+test("CLI env get dev uses the running dev server port", async () => {
 	const cwd = process.cwd();
-	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-override-"));
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-running-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
 		process.chdir(root);
+		const environment = initAgentPondEnvironment("dev");
+		const lock = acquireDevServerLock(environment);
+		lock.update({
+			host: "127.0.0.1",
+			port: 4319,
+			url: "http://127.0.0.1:4319",
+		});
 		const output = await captureStdout(() =>
-			main([
-				"node",
-				"agentpond",
-				"env",
-				"get",
-				"dev",
-				"--host",
-				"0.0.0.0",
-				"--port",
-				"9999",
-			]),
+			main(["node", "agentpond", "env", "get", "dev"]),
 		);
+		lock.release();
 
 		assert.equal(process.exitCode, undefined);
 		assert.match(
 			output,
-			/export OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/0\.0\.0\.0:9999\/api\/public\/otel/,
+			/export OTEL_EXPORTER_OTLP_ENDPOINT=http:\/\/127\.0\.0\.1:4319\/api\/public\/otel/,
 		);
-		assert.match(output, /export LANGFUSE_BASE_URL=http:\/\/0\.0\.0\.0:9999/);
+		assert.match(
+			output,
+			/export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http:\/\/127\.0\.0\.1:4319\/api\/public\/otel\/v1\/traces/,
+		);
+		assert.match(output, /export LANGFUSE_BASE_URL=http:\/\/127\.0\.0\.1:4319/);
 		assert.match(output, /export LANGFUSE_PUBLIC_KEY=pk-agentpond-dev/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env get dev rejects manual host and port overrides", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-env-no-port-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "env", "get", "dev", "--port", "4319"]),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /unknown option '--port'/);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -924,6 +958,72 @@ test("CLI dev logger prints JSON logs and suppresses server listen logs", () => 
 			},
 		],
 	);
+});
+
+test("CLI dev falls back to the next port when the requested port is in use", async () => {
+	const listenedPorts: number[] = [];
+	const closedPorts: number[] = [];
+	let successfulServer:
+		| {
+				close: () => Promise<void>;
+		  }
+		| undefined;
+	const stderr = await captureStderr(async () => {
+		const result = await listenOnAvailablePort({
+			host: "127.0.0.1",
+			startPort: 4318,
+			createServer: () => {
+				let attemptedPort: number | undefined;
+				const server = {
+					listen: async ({ port }: { port: number }) => {
+						attemptedPort = port;
+						listenedPorts.push(port);
+						if (port === 4318) {
+							const error = new Error("address already in use") as Error & {
+								code: string;
+							};
+							error.code = "EADDRINUSE";
+							throw error;
+						}
+					},
+					close: async () => {
+						if (attemptedPort !== undefined) closedPorts.push(attemptedPort);
+					},
+				};
+				return server as never;
+			},
+		});
+		successfulServer = result.server;
+
+		assert.equal(result.port, 4319);
+	});
+
+	assert.deepEqual(listenedPorts, [4318, 4319]);
+	assert.deepEqual(closedPorts, [4318]);
+	assert.match(stderr, /Port 4318 is in use, using 4319 instead\./);
+	await successfulServer?.close();
+});
+
+test("CLI dev server lock allows only one server per AgentPond directory", () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-dev-lock-exclusive-"));
+	try {
+		process.chdir(root);
+		const environment = initAgentPondEnvironment("dev");
+		const lock = acquireDevServerLock(environment);
+		try {
+			assert.throws(
+				() => acquireDevServerLock(environment),
+				(error: unknown) =>
+					error instanceof Error &&
+					(error as NodeJS.ErrnoException).code === "EEXIST",
+			);
+		} finally {
+			lock.release();
+		}
+	} finally {
+		process.chdir(cwd);
+	}
 });
 
 test("CLI dev write commands fail while the dev server lock is active", async () => {
@@ -1523,6 +1623,10 @@ test("CLI --limit caps list result count", async () => {
 
 		assert.equal(process.exitCode, undefined);
 		assert.equal(traces.length, 2);
+		assert.deepEqual(
+			traces.map((trace) => trace.id),
+			["trace-3", "trace-2"],
+		);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
