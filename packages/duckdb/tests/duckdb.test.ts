@@ -448,10 +448,7 @@ test("DuckDB readonly cache query does not retry non-lock failures", async () =>
 		},
 	};
 
-	await assert.rejects(
-		db.query("SELECT id FROM traces"),
-		/projection failed/,
-	);
+	await assert.rejects(db.query("SELECT id FROM traces"), /projection failed/);
 	assert.equal(attempts, 1);
 });
 
