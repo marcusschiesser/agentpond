@@ -108,36 +108,69 @@ The repository contains scenario-based examples under [examples](./examples/READ
 - [Basic traces](./examples/basic-traces/README.md): fixture-based Python and TypeScript examples that emit traces, observations, and annotation scores without calling an LLM.
 - [Hugging Face Space](./examples/huggingface-space/README.md): deploy AgentPond ingestion to a Docker Space and store traces in a Hugging Face Storage Bucket.
 - [LLM compliance workflow](./examples/llm-compliance/README.md): a Python `uv` example that calls OpenAI, parses a structured compliance score, and records the workflow in Langfuse.
+- [OpenInference OpenAI traces](./examples/openinference-openai/README.md): minimal Python and TypeScript examples that call OpenAI once and export OpenInference traces to AgentPond.
 
 Each scenario README includes prerequisites and run commands.
 
 ## Use AgentPond in your project
 
-AgentPond implements Langfuse-compatible ingestion endpoints. To send traces to AgentPond, use the normal Langfuse SDK integration for your language or framework.
+To use AgentPond in your project, your app sends traces to an AgentPond server, and your coding agent uses the AgentPond CLI to analyze those traces.
 
-See the [Langfuse SDK overview](https://langfuse.com/docs/observability/sdk/overview) for SDK installation and instrumentation instructions.
+### Sending traces
 
-### Environments
+AgentPond accepts Langfuse-compatible ingestion and standard OpenTelemetry Protocol (OTLP) traces.
 
-AgentPond keeps dev, staging, and production data separate by environment.
+To send traces from your app, use one of these instrumentation paths:
 
-#### Development
+- the [Langfuse SDK](https://langfuse.com/docs/observability/sdk/overview) integration for your language or framework
+- the [OpenInference SDK](https://github.com/Arize-ai/openinference) with an OpenTelemetry OTLP exporter
 
-AgentPond provides a local Langfuse-compatible ingestion server for development. To start it, just call:
+Install the matching instrumentation skill so your coding agent can add the SDK to your app:
+
+```sh
+npx skills add https://github.com/langfuse/skills --skill langfuse-observability
+```
+
+```sh
+npx skills add https://github.com/arize-ai/arize-skills --skill arize-instrumentation
+```
+
+For complete examples, see the [LLM compliance workflow](./examples/llm-compliance/README.md) for Langfuse SDK instrumentation and the [OpenInference OpenAI traces](./examples/openinference-openai/README.md) example for OpenInference instrumentation.
+
+### Storing traces
+
+AgentPond provides a local ingestion server, so you can receive traces for your development environment. To start it, just call:
 
 ```sh
 agentpond dev
 ```
 
-If the default port `4318` is already in use, `agentpond dev` automatically tries the next open port. Only one dev server can run per AgentPond directory.
-
-While that server is running, your project can use `agentpond env get dev` to get the environment values needed to use the running server for this AgentPond directory with standard OpenTelemetry exporters or the Langfuse SDK. Use `--otel` or `--langfuse` when you only want one family of variables. You can copy those values to your project's `.env` file or call this before running your app:
+Then, start a second terminal and load the environment values your app needs to send traces to AgentPond:
 
 ```sh
 eval "$(agentpond env get dev)"
 ```
 
-#### Staging and production
+Finally, run your development server as usual.
+
+### Analyzing traces
+
+After your app emits traces, inspect them with your coding agent.
+Add this skill so it can query trace data, inspect failures, and propose evals and regression tests:
+
+```sh
+npx skills add marcusschiesser/agentpond
+```
+
+Then ask your coding agent to start an analysis like this:
+
+```text
+Analyze why the last agent run for user 32423 did not return a result
+```
+
+### Environments
+
+AgentPond keeps data separated by your deployment environment (e.g. dev, staging, prod).
 
 For staging and production services, deploy the AgentPond ingestion service together with an object store in your infrastructure. Docker images are published to `ghcr.io/marcusschiesser/agentpond`, and [docker-compose.yml](./docker-compose.yml) provides a template that you can run locally with `docker compose up`. See [Deployment](./docs/deployment.md) for real AWS, Google Cloud, Vercel Blob, and other infrastructure options.
 
@@ -158,16 +191,6 @@ agentpond env use staging
 ```
 
 After that, `agentpond` queries traces from the selected staging environment by default.
-
-### Add coding agent
-
-After sending traces to AgentPond, you need to give your coding agent the skill to access AgentPond:
-
-```sh
-npx skills add marcusschiesser/agentpond
-```
-
-This command installs a skill to use the AgentPond CLI, understand its DuckDB schema for advanced queries, and provides trace-analysis guidance to help improve your agents.
 
 
 ## Development
