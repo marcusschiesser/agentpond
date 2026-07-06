@@ -1,5 +1,16 @@
 # agentpond
 
+## 0.4.2
+
+### Patch Changes
+
+- e01cbb1: Make `agentpond dev` automatically use the next open port when the requested dev server port is already in use, and make `agentpond env get dev` read the running dev server endpoint for the current AgentPond directory.
+- e01cbb1: Add simple Python and TypeScript OpenInference OpenAI examples and print the trace-specific OTLP endpoint for SDKs that require a full traces URL.
+- 718a6c0: Use a patched OpenTelemetry core dependency for the OpenInference OpenAI example.
+- Updated dependencies [ce9373a]
+  - @agentpond/duckdb@0.3.4
+  - @agentpond/fastify-ingest@0.3.3
+
 ## 0.4.1
 
 ### Patch Changes

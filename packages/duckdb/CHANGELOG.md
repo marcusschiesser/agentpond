@@ -1,5 +1,11 @@
 # @agentpond/duckdb
 
+## 0.3.4
+
+### Patch Changes
+
+- ce9373a: Retry transient DuckDB read locks so CLI read commands are more resilient while the dev server is writing.
+
 ## 0.3.3
 
 ### Patch Changes
