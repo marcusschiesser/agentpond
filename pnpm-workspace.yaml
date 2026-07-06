@@ -6,11 +6,18 @@ packages:
 
 reporter: silent
 
+minimumReleaseAge: 10080
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - chokidar@4.0.3
+
 allowBuilds:
   esbuild: true
   protobufjs: true
 
 minimumReleaseAgeExclude:
+  - '@opentelemetry/*'
   - '@duckdb/node-api@1.5.4-r.1'
   - '@duckdb/node-bindings-darwin-arm64@1.5.4-r.1'
   - '@duckdb/node-bindings-darwin-x64@1.5.4-r.1'

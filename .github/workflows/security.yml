@@ -254,7 +254,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate CycloneDX SBOM
-        run: pnpm dlx @cyclonedx/cyclonedx-npm@5.0.0 --output-file bom.json
+        run: pnpm dlx @cyclonedx/cyclonedx-npm@5.0.0 --ignore-npm-errors --output-file bom.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
