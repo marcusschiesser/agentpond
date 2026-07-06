@@ -64,6 +64,12 @@ jobs:
             echo "title=Release: agentpond" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Configure release PR git credentials
+        if: github.event_name == 'push'
+        run: git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create release PR or publish
         id: changesets
         if: github.event_name == 'push'
