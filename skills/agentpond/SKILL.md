@@ -85,7 +85,16 @@ npx agentpond env init staging --store vercel
 npx agentpond env init staging --store local
 ```
 
-Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings. GCS environments use Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Firebase projects do not need Firebase storage settings in AgentPond env files; run AgentPond inside the Firebase project directory or a nested package. It detects `.firebaserc` or an ancestor `firebase.json`, reads the Firebase project id from `.firebaserc` or Firebase/Google project env (`FIREBASE_CONFIG`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `GOOGLE_CLOUD_PROJECT`), reads the default Firebase Storage bucket through `firebase-admin`, uses the fixed `agentpond/` prefix, and uses the Firebase project id as the local cache environment name when `--env` is not passed. Firebase setup should also deny client SDK access to `agentpond/` in `storage.rules` with `allow read, write: if false;`; Firebase Admin writes from Functions and CLI sync bypass those rules. Vercel environments use `AGENTPOND_STORE=vercel`, `AGENTPOND_BLOB_ACCESS=private`, and Vercel Blob credentials from `BLOB_READ_WRITE_TOKEN` or OIDC (`BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`). Do not ask users to paste secrets into chat.
+Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings.
+
+Provider notes:
+- GCS: Use Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`.
+- Firebase: Do not add Firebase bucket or prefix settings to AgentPond env files. Run AgentPond inside the Firebase project directory or a nested package. It detects `.firebaserc` or an ancestor `firebase.json`, reads the project id from `.firebaserc` or Firebase/Google project env, syncs `FIREBASE_CONFIG.storageBucket` when present or checks the default Firebase buckets otherwise, uses the fixed `agentpond/` prefix, and uses the Firebase project id as the local cache environment name when `--env` is not passed. Read `references/cli.md` for details.
+- Vercel Blob: Use `AGENTPOND_STORE=vercel`, `AGENTPOND_BLOB_ACCESS=private`, and credentials from `BLOB_READ_WRITE_TOKEN` or OIDC (`BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`).
+
+For Firebase setup, also deny client SDK access to `agentpond/` in `storage.rules` with `allow read, write: if false;`. Firebase Admin writes from Functions and CLI sync bypass those rules.
+
+Do not ask users to paste secrets into chat.
 
 For Hugging Face Storage Buckets, use the S3-compatible endpoint and checksum settings from <https://huggingface.co/docs/hub/storage-buckets-s3>.
 
