@@ -2,8 +2,8 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import type { AppOptions, getApps, initializeApp } from "firebase-admin/app";
 import type {
-	getStorage,
 	Storage as FirebaseAdminStorage,
+	getStorage,
 } from "firebase-admin/storage";
 
 const require = createRequire(import.meta.url);

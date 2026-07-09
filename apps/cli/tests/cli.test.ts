@@ -22,18 +22,18 @@ import {
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
 import { FirebaseStorageObjectStore } from "@agentpond/firebase";
+import { configForCommand } from "../src/command-support.js";
 import {
 	createDevLoggerOptions,
 	listenOnAvailablePort,
 } from "../src/commands/dev.js";
 import { CLI_VERSION, createOtelTraceId, main } from "../src/index.js";
-import { manualTraceResourceSpans } from "../src/otel-trace.js";
 import {
 	type ObjectStorageContext,
 	objectStorageForConfig,
 } from "../src/object-store.js";
+import { manualTraceResourceSpans } from "../src/otel-trace.js";
 import { writeEventsAndSyncCache } from "../src/sync-write.js";
-import { configForCommand } from "../src/command-support.js";
 import {
 	checkForCliUpdate,
 	isNewerVersion,

@@ -7,4 +7,4 @@
 "@agentpond/ingest": patch
 ---
 
-Add zero-config support for Firebase, including Firebase CLI auto-detection from `.firebaserc` or `firebase.json` monorepos, Firebase project-id cache environments, workspace-root CLI cache resolution, and a Firebase optimized ingest function.
+Add zero-config support for Firebase, including Firebase CLI auto-detection from `.firebaserc` or `firebase.json` monorepos, Firebase project-id cache environments, workspace-root CLI cache resolution, a Firebase optimized ingest function, and pnpm install policy support for Firebase dependencies.

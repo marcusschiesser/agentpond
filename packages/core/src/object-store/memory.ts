@@ -1,9 +1,9 @@
-import type { ObjectStore } from "./types.js";
 import {
 	type IngestionSink,
 	type ObjectStoreIngestionSinkOptions,
 	sinkFromStore,
 } from "./ingestion-handler.js";
+import type { ObjectStore } from "./types.js";
 
 export class MemoryObjectStore implements ObjectStore {
 	readonly writes: string[] = [];

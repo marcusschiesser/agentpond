@@ -1,4 +1,4 @@
-import { configFromRuntimeEnv, type AgentPondConfig } from "../config.js";
+import { type AgentPondConfig, configFromRuntimeEnv } from "../config.js";
 import type {
 	AgentPondEnvironment,
 	AgentPondStoreType,
