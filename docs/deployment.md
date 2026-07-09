@@ -89,7 +89,7 @@ Set the application SDK ingestion URL to the exported Firebase Function endpoint
 LANGFUSE_BASE_URL=https://<region>-<project>.cloudfunctions.net/telemetryIngest/api/public/otel/v1/traces
 ```
 
-Set `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` for ingestion auth. Firebase storage writes to the default Cloud Storage for Firebase bucket under the `agentpond/` object prefix by default; use `FirebaseStorageObjectStore.fromConfig({ prefix })` when code needs a different prefix. Firebase emulator and production runtimes both write through Firebase Storage; the adapter does not switch to DuckDB.
+Set `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` for ingestion auth. Firebase storage writes to the default Cloud Storage for Firebase bucket under the `agentpond/` object prefix by default; use `FirebaseStorageObjectStore.fromConfig({ prefix })` when code needs a different prefix. 
 
 Keep the `agentpond/` trace prefix private from Firebase client SDKs. Add a deny rule for that prefix in `storage.rules`; Firebase Admin writes from Functions and CLI sync are not blocked by Firebase Storage Security Rules.
 
@@ -113,7 +113,9 @@ firebase use <project>
 agentpond sync
 ```
 
-The CLI detects `.firebaserc` or an ancestor `firebase.json`, so it also works from nested function packages in Firebase monorepos. When `.firebaserc` is present, AgentPond uses `projects.default` from `firebase use`. When only `firebase.json` is present, set a Firebase/Google project environment variable such as `GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `FIREBASE_CONFIG`. AgentPond reads the default bucket `${projectId}.firebasestorage.app` under `agentpond/`. Without `--env`, the Firebase project id is the local cache environment name, so project `lunaraspect-dev` syncs to `.agentpond/envs/lunaraspect-dev/cache.duckdb`. The local sync path uses `firebase-admin` from the Firebase project and does not require the `gcloud` CLI. Firebase Admin SDK credential lookup is still responsible for authentication; AgentPond does not read private Firebase CLI token files.
+The CLI detects `.firebaserc` or an ancestor `firebase.json`, so it also works from nested function packages in Firebase monorepos. 
+When `.firebaserc` is present, AgentPond uses `projects.default` from `firebase use`. When only `firebase.json` is present, set a Firebase/Google project environment variable such as `GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `FIREBASE_CONFIG`. 
+AgentPond reads the default bucket `${projectId}.firebasestorage.app` under `agentpond/`. 
 
 ## Vercel
 
