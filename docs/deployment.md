@@ -83,6 +83,12 @@ https://<region>-<project>.cloudfunctions.net/telemetryIngest/api/public/otel/v1
 https://<region>-<project>.cloudfunctions.net/telemetryIngest/api/public/ingestion
 ```
 
+Set the application SDK ingestion URL to the exported Firebase Function endpoint. For OTLP trace export through `telemetryIngest`, set `LANGFUSE_BASE_URL` to:
+
+```bash
+LANGFUSE_BASE_URL=https://<region>-<project>.cloudfunctions.net/telemetryIngest/api/public/otel/v1/traces
+```
+
 Set `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` for ingestion auth. Firebase storage writes to the default Cloud Storage for Firebase bucket under the `agentpond/` object prefix by default; use `FirebaseStorageObjectStore.fromConfig({ prefix })` when code needs a different prefix. Firebase emulator and production runtimes both write through Firebase Storage; the adapter does not switch to DuckDB.
 
 Keep the `agentpond/` trace prefix private from Firebase client SDKs. Add a deny rule for that prefix in `storage.rules`; Firebase Admin writes from Functions and CLI sync are not blocked by Firebase Storage Security Rules.
