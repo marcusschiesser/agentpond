@@ -43,6 +43,16 @@ export AGENTPOND_PREFIX=
 
 Authenticate GCS with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`; do not ask users to paste service-account JSON into chat.
 
+Firebase project directories use:
+
+```bash
+firebase login
+firebase use <project>
+npx agentpond sync
+```
+
+AgentPond detects `.firebaserc` or an ancestor `firebase.json`, so this also works from nested packages in Firebase monorepos. It uses `.firebaserc` `projects.default` from `firebase use` when present; if only `firebase.json` is present, set `FIREBASE_CONFIG`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `GOOGLE_CLOUD_PROJECT` with the Firebase project id. AgentPond reads the default Cloud Storage for Firebase bucket and always uses the `agentpond/` prefix. Without `--env`, the Firebase project id is the local cache environment name, for example `.agentpond/envs/lunaraspect-dev/cache.duckdb`. Do not add Firebase bucket or prefix settings to AgentPond env files.
+
 Vercel Blob environments use:
 
 ```bash
@@ -57,6 +67,7 @@ Provider package serverless ingestion exports:
 
 ```ts
 import { lambdaIngestHandler, S3ObjectStore } from "@agentpond/aws";
+import { createFirebaseIngestFunction } from "@agentpond/firebase";
 import {
 	createHttpIngestFunction,
 	GcsObjectStore,
@@ -65,9 +76,9 @@ import {
 import { VercelBlobObjectStore } from "@agentpond/vercel";
 ```
 
-Use `lambdaIngestHandler` for AWS Lambda Function URLs or API Gateway HTTP API v2, `httpIngestFunction` for Google HTTP Cloud Functions, and `createHttpIngestFunction` with `pathPrefix` and `GcsObjectStore.fromRuntimeEnv().toSink()` for Firebase Functions.
+Use `lambdaIngestHandler` for AWS Lambda Function URLs or API Gateway HTTP API v2 and `httpIngestFunction` for Google HTTP Cloud Functions. Firebase Functions should use `createFirebaseIngestFunction()`; the Firebase store writes to the default Cloud Storage for Firebase bucket under `agentpond/`, and local sync detects `.firebaserc` or an ancestor `firebase.json`.
 
-If no environment is selected, AgentPond uses `dev`. DuckDB caches are stored at `./.agentpond/envs/<name>/cache.duckdb`.
+If no environment is selected, AgentPond uses `dev`. DuckDB caches are stored at `.agentpond/envs/<name>/cache.duckdb` in the current workspace root, or current directory outside a workspace.
 
 The CLI also accepts common settings as flags:
 

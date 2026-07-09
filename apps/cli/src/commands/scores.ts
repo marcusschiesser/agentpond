@@ -13,9 +13,11 @@ import {
 	cacheForRead,
 	commandContext,
 	type GlobalOptions,
-	isDevEnvironment,
 } from "../command-support.js";
-import { objectStoreForConfig } from "../object-store.js";
+import {
+	objectStorageForConfig,
+	usesAgentPondDevServer,
+} from "../object-store.js";
 import { sql } from "../sql.js";
 import { writeEventsAndSyncCache } from "../sync-write.js";
 
@@ -141,7 +143,7 @@ export async function createScore(
 		},
 	};
 
-	if (isDevEnvironment(config)) {
+	if (usesAgentPondDevServer(config)) {
 		const result = await new DuckDbIngestionSink(config.dbPath).writeEvents({
 			projectId: config.projectId,
 			events: [event],
@@ -150,8 +152,8 @@ export async function createScore(
 		print({ eventId: event.id, scoreId: event.body.id, ...result }, json);
 		return;
 	}
-	const store = objectStoreForConfig(config);
-	const manifest = await writeEventsAndSyncCache(config, store, [event]);
+	const storage = objectStorageForConfig(config);
+	const manifest = await writeEventsAndSyncCache(config, storage, [event]);
 	print(
 		{ eventId: event.id, scoreId: event.body.id, objects: manifest.objects },
 		json,

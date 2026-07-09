@@ -29,6 +29,7 @@
 		"@agentpond/core": "workspace:*",
 		"@agentpond/duckdb": "workspace:*",
 		"@agentpond/fastify-ingest": "workspace:*",
+		"@agentpond/firebase": "workspace:*",
 		"@agentpond/google": "workspace:*",
 		"@agentpond/vercel": "workspace:*",
 		"@duckdb/node-api": "^1.5.4-r.1",

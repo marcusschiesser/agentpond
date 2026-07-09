@@ -5,6 +5,7 @@ packages:
   - "packages/*"
 
 reporter: silent
+autoInstallPeers: false
 
 minimumReleaseAge: 10080
 blockExoticSubdeps: true

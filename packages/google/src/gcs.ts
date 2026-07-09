@@ -26,12 +26,12 @@ export function gcsConfigFromRuntimeEnv(): GcsConfig {
 	return gcsConfigForAgentPondEnvironment();
 }
 
-type GcsFile = {
+export type GcsFile = {
 	save(data: string, options: { contentType: string }): Promise<void>;
 	download(): Promise<[Buffer]>;
 };
 
-type GcsBucket = {
+export type GcsBucket = {
 	file(name: string): GcsFile;
 	getFiles(options: {
 		prefix: string;
@@ -44,6 +44,7 @@ type GcsStorage = {
 };
 
 export class GcsObjectStore implements ObjectStore {
+	private readonly configValue?: GcsConfig;
 	private readonly bucket: GcsBucket;
 
 	static fromEnvironment(
@@ -62,11 +63,26 @@ export class GcsObjectStore implements ObjectStore {
 		return new GcsObjectStore(config);
 	}
 
-	constructor(
-		readonly config: GcsConfig,
-		storage: GcsStorage = new Storage(),
-	) {
-		this.bucket = storage.bucket(config.bucket);
+	static fromBucket(bucket: GcsBucket): GcsObjectStore {
+		return new GcsObjectStore(bucket);
+	}
+
+	constructor(bucket: GcsBucket);
+	constructor(config: GcsConfig, storage?: GcsStorage);
+	constructor(configOrBucket: GcsConfig | GcsBucket, storage?: GcsStorage) {
+		if (isGcsBucket(configOrBucket)) {
+			this.bucket = configOrBucket;
+			return;
+		}
+		this.configValue = configOrBucket;
+		this.bucket = (storage ?? new Storage()).bucket(configOrBucket.bucket);
+	}
+
+	get config(): GcsConfig {
+		if (!this.configValue) {
+			throw new Error("GCS config is not available for a pre-created bucket");
+		}
+		return this.configValue;
 	}
 
 	toSink(options: ObjectStoreIngestionSinkOptions = {}): IngestionSink {
@@ -97,4 +113,11 @@ export class GcsObjectStore implements ObjectStore {
 		const [files] = await this.bucket.getFiles({ prefix, autoPaginate: true });
 		return files.map((file) => file.name).sort();
 	}
+}
+
+function isGcsBucket(value: GcsConfig | GcsBucket): value is GcsBucket {
+	return (
+		typeof (value as GcsBucket).file === "function" &&
+		typeof (value as GcsBucket).getFiles === "function"
+	);
 }

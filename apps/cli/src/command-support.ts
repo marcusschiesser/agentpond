@@ -7,6 +7,7 @@ import {
 	isDevServerRunning,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
+import { firebaseCliProjectConfigFromCwdIfAvailable } from "@agentpond/firebase";
 import type { Command } from "commander";
 import { CliError } from "./cli-support.js";
 
@@ -27,10 +28,16 @@ export function addGlobalOptions(command: Command): Command {
 }
 
 export function commandContext(options: GlobalOptions): CommandContext {
-	const config = configFromEnv({ envName: options.env });
+	const config = configForCommand(options);
 	const json = Boolean(options.json);
 	logImplicitEnvironment(options, config, json);
 	return { config, json };
+}
+
+export function configForCommand(options: GlobalOptions): AgentPondConfig {
+	if (options.env) return configFromEnv({ envName: options.env });
+	const firebaseProject = firebaseCliProjectConfigFromCwdIfAvailable();
+	return configFromEnv({ envName: firebaseProject?.projectId });
 }
 
 export function isDevEnvironment(config: AgentPondConfig): boolean {

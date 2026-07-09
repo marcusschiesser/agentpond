@@ -1,0 +1,41 @@
+{
+	"name": "@agentpond/firebase",
+	"version": "0.3.3",
+	"description": "Firebase Storage and Functions ingestion adapters for AgentPond",
+	"license": "MIT",
+	"type": "module",
+	"files": [
+		"dist"
+	],
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/marcusschiesser/agentpond.git",
+		"directory": "packages/firebase"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"dependencies": {
+		"@agentpond/core": "workspace:*",
+		"@agentpond/google": "workspace:*",
+		"@agentpond/ingest": "workspace:*"
+	},
+	"devDependencies": {
+		"firebase-admin": ">=13.6.0"
+	},
+	"peerDependencies": {
+		"firebase-admin": ">=13.6.0"
+	},
+	"peerDependenciesMeta": {
+		"firebase-admin": {
+			"optional": true
+		}
+	}
+}

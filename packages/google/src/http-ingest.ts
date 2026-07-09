@@ -1,6 +1,7 @@
 import {
 	type AgentPondConfig,
 	type AuthConfig,
+	type ObjectStore,
 	authFromRuntimeEnv,
 	sinkForConfig,
 } from "@agentpond/core";
@@ -9,15 +10,21 @@ import {
 	handleIngestRequest,
 	type IngestionLogger,
 	type IngestionSink,
+	resolveIngestionSink,
 } from "@agentpond/ingest";
 import { GcsObjectStore } from "./gcs.js";
 
 export type GoogleIngestFunctionOptions = {
 	auth?: AuthConfig | false;
+	store?: ObjectStore;
 	sink?: IngestionSink;
 	logger?: IngestionLogger;
-	pathPrefix?: string | string[];
+	pathPrefix?: string | string[] | GooglePathPrefixResolver;
 };
+
+export type GooglePathPrefixResolver = (
+	req: GoogleHttpRequest,
+) => string | string[] | undefined;
 
 export type GoogleHttpRequest = {
 	method?: string;
@@ -43,7 +50,9 @@ export type GoogleHttpIngestFunction = (
 export function createHttpIngestFunction(
 	options: GoogleIngestFunctionOptions = {},
 ): GoogleHttpIngestFunction {
-	const sink = options.sink ?? GcsObjectStore.fromRuntimeEnv().toSink();
+	const sink = resolveIngestionSink(options, () =>
+		GcsObjectStore.fromRuntimeEnv(),
+	);
 	const auth = options.auth ?? googleAuthFromRuntimeEnv();
 
 	return async (req, res) => {
@@ -78,13 +87,15 @@ export function googleSinkForConfig(config: AgentPondConfig): IngestionSink {
 
 function requestPath(
 	req: GoogleHttpRequest,
-	pathPrefix?: string | string[],
+	pathPrefix?: GoogleIngestFunctionOptions["pathPrefix"],
 ): string {
 	const rawPath = req.originalUrl ?? req.url ?? req.path ?? "/";
-	if (!pathPrefix) return rawPath;
+	const resolvedPathPrefix =
+		typeof pathPrefix === "function" ? pathPrefix(req) : pathPrefix;
+	if (!resolvedPathPrefix) return rawPath;
 
 	const path = rawPath.split("?", 1)[0] || "/";
-	for (const prefix of normalizePathPrefixes(pathPrefix)) {
+	for (const prefix of normalizePathPrefixes(resolvedPathPrefix)) {
 		const exactIndex = path === prefix ? 0 : -1;
 		const segmentIndex = path.indexOf(`${prefix}/`);
 		const index = exactIndex >= 0 ? exactIndex : segmentIndex;

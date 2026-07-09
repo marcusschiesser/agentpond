@@ -87,6 +87,24 @@ test("GCS object store writes, reads, and lists JSON objects", async () => {
 	]);
 });
 
+test("GCS object store can wrap an already-created bucket", async () => {
+	const objects = new Map<string, string>();
+	const store = GcsObjectStore.fromBucket(createBucket(objects));
+
+	await store.putJson("project-a/trace/trace-1/event.json", { ok: true });
+
+	assert.deepEqual(await store.getJson("project-a/trace/trace-1/event.json"), {
+		ok: true,
+	});
+	assert.deepEqual(await store.listKeys("project-a/trace/"), [
+		"project-a/trace/trace-1/event.json",
+	]);
+	assert.throws(
+		() => store.config,
+		/GCS config is not available for a pre-created bucket/,
+	);
+});
+
 test("GCS object store creates sink with runtime prefix", async () => {
 	const objects = new Map<string, string>();
 	const store = new GcsObjectStore(
@@ -198,6 +216,48 @@ test("Google HTTP ingest function accepts JSON ingestion from rawBody", async ()
 	assert.equal((await store.listKeys("project-a/")).length > 0, true);
 });
 
+test("Google HTTP ingest function accepts object stores", async () => {
+	const store = new MemoryObjectStore();
+	const fn = createHttpIngestFunction({ auth, store });
+	const res = createResponse();
+
+	await fn(
+		{
+			method: "POST",
+			url: "/api/public/ingestion",
+			headers: {
+				authorization: authHeader(),
+				"content-type": "application/json",
+			},
+			rawBody: JSON.stringify({
+				batch: [
+					{
+						id: "event-google-store-1",
+						timestamp: "2026-06-14T00:00:00.000Z",
+						type: eventTypes.TRACE_CREATE,
+						body: { id: "trace-google-store-1" },
+					},
+				],
+			}),
+		},
+		res,
+	);
+
+	assert.equal(res.statusCode, 207);
+	assert.equal((await store.listKeys("project-a/")).length > 0, true);
+});
+
+test("Google HTTP ingest function rejects both store and sink", () => {
+	assert.throws(
+		() =>
+			createHttpIngestFunction({
+				store: new MemoryObjectStore(),
+				sink: sinkFromStore(new MemoryObjectStore()),
+			}),
+		/AgentPond ingest options cannot include both store and sink/,
+	);
+});
+
 test("Google HTTP ingest function strips configured path prefixes", async () => {
 	const store = new MemoryObjectStore();
 	const fn = createHttpIngestFunction({
@@ -211,6 +271,37 @@ test("Google HTTP ingest function strips configured path prefixes", async () => 
 		{
 			method: "POST",
 			originalUrl: "/agentPondIngest/api/public/ingestion?batch=1",
+			headers: {
+				authorization: authHeader(),
+				"content-type": "application/json",
+			},
+			rawBody: JSON.stringify({ batch: [] }),
+		},
+		res,
+	);
+
+	assert.equal(res.statusCode, 207);
+	assert.deepEqual(JSON.parse(res.body), { successes: [], errors: [] });
+});
+
+test("Google HTTP ingest function accepts path prefix resolvers", async () => {
+	const store = new MemoryObjectStore();
+	const fn = createHttpIngestFunction({
+		auth,
+		sink: sinkFromStore(store),
+		pathPrefix: (req) => {
+			const rawPath = req.originalUrl ?? req.url ?? req.path ?? "/";
+			const path = rawPath.split("?", 1)[0] || "/";
+			const apiIndex = path.indexOf("/api/public/");
+			return apiIndex > 0 ? path.slice(0, apiIndex) : undefined;
+		},
+	});
+	const res = createResponse();
+
+	await fn(
+		{
+			method: "POST",
+			originalUrl: "/telemetryIngest/api/public/ingestion?batch=1",
 			headers: {
 				authorization: authHeader(),
 				"content-type": "application/json",
@@ -304,5 +395,22 @@ function createResponse() {
 			this.body = body;
 			return this;
 		},
+	};
+}
+
+function createBucket(objects: Map<string, string>) {
+	return {
+		file: (name: string) => ({
+			save: async (data: string, options: { contentType: string }) => {
+				assert.equal(options.contentType, "application/json");
+				objects.set(name, data);
+			},
+			download: async () => [Buffer.from(objects.get(name) ?? "", "utf8")],
+		}),
+		getFiles: async ({ prefix }: { prefix: string }) => [
+			[...objects.keys()]
+				.filter((key) => key.startsWith(prefix))
+				.map((name) => ({ name })),
+		],
 	};
 }

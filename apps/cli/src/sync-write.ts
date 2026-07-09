@@ -3,48 +3,48 @@ import {
 	type AgentPondConfig,
 	type BatchManifest,
 	type IngestionEvent,
-	type ObjectStore,
 	type OtelStorageObject,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
+import type { ObjectStorageContext } from "./object-store.js";
 
 export async function writeOtelAndSyncCache(
 	config: AgentPondConfig,
-	store: ObjectStore,
+	storage: ObjectStorageContext,
 	resourceSpans: unknown[],
 ): Promise<OtelStorageObject | undefined> {
-	return writeAndSyncCache(config, store, (writer) =>
+	return writeAndSyncCache(config, storage, (writer) =>
 		writer.writeOtelResourceSpans(resourceSpans),
 	);
 }
 
 export async function writeEventsAndSyncCache(
 	config: AgentPondConfig,
-	store: ObjectStore,
+	storage: ObjectStorageContext,
 	events: IngestionEvent[],
 ): Promise<BatchManifest> {
-	return writeAndSyncCache(config, store, (writer) =>
+	return writeAndSyncCache(config, storage, (writer) =>
 		writer.writeAcceptedEvents(events),
 	);
 }
 
 async function writeAndSyncCache<T>(
 	config: AgentPondConfig,
-	store: ObjectStore,
+	storage: ObjectStorageContext,
 	write: (writer: AcceptedEventWriter) => Promise<T>,
 ): Promise<T> {
 	const writer = new AcceptedEventWriter({
-		store,
-		projectId: config.projectId,
-		prefix: config.prefix,
+		store: storage.store,
+		projectId: storage.projectId,
+		prefix: storage.prefix,
 	});
 	const result = await write(writer);
 	const db = new AgentPondCache(config.dbPath);
 	try {
 		await db.syncFromStore({
-			store,
-			projectId: config.projectId,
-			prefix: config.prefix,
+			store: storage.store,
+			projectId: storage.projectId,
+			prefix: storage.prefix,
 		});
 	} finally {
 		await db.close();

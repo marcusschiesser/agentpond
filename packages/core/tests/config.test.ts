@@ -4,6 +4,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	realpathSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -11,6 +12,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
 	configFromEnv,
+	configFromRuntimeEnv,
 	eventTypes,
 	FileSystemObjectStore,
 	initAgentPondEnvironment,
@@ -18,6 +20,7 @@ import {
 	resolveAgentPondEnvironment,
 	selectAgentPondEnvironment,
 	sinkForConfig,
+	sinkForRuntimeEnv,
 	sinkFromStore,
 } from "@agentpond/core";
 
@@ -279,7 +282,6 @@ test("environment resolution can use the pnpm workspace root from a nested packa
 	const environment = resolveAgentPondEnvironment({
 		name: "dev",
 		cwd: nested,
-		resolveWorkspace: true,
 	});
 
 	assert.equal(environment.envDir, join(root, ".agentpond", "envs", "dev"));
@@ -287,6 +289,31 @@ test("environment resolution can use the pnpm workspace root from a nested packa
 		environment.dbPath,
 		join(root, ".agentpond", "envs", "dev", "cache.duckdb"),
 	);
+});
+
+test("config can resolve the DuckDB cache from the workspace root", () => {
+	const originalCwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-config-workspace-")),
+	);
+	const nested = join(root, "packages", "functions");
+	mkdirSync(nested, { recursive: true });
+	writeFileSync(
+		join(root, "pnpm-workspace.yaml"),
+		"packages:\n  - packages/*\n",
+	);
+	try {
+		process.chdir(nested);
+		const config = configFromEnv();
+
+		assert.equal(config.environment?.agentpondDir, join(root, ".agentpond"));
+		assert.equal(
+			config.dbPath,
+			join(root, ".agentpond", "envs", "dev", "cache.duckdb"),
+		);
+	} finally {
+		process.chdir(originalCwd);
+	}
 });
 
 test("environment resolution accepts common workspace root markers", () => {
@@ -323,26 +350,10 @@ test("environment resolution accepts common workspace root markers", () => {
 			resolveAgentPondEnvironment({
 				name: "dev",
 				cwd: nested,
-				resolveWorkspace: true,
 			}).envDir,
 			join(root, ".agentpond", "envs", "dev"),
 		);
 	}
-});
-
-test("environment resolution keeps cwd behavior unless workspace root is requested", () => {
-	const root = mkdtempSync(join(tmpdir(), "agentpond-workspace-default-"));
-	const nested = join(root, "packages", "functions");
-	mkdirSync(nested, { recursive: true });
-	writeFileSync(
-		join(root, "pnpm-workspace.yaml"),
-		"packages:\n  - packages/*\n",
-	);
-
-	assert.equal(
-		resolveAgentPondEnvironment({ name: "dev", cwd: nested }).envDir,
-		join(nested, ".agentpond", "envs", "dev"),
-	);
 });
 
 test("workspace root environment resolution falls back to cwd outside a pnpm workspace", () => {
@@ -350,7 +361,6 @@ test("workspace root environment resolution falls back to cwd outside a pnpm wor
 	const environment = resolveAgentPondEnvironment({
 		name: "dev",
 		cwd,
-		resolveWorkspace: true,
 	});
 
 	assert.equal(
@@ -391,6 +401,45 @@ test("environment file values are loaded below process env", () => {
 			configFromEnv({ envName: "production" }).dbPath,
 			join(process.cwd(), ".agentpond", "envs", "production", "cache.duckdb"),
 		);
+	} finally {
+		process.chdir(originalCwd);
+		restoreEnv(originalEnv);
+	}
+});
+
+test("runtime config reads process env only", () => {
+	const originalCwd = process.cwd();
+	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-runtime-config-"));
+	try {
+		clearEnv(CONFIG_ENV_KEYS);
+		process.chdir(cwd);
+		const env = initAgentPondEnvironment("dev");
+		writeFileSync(
+			env.envFilePath,
+			[
+				"AGENTPOND_PROJECT_ID=file-project",
+				"AGENTPOND_PREFIX=file-prefix",
+				"LANGFUSE_PUBLIC_KEY=pk-file",
+				"LANGFUSE_SECRET_KEY=sk-file",
+				"",
+			].join("\n"),
+			"utf8",
+		);
+		process.env.AGENTPOND_PROJECT_ID = "runtime-project";
+		process.env.AGENTPOND_PREFIX = "runtime-prefix";
+		process.env.LANGFUSE_PUBLIC_KEY = "pk-runtime";
+		process.env.LANGFUSE_SECRET_KEY = "sk-runtime";
+
+		assert.deepEqual(configFromRuntimeEnv(), {
+			projectId: "runtime-project",
+			prefix: "runtime-prefix/",
+			auth: {
+				projectId: "runtime-project",
+				publicKey: "pk-runtime",
+				secretKey: "sk-runtime",
+			},
+		});
 	} finally {
 		process.chdir(originalCwd);
 		restoreEnv(originalEnv);
@@ -491,6 +540,51 @@ test("sinkForConfig wraps the configured object store factory", async () => {
 	}
 });
 
+test("sinkForRuntimeEnv wraps runtime object store factories", async () => {
+	const s3Store = new FileSystemObjectStore(
+		mkdtempSync(join(tmpdir(), "agentpond-runtime-s3-")),
+	);
+	const gcsStore = new FileSystemObjectStore(
+		mkdtempSync(join(tmpdir(), "agentpond-runtime-gcs-")),
+	);
+	const projectId = "project-a";
+
+	await sinkForRuntimeEnv(
+		{
+			gcs: () => gcsStore,
+			s3: () => s3Store,
+		},
+		{ AGENTPOND_PREFIX: "runtime" },
+	).writeOtelResourceSpans({
+		projectId,
+		resourceSpans: [{ resource: {}, scopeSpans: [] }],
+	});
+	await sinkForRuntimeEnv(
+		{
+			gcs: () => gcsStore,
+			s3: () => s3Store,
+		},
+		{ AGENTPOND_STORE: "gcs", AGENTPOND_PREFIX: "runtime" },
+	).writeOtelResourceSpans({
+		projectId,
+		resourceSpans: [{ resource: {}, scopeSpans: [] }],
+	});
+
+	assert.equal((await s3Store.listKeys("runtime/otel/project-a/")).length, 1);
+	assert.equal((await gcsStore.listKeys("runtime/otel/project-a/")).length, 1);
+	assert.throws(
+		() =>
+			sinkForRuntimeEnv(
+				{
+					gcs: () => gcsStore,
+					s3: () => s3Store,
+				},
+				{ AGENTPOND_STORE: "local" },
+			),
+		/AGENTPOND_STORE must be "s3", "gcs", or "vercel"/,
+	);
+});
+
 const CONFIG_ENV_KEYS = [
 	"AGENTPOND_PROJECT_ID",
 	"AGENTPOND_PREFIX",
@@ -506,6 +600,7 @@ const CONFIG_ENV_KEYS = [
 	"AGENTPOND_S3_PREFIX",
 	"AGENTPOND_GCS_BUCKET",
 	"AGENTPOND_GCS_PREFIX",
+	"AGENTPOND_FIREBASE_STORAGE_BUCKET",
 	"AGENTPOND_BLOB_ACCESS",
 	"LANGFUSE_BASE_URL",
 	"LANGFUSE_PUBLIC_KEY",

@@ -22,7 +22,6 @@ export type AgentPondEnvironment = {
 export type ResolveEnvironmentOptions = {
 	name?: string;
 	cwd?: string;
-	resolveWorkspace?: boolean;
 };
 
 export type EnvFileEntry = {
@@ -76,9 +75,7 @@ export function agentPondDir(cwd = process.cwd()): string {
 export function resolveAgentPondEnvironment(
 	options: ResolveEnvironmentOptions = {},
 ): AgentPondEnvironment {
-	const cwd = options.resolveWorkspace
-		? agentPondWorkspaceRoot(options.cwd)
-		: options.cwd;
+	const cwd = agentPondWorkspaceRoot(options.cwd);
 	const root = agentPondDir(cwd);
 	const name = normalizeEnvironmentName(
 		options.name ?? readSelectedEnvironment(root) ?? "dev",

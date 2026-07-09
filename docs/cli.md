@@ -1,6 +1,6 @@
 # CLI Usage
 
-AgentPond ships a CLI named `agentpond` for syncing traces and scores from an object storage (local, S3, GCS, or Vercel Blob) into a local DuckDB cache, so you can analyze production agent data with SQL and focused trace commands. It can also create manual traces and scores for local testing.
+AgentPond ships a CLI named `agentpond` for syncing traces and scores from object storage (local, S3, GCS, Cloud Storage for Firebase, or Vercel Blob) into a local DuckDB cache, so you can analyze production agent data with SQL and focused trace commands. It can also create manual traces and scores for local testing.
 
 ## Install
 
@@ -59,7 +59,7 @@ agentpond --env production sync
 agentpond --s3-bucket agentpond --s3-endpoint http://localhost:9000 sync
 ```
 
-By default, AgentPond stores one DuckDB cache per environment at `./.agentpond/envs/<name>/cache.duckdb`. The dev event store lives at `./.agentpond/envs/dev/events`.
+By default, AgentPond stores one DuckDB cache per environment at `.agentpond/envs/<name>/cache.duckdb` in the current workspace root, falling back to the current directory outside a workspace. The dev event store lives at `.agentpond/envs/dev/events` in the same AgentPond directory.
 
 ## Global Flags
 
@@ -82,6 +82,9 @@ agentpond env get dev --otel
 agentpond env get dev --langfuse
 agentpond env list
 agentpond env init staging --store s3
+agentpond env init staging --store gcs
+agentpond env init staging --store vercel
+agentpond env init staging --store local
 agentpond env use production
 ```
 
@@ -91,7 +94,7 @@ known environments. Scripts should keep passing an explicit name, such as
 
 Environment files are stored at `.agentpond/envs/<name>.env`. If no environment has been selected yet, AgentPond uses `dev`.
 
-GCS environments use `AGENTPOND_GCS_BUCKET` and authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Vercel environments use `AGENTPOND_STORE=vercel`, `AGENTPOND_BLOB_ACCESS=private`, and Vercel Blob credentials from `BLOB_READ_WRITE_TOKEN` or OIDC (`BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`). All storage providers use `AGENTPOND_PREFIX` for an optional object key prefix. S3-compatible providers can require provider-specific endpoint and checksum settings; for Hugging Face Storage Buckets, see <https://huggingface.co/docs/hub/storage-buckets-s3>.
+GCS environments use `AGENTPOND_GCS_BUCKET` and authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Firebase projects do not need Firebase storage settings in AgentPond env files: run the CLI inside a Firebase project directory or nested package, and AgentPond detects `.firebaserc` or an ancestor `firebase.json`. It uses `.firebaserc` `projects.default` when present, otherwise it reads the project id from Firebase/Google environment (`FIREBASE_CONFIG`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `GOOGLE_CLOUD_PROJECT`), then reads the default Cloud Storage for Firebase bucket under the fixed `agentpond/` prefix. Without `--env`, the Firebase project id is also the local AgentPond cache environment name, such as `.agentpond/envs/lunaraspect-dev/cache.duckdb`. Vercel environments use `AGENTPOND_STORE=vercel`, `AGENTPOND_BLOB_ACCESS=private`, and Vercel Blob credentials from `BLOB_READ_WRITE_TOKEN` or OIDC (`BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`). Non-Firebase storage providers use `AGENTPOND_PREFIX` for an optional object key prefix. S3-compatible providers can require provider-specific endpoint and checksum settings; for Hugging Face Storage Buckets, see <https://huggingface.co/docs/hub/storage-buckets-s3>.
 
 For serverless and container ingestion deployments, see [Deployment](./deployment.md).
 
@@ -103,7 +106,7 @@ Start a local Langfuse SDK-compatible ingestion server:
 agentpond dev
 ```
 
-The dev server writes directly to `.agentpond/envs/dev/cache.duckdb` and does not enforce credential matching. If the requested port is already in use, it automatically tries the next open port. `agentpond env get dev` prints both standard OTLP HTTP exporter variables and Langfuse-compatible SDK variables for the running dev server in this AgentPond directory, and errors if no dev server is running. Use `--otel` for only `OTEL_EXPORTER_OTLP_*` variables or `--langfuse` for only Langfuse-compatible variables. Langfuse SDKs should still be configured with the dummy keys printed by the command because SDKs expect public and secret keys to be present.
+The dev server writes directly to `.agentpond/envs/dev/cache.duckdb` in the current workspace root, or current directory outside a workspace, and does not enforce credential matching. If the requested port is already in use, it automatically tries the next open port. `agentpond env get dev` prints both standard OTLP HTTP exporter variables and Langfuse-compatible SDK variables for the running dev server in this AgentPond directory, and errors if no dev server is running. Use `--otel` for only `OTEL_EXPORTER_OTLP_*` variables or `--langfuse` for only Langfuse-compatible variables. Langfuse SDKs should still be configured with the dummy keys printed by the command because SDKs expect public and secret keys to be present.
 
 ```sh
 eval "$(agentpond env get dev)"

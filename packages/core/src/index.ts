@@ -7,3 +7,4 @@ export * from "./otel.js";
 export * from "./schemas.js";
 export * from "./time.js";
 export * from "./writer.js";
+export * from "./workspace.js";

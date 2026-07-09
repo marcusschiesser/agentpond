@@ -1,24 +1,39 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
 	type AgentPondConfig,
 	acquireDevServerLock,
+	configFromEnv,
 	eventTypes,
 	type IngestionEvent,
 	initAgentPondEnvironment,
 	MemoryObjectStore,
+	type ObjectStore,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
+import { FirebaseStorageObjectStore } from "@agentpond/firebase";
 import {
 	createDevLoggerOptions,
 	listenOnAvailablePort,
 } from "../src/commands/dev.js";
 import { CLI_VERSION, createOtelTraceId, main } from "../src/index.js";
 import { manualTraceResourceSpans } from "../src/otel-trace.js";
+import {
+	type ObjectStorageContext,
+	objectStorageForConfig,
+} from "../src/object-store.js";
 import { writeEventsAndSyncCache } from "../src/sync-write.js";
+import { configForCommand } from "../src/command-support.js";
 import {
 	checkForCliUpdate,
 	isNewerVersion,
@@ -78,6 +93,17 @@ function testConfig(dbPath: string): AgentPondConfig {
 		projectId: "default-project",
 		dbPath,
 		prefix: "",
+	};
+}
+
+function testStorageContext(
+	config: AgentPondConfig,
+	store: ObjectStore,
+): ObjectStorageContext {
+	return {
+		store,
+		projectId: config.projectId,
+		prefix: config.prefix,
 	};
 }
 
@@ -288,7 +314,9 @@ test("CLI-created scores are immediately visible to score list queries", async (
 		},
 	};
 
-	await writeEventsAndSyncCache(config, store, [event]);
+	await writeEventsAndSyncCache(config, testStorageContext(config, store), [
+		event,
+	]);
 
 	const db = new AgentPondCache(dbPath);
 	const rows = await db.query<{
@@ -337,7 +365,11 @@ test("CLI trace and observation reads expose provided usage and cost fields as J
 		},
 	];
 
-	await writeEventsAndSyncCache(config, store, events);
+	await writeEventsAndSyncCache(
+		config,
+		testStorageContext(config, store),
+		events,
+	);
 
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
@@ -396,7 +428,7 @@ test("CLI observation list has stable order for identical start times", async ()
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-"));
 	const dbPath = devDbPath(root);
 	const config = testConfig(dbPath);
-	await writeEventsAndSyncCache(config, store, [
+	await writeEventsAndSyncCache(config, testStorageContext(config, store), [
 		{
 			id: "trace-event-1",
 			timestamp: "2026-06-19T07:54:54.798Z",
@@ -1208,7 +1240,7 @@ test("CLI supports equals-style flag values", async () => {
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-equals-"));
 	const dbPath = devDbPath(root);
 	const config = testConfig(dbPath);
-	await writeEventsAndSyncCache(config, store, [
+	await writeEventsAndSyncCache(config, testStorageContext(config, store), [
 		{
 			id: "trace-event-1",
 			timestamp: "2026-06-14T00:00:00.000Z",
@@ -1332,6 +1364,198 @@ test("CLI env init writes Vercel store files from --store", async () => {
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI object storage auto-detects Firebase projects from .firebaserc", () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-auto-"));
+	const originalFromCliProject = FirebaseStorageObjectStore.fromCliProject;
+	const originalEnvStore = process.env.AGENTPOND_STORE;
+	const store = new MemoryObjectStore();
+	let projectId: string | undefined;
+	try {
+		delete process.env.AGENTPOND_STORE;
+		process.chdir(root);
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "firebase-demo" } }),
+			"utf8",
+		);
+		FirebaseStorageObjectStore.fromCliProject = ((project) => {
+			projectId = project.projectId;
+			return store;
+		}) as typeof FirebaseStorageObjectStore.fromCliProject;
+
+		const storage = objectStorageForConfig(configFromEnv());
+
+		assert.equal(storage.store, store);
+		assert.equal(storage.projectId, "firebase-demo");
+		assert.equal(storage.prefix, "agentpond/");
+		assert.equal(projectId, "firebase-demo");
+	} finally {
+		FirebaseStorageObjectStore.fromCliProject = originalFromCliProject;
+		if (originalEnvStore === undefined) {
+			delete process.env.AGENTPOND_STORE;
+		} else {
+			process.env.AGENTPOND_STORE = originalEnvStore;
+		}
+		process.chdir(cwd);
+	}
+});
+
+test("CLI object storage auto-detects Firebase monorepos from firebase.json", () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-json-"));
+	const nested = join(root, "packages", "functions");
+	const originalFromCliProject = FirebaseStorageObjectStore.fromCliProject;
+	const originalEnvStore = process.env.AGENTPOND_STORE;
+	const originalGoogleProject = process.env.GOOGLE_CLOUD_PROJECT;
+	const store = new MemoryObjectStore();
+	let projectId: string | undefined;
+	try {
+		delete process.env.AGENTPOND_STORE;
+		process.env.GOOGLE_CLOUD_PROJECT = "firebase-json-project";
+		writeFileSync(
+			join(root, "firebase.json"),
+			JSON.stringify({ functions: [{ source: "packages/functions" }] }),
+			"utf8",
+		);
+		mkdirSync(nested, { recursive: true });
+		process.chdir(nested);
+		FirebaseStorageObjectStore.fromCliProject = ((project) => {
+			projectId = project.projectId;
+			return store;
+		}) as typeof FirebaseStorageObjectStore.fromCliProject;
+
+		const storage = objectStorageForConfig(configFromEnv());
+
+		assert.equal(storage.store, store);
+		assert.equal(storage.projectId, "firebase-json-project");
+		assert.equal(storage.prefix, "agentpond/");
+		assert.equal(projectId, "firebase-json-project");
+	} finally {
+		FirebaseStorageObjectStore.fromCliProject = originalFromCliProject;
+		if (originalEnvStore === undefined) {
+			delete process.env.AGENTPOND_STORE;
+		} else {
+			process.env.AGENTPOND_STORE = originalEnvStore;
+		}
+		if (originalGoogleProject === undefined) {
+			delete process.env.GOOGLE_CLOUD_PROJECT;
+		} else {
+			process.env.GOOGLE_CLOUD_PROJECT = originalGoogleProject;
+		}
+		process.chdir(cwd);
+	}
+});
+
+test("CLI uses Firebase project ids as local cache environment names", () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-env-")),
+	);
+	try {
+		process.chdir(root);
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "lunaraspect-dev" } }),
+			"utf8",
+		);
+
+		const config = configForCommand({});
+		const explicitConfig = configForCommand({ env: "custom" });
+
+		assert.equal(config.environment?.name, "lunaraspect-dev");
+		assert.equal(
+			config.dbPath,
+			join(root, ".agentpond", "envs", "lunaraspect-dev", "cache.duckdb"),
+		);
+		assert.equal(explicitConfig.environment?.name, "custom");
+		assert.equal(
+			explicitConfig.dbPath,
+			join(root, ".agentpond", "envs", "custom", "cache.duckdb"),
+		);
+
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "lunaraspect-9ffa3" } }),
+			"utf8",
+		);
+		const switchedConfig = configForCommand({});
+		assert.equal(switchedConfig.environment?.name, "lunaraspect-9ffa3");
+		assert.equal(
+			switchedConfig.dbPath,
+			join(root, ".agentpond", "envs", "lunaraspect-9ffa3", "cache.duckdb"),
+		);
+	} finally {
+		process.chdir(cwd);
+	}
+});
+
+test("CLI explicit non-Firebase store wins over .firebaserc detection", () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-explicit-")),
+	);
+	const originalEnvStore = process.env.AGENTPOND_STORE;
+	try {
+		process.chdir(root);
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "firebase-demo" } }),
+			"utf8",
+		);
+		process.env.AGENTPOND_STORE = "local";
+
+		const config = configForCommand({});
+		const storage = objectStorageForConfig(configFromEnv());
+
+		assert.equal(config.environment?.name, "firebase-demo");
+		assert.equal(
+			config.dbPath,
+			join(root, ".agentpond", "envs", "firebase-demo", "cache.duckdb"),
+		);
+		assert.equal(storage.projectId, "default-project");
+		assert.equal(storage.prefix, "");
+		assert.notEqual(
+			storage.store.constructor.name,
+			"FirebaseStorageObjectStore",
+		);
+	} finally {
+		if (originalEnvStore === undefined) {
+			delete process.env.AGENTPOND_STORE;
+		} else {
+			process.env.AGENTPOND_STORE = originalEnvStore;
+		}
+		process.chdir(cwd);
+	}
+});
+
+test("CLI explicit Firebase store does not trigger .firebaserc detection", () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-ignored-"));
+	const originalEnvStore = process.env.AGENTPOND_STORE;
+	try {
+		process.chdir(root);
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "firebase-demo" } }),
+			"utf8",
+		);
+		process.env.AGENTPOND_STORE = "firebase";
+
+		assert.throws(
+			() => objectStorageForConfig(configFromEnv()),
+			/AGENTPOND_STORE must be "local", "s3", "gcs", or "vercel"/,
+		);
+	} finally {
+		if (originalEnvStore === undefined) {
+			delete process.env.AGENTPOND_STORE;
+		} else {
+			process.env.AGENTPOND_STORE = originalEnvStore;
+		}
+		process.chdir(cwd);
 	}
 });
 
@@ -1591,7 +1815,7 @@ test("CLI --limit caps list result count", async () => {
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-"));
 	const dbPath = devDbPath(root);
 	const config = testConfig(dbPath);
-	await writeEventsAndSyncCache(config, store, [
+	await writeEventsAndSyncCache(config, testStorageContext(config, store), [
 		{
 			id: "trace-event-1",
 			timestamp: "2026-06-14T00:00:00.000Z",

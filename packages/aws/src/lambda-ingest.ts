@@ -1,6 +1,7 @@
 import {
 	type AgentPondConfig,
 	type AuthConfig,
+	type ObjectStore,
 	sinkForConfig,
 } from "@agentpond/core";
 import {
@@ -8,11 +9,13 @@ import {
 	handleIngestRequest,
 	type IngestionLogger,
 	type IngestionSink,
+	resolveIngestionSink,
 } from "@agentpond/ingest";
 import { S3ObjectStore } from "./s3.js";
 
 export type AwsIngestHandlerOptions = {
 	auth?: AuthConfig | false;
+	store?: ObjectStore;
 	sink?: IngestionSink;
 	logger?: IngestionLogger;
 };
@@ -46,7 +49,9 @@ export type LambdaIngestHandler = (
 export function createLambdaIngestHandler(
 	options: AwsIngestHandlerOptions = {},
 ): LambdaIngestHandler {
-	const sink = options.sink ?? S3ObjectStore.fromRuntimeEnv().toSink();
+	const sink = resolveIngestionSink(options, () =>
+		S3ObjectStore.fromRuntimeEnv(),
+	);
 
 	return async (event) => {
 		const response = await handleIngestRequest(requestForLambda(event), {
