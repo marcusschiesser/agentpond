@@ -92,11 +92,11 @@ Run `agentpond env use` without a name in an interactive terminal to choose from
 known environments. Scripts should keep passing an explicit name, such as
 `agentpond env use production`.
 
-Environment files are stored at `.agentpond/envs/<name>.env`. If no environment has been selected yet, AgentPond uses `dev`.
+Environment files are stored at `.agentpond/envs/<name>.env`. If no environment has been selected yet, AgentPond uses `dev`. For non-Firebase AgentPond environments, the built-in dev server writes directly to `.agentpond/envs/dev/cache.duckdb`, so `agentpond sync` is not needed for `dev`. Firebase projects use their Firebase ingest function and Firebase Storage for every environment, including dev.
 
 ### Local Store
 
-Local environments use `AGENTPOND_STORE=local` and read objects from the local AgentPond directory. Run `agentpond --env <name> sync` to load local object-store data into the cache. The dev server writes directly to `.agentpond/envs/dev/cache.duckdb`, so `agentpond sync` is not needed for `dev`.
+Local environments use `AGENTPOND_STORE=local` and read objects from the local AgentPond directory. Run `agentpond --env <name> sync` to load local object-store data into the cache.
 
 ### S3 Store
 
@@ -108,7 +108,7 @@ GCS environments use `AGENTPOND_STORE=gcs`, `AGENTPOND_GCS_BUCKET`, and optional
 
 ### Firebase Store
 
-Firebase projects do not need Firebase storage settings in AgentPond env files. Run `agentpond sync` inside a Firebase project directory or nested package to retrieve traces, and AgentPond detects `.firebaserc` or an ancestor `firebase.json`. It uses `.firebaserc` `projects.default` when present, otherwise it reads the project id from Firebase/Google environment (`FIREBASE_CONFIG`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `GOOGLE_CLOUD_PROJECT`), then reads the default Cloud Storage for Firebase bucket under the fixed `agentpond/` prefix. Without `--env`, the Firebase project id is also the local AgentPond cache environment name, such as `.agentpond/envs/lunaraspect-dev/cache.duckdb`.
+Firebase projects do not need Firebase storage settings in AgentPond env files. Run `agentpond sync` inside a Firebase project directory or nested package to retrieve traces, and AgentPond detects `.firebaserc` or an ancestor `firebase.json`. It uses `.firebaserc` `projects.default` when present, otherwise it reads the project id from Firebase/Google environment (`FIREBASE_CONFIG`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `GOOGLE_CLOUD_PROJECT`). When `FIREBASE_CONFIG` includes `storageBucket`, AgentPond syncs that bucket; otherwise it checks the Firebase default `${projectId}.appspot.com` and `${projectId}.firebasestorage.app` buckets under the fixed `agentpond/` prefix. Without `--env`, the Firebase project id is also the local AgentPond cache environment name, such as `.agentpond/envs/lunaraspect-dev/cache.duckdb`.
 
 ### Vercel Blob Store
 
