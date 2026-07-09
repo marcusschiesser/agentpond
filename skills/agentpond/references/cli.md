@@ -53,6 +53,20 @@ npx agentpond sync
 
 AgentPond detects `.firebaserc` or an ancestor `firebase.json`, so this also works from nested packages in Firebase monorepos. It uses `.firebaserc` `projects.default` from `firebase use` when present; if only `firebase.json` is present, set `FIREBASE_CONFIG`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `GOOGLE_CLOUD_PROJECT` with the Firebase project id. AgentPond reads the default Cloud Storage for Firebase bucket and always uses the `agentpond/` prefix. Without `--env`, the Firebase project id is the local cache environment name, for example `.agentpond/envs/lunaraspect-dev/cache.duckdb`. Do not add Firebase bucket or prefix settings to AgentPond env files.
 
+Firebase client SDKs must not read or write AgentPond trace objects. Add this deny rule to `storage.rules`; Firebase Admin writes from Functions and CLI sync bypass Firebase Storage Security Rules:
+
+```rules
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /agentpond/{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
 Vercel Blob environments use:
 
 ```bash

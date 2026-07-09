@@ -54,7 +54,7 @@ The default function writes to Google Cloud Storage with `GcsObjectStore.fromRun
 
 ## Firebase
 
-Firebase Functions should use `@agentpond/firebase`. The Firebase adapter writes to the default Cloud Storage for Firebase bucket through Firebase Admin and stores AgentPond objects under the `agentpond/` prefix by default so trace data stays separate from app files.
+Firebase Functions should use `@agentpond/firebase`. The Firebase adapter writes to the default Cloud Storage for Firebase and stores AgentPond objects under a `agentpond/` prefix so trace data stays separate from app files.
 
 ```ts
 import { onRequest } from "firebase-functions/v2/https";
@@ -84,6 +84,20 @@ https://<region>-<project>.cloudfunctions.net/telemetryIngest/api/public/ingesti
 ```
 
 Set `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` for ingestion auth. Firebase storage writes to the default Cloud Storage for Firebase bucket under the `agentpond/` object prefix by default; use `FirebaseStorageObjectStore.fromConfig({ prefix })` when code needs a different prefix. Firebase emulator and production runtimes both write through Firebase Storage; the adapter does not switch to DuckDB.
+
+Keep the `agentpond/` trace prefix private from Firebase client SDKs. Add a deny rule for that prefix in `storage.rules`; Firebase Admin writes from Functions and CLI sync are not blocked by Firebase Storage Security Rules.
+
+```rules
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /agentpond/{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
 
 To sync Firebase Storage data locally from the same Firebase project, run AgentPond inside the Firebase project directory:
 
