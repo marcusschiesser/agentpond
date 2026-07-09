@@ -12,7 +12,23 @@ In interactive terminals, AgentPond checks npm for a newer CLI version on startu
 
 ## Configuration
 
-AgentPond reads object storage settings from the selected environment file under `.agentpond/envs/<name>.env`, then process environment variables, then flags. Environments can use `local`, `s3`, `gcs`, or `vercel` storage:
+AgentPond reads object storage settings from the selected environment file under `.agentpond/envs/<name>.env`, then process environment variables, then flags.
+
+### Local Store
+
+Use `local` for filesystem-backed object storage, usually for tests or simple local workflows:
+
+```bash
+export AGENTPOND_STORE=local
+export AGENTPOND_PROJECT_ID=default-project
+export AGENTPOND_PREFIX=
+```
+
+Run `npx agentpond --env <name> sync` to load local object-store data into the cache. The dev server writes directly to `.agentpond/envs/dev/cache.duckdb`, so do not run `npx agentpond sync` for `dev`.
+
+### S3 Store
+
+Use `s3` for AWS S3 or S3-compatible storage:
 
 ```bash
 export AGENTPOND_PROJECT_ID=default-project
@@ -33,7 +49,11 @@ export AWS_REGION=us-east-1
 
 For Hugging Face Storage Buckets, follow the S3-compatible endpoint and checksum guidance in <https://huggingface.co/docs/hub/storage-buckets-s3>.
 
-GCS environments use:
+Run `npx agentpond --env <name> sync` to retrieve traces from the S3 bucket into the local DuckDB cache.
+
+### GCS Store
+
+Use `gcs` for Google Cloud Storage:
 
 ```bash
 export AGENTPOND_STORE=gcs
@@ -41,9 +61,11 @@ export AGENTPOND_GCS_BUCKET=agentpond
 export AGENTPOND_PREFIX=
 ```
 
-Authenticate GCS with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`; do not ask users to paste service-account JSON into chat.
+Authenticate GCS with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`; do not ask users to paste service-account JSON into chat. Run `npx agentpond --env <name> sync` to retrieve traces.
 
-Firebase project directories use:
+### Firebase Store
+
+Firebase projects do not use AgentPond env files for bucket or prefix configuration. Run AgentPond inside the Firebase project directory to retrieve traces:
 
 ```bash
 firebase login
@@ -53,7 +75,9 @@ npx agentpond sync
 
 AgentPond detects `.firebaserc` or an ancestor `firebase.json`, so this also works from nested packages in Firebase monorepos. It uses `.firebaserc` `projects.default` from `firebase use` when present; if only `firebase.json` is present, set `FIREBASE_CONFIG`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `GOOGLE_CLOUD_PROJECT` with the Firebase project id. AgentPond reads the default Cloud Storage for Firebase bucket and always uses the `agentpond/` prefix. Without `--env`, the Firebase project id is the local cache environment name, for example `.agentpond/envs/lunaraspect-dev/cache.duckdb`. Do not add Firebase bucket or prefix settings to AgentPond env files.
 
-Vercel Blob environments use:
+### Vercel Blob Store
+
+Use `vercel` for Vercel Blob:
 
 ```bash
 export AGENTPOND_STORE=vercel
@@ -62,6 +86,8 @@ export AGENTPOND_PREFIX=
 export BLOB_READ_WRITE_TOKEN=
 # Or use Vercel OIDC with BLOB_STORE_ID and VERCEL_OIDC_TOKEN.
 ```
+
+Run `npx agentpond --env <name> sync` to retrieve traces from Vercel Blob.
 
 Provider package serverless ingestion exports:
 

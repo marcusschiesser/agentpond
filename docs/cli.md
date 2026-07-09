@@ -94,7 +94,25 @@ known environments. Scripts should keep passing an explicit name, such as
 
 Environment files are stored at `.agentpond/envs/<name>.env`. If no environment has been selected yet, AgentPond uses `dev`.
 
-GCS environments use `AGENTPOND_GCS_BUCKET` and authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Firebase projects do not need Firebase storage settings in AgentPond env files: run the CLI inside a Firebase project directory or nested package, and AgentPond detects `.firebaserc` or an ancestor `firebase.json`. It uses `.firebaserc` `projects.default` when present, otherwise it reads the project id from Firebase/Google environment (`FIREBASE_CONFIG`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `GOOGLE_CLOUD_PROJECT`), then reads the default Cloud Storage for Firebase bucket under the fixed `agentpond/` prefix. Without `--env`, the Firebase project id is also the local AgentPond cache environment name, such as `.agentpond/envs/lunaraspect-dev/cache.duckdb`. Vercel environments use `AGENTPOND_STORE=vercel`, `AGENTPOND_BLOB_ACCESS=private`, and Vercel Blob credentials from `BLOB_READ_WRITE_TOKEN` or OIDC (`BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`). Non-Firebase storage providers use `AGENTPOND_PREFIX` for an optional object key prefix. S3-compatible providers can require provider-specific endpoint and checksum settings; for Hugging Face Storage Buckets, see <https://huggingface.co/docs/hub/storage-buckets-s3>.
+### Local Store
+
+Local environments use `AGENTPOND_STORE=local` and read objects from the local AgentPond directory. Run `agentpond --env <name> sync` to load local object-store data into the cache. The dev server writes directly to `.agentpond/envs/dev/cache.duckdb`, so `agentpond sync` is not needed for `dev`.
+
+### S3 Store
+
+S3 environments use `AGENTPOND_STORE=s3`, `AGENTPOND_S3_BUCKET`, AWS credentials, and optional `AGENTPOND_PREFIX`. Run `agentpond --env <name> sync` to retrieve traces from the bucket into the local DuckDB cache. S3-compatible providers can require provider-specific endpoint and checksum settings; for Hugging Face Storage Buckets, see <https://huggingface.co/docs/hub/storage-buckets-s3>.
+
+### GCS Store
+
+GCS environments use `AGENTPOND_STORE=gcs`, `AGENTPOND_GCS_BUCKET`, and optional `AGENTPOND_PREFIX`. Authenticate with Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`, then run `agentpond --env <name> sync` to retrieve traces.
+
+### Firebase Store
+
+Firebase projects do not need Firebase storage settings in AgentPond env files. Run `agentpond sync` inside a Firebase project directory or nested package to retrieve traces, and AgentPond detects `.firebaserc` or an ancestor `firebase.json`. It uses `.firebaserc` `projects.default` when present, otherwise it reads the project id from Firebase/Google environment (`FIREBASE_CONFIG`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `GOOGLE_CLOUD_PROJECT`), then reads the default Cloud Storage for Firebase bucket under the fixed `agentpond/` prefix. Without `--env`, the Firebase project id is also the local AgentPond cache environment name, such as `.agentpond/envs/lunaraspect-dev/cache.duckdb`.
+
+### Vercel Blob Store
+
+Vercel environments use `AGENTPOND_STORE=vercel`, `AGENTPOND_BLOB_ACCESS=private`, optional `AGENTPOND_PREFIX`, and Vercel Blob credentials from `BLOB_READ_WRITE_TOKEN` or OIDC (`BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`). Run `agentpond --env <name> sync` to retrieve traces from Vercel Blob.
 
 For serverless and container ingestion deployments, see [Deployment](./deployment.md).
 
