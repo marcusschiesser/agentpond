@@ -152,7 +152,7 @@ export async function createScore(
 		print({ eventId: event.id, scoreId: event.body.id, ...result }, json);
 		return;
 	}
-	const storage = objectStorageForConfig(config);
+	const storage = await objectStorageForConfig(config);
 	const manifest = await writeEventsAndSyncCache(config, storage, [event]);
 	print(
 		{ eventId: event.id, scoreId: event.body.id, objects: manifest.objects },

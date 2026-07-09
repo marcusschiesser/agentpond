@@ -26,7 +26,6 @@ const auth: AuthConfig = {
 
 const testProject = {
 	projectId: "demo-project",
-	bucket: "demo-project.firebasestorage.app",
 };
 
 function authHeader(): string {
@@ -84,11 +83,9 @@ test("Firebase CLI project config reads .firebaserc from cwd", () => {
 	assert.equal(isFirebaseProjectDirectory(cwd), true);
 	assert.deepEqual(firebaseCliProjectConfigFromCwd(cwd), {
 		projectId: "demo-project",
-		bucket: "demo-project.firebasestorage.app",
 	});
 	assert.deepEqual(firebaseCliProjectConfigFromCwdIfAvailable(cwd), {
 		projectId: "demo-project",
-		bucket: "demo-project.firebasestorage.app",
 	});
 });
 
@@ -105,7 +102,25 @@ test("Firebase CLI project config walks up to Firebase project roots", () => {
 		} as NodeJS.ProcessEnv),
 		{
 			projectId: "env-project",
-			bucket: "env-project.firebasestorage.app",
+		},
+	);
+});
+
+test("Firebase CLI project config reads Firebase config storage buckets", () => {
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-firebase-env-project-"));
+	writeFileSync(join(cwd, "firebase.json"), JSON.stringify({ functions: [] }));
+
+	assert.deepEqual(
+		firebaseCliProjectConfigFromCwd(cwd, {
+			FIREBASE_CONFIG: JSON.stringify({
+				projectId: "firebase-config-project",
+				storageBucket: "firebase-config-project.firebasestorage.app",
+			}),
+			GCLOUD_PROJECT: "gcloud-project",
+		} as NodeJS.ProcessEnv),
+		{
+			projectId: "firebase-config-project",
+			bucket: "firebase-config-project.firebasestorage.app",
 		},
 	);
 });
@@ -116,21 +131,10 @@ test("Firebase CLI project config reads Firebase standard env project ids", () =
 
 	assert.deepEqual(
 		firebaseCliProjectConfigFromCwd(cwd, {
-			FIREBASE_CONFIG: JSON.stringify({ projectId: "firebase-config-project" }),
-			GCLOUD_PROJECT: "gcloud-project",
-		} as NodeJS.ProcessEnv),
-		{
-			projectId: "firebase-config-project",
-			bucket: "firebase-config-project.firebasestorage.app",
-		},
-	);
-	assert.deepEqual(
-		firebaseCliProjectConfigFromCwd(cwd, {
 			GCLOUD_PROJECT: "gcloud-project",
 		} as NodeJS.ProcessEnv),
 		{
 			projectId: "gcloud-project",
-			bucket: "gcloud-project.firebasestorage.app",
 		},
 	);
 	assert.deepEqual(
@@ -139,7 +143,6 @@ test("Firebase CLI project config reads Firebase standard env project ids", () =
 		} as NodeJS.ProcessEnv),
 		{
 			projectId: "gcp-project",
-			bucket: "gcp-project.firebasestorage.app",
 		},
 	);
 });
@@ -167,15 +170,17 @@ test("Firebase CLI store reads the default bucket from the initialized project",
 	await withFakeFirebaseProject(
 		new Map(),
 		async ({ initializedApps, selectedBuckets }) => {
-			FirebaseStorageObjectStore.fromCliProject(testProject);
+			await FirebaseStorageObjectStore.fromCliProject(testProject);
 
 			assert.deepEqual(initializedApps, [
 				{
 					projectId: "demo-project",
-					storageBucket: "demo-project.firebasestorage.app",
 				},
 			]);
-			assert.deepEqual(selectedBuckets, [undefined]);
+			assert.deepEqual(selectedBuckets, [
+				"demo-project.appspot.com",
+				"demo-project.firebasestorage.app",
+			]);
 		},
 	);
 });
@@ -203,7 +208,7 @@ test("Firebase programmatic store passes custom buckets to initialized storage",
 test("Firebase storage object store writes, reads, and lists JSON objects", async () => {
 	const objects = new Map<string, string>();
 	await withFakeFirebaseProject(objects, async () => {
-		const store = FirebaseStorageObjectStore.fromCliProject(testProject);
+		const store = await FirebaseStorageObjectStore.fromCliProject(testProject);
 
 		await store.putJson("project-a/trace/trace-1/event.json", { ok: true });
 		await store.putJson("project-a/trace/trace-2/event.json", { ok: 2 });
@@ -221,10 +226,59 @@ test("Firebase storage object store writes, reads, and lists JSON objects", asyn
 	});
 });
 
+test("Firebase CLI store ignores missing alternate default buckets", async () => {
+	const objects = new Map<string, string>([
+		["project-a/trace/trace-1/event.json", JSON.stringify({ ok: true })],
+	]);
+	await withFakeFirebaseProject(
+		objects,
+		async () => {
+			const store =
+				await FirebaseStorageObjectStore.fromCliProject(testProject);
+
+			assert.deepEqual(await store.listKeys("project-a/trace/"), [
+				"project-a/trace/trace-1/event.json",
+			]);
+			assert.deepEqual(
+				await store.getJson("project-a/trace/trace-1/event.json"),
+				{ ok: true },
+			);
+		},
+		{ missingBuckets: new Set(["demo-project.firebasestorage.app"]) },
+	);
+});
+
+test("Firebase CLI store reads from the alternate bucket when it has objects", async () => {
+	const alternateObjects = new Map<string, string>([
+		["agentpond/otel/project-a/2026/01/01/00/object.json", JSON.stringify({})],
+		["project-a/trace/trace-1/event.json", JSON.stringify({ ok: true })],
+	]);
+	await withFakeFirebaseProject(
+		new Map(),
+		async () => {
+			const store =
+				await FirebaseStorageObjectStore.fromCliProject(testProject);
+
+			assert.deepEqual(await store.listKeys("project-a/trace/"), [
+				"project-a/trace/trace-1/event.json",
+			]);
+			assert.deepEqual(
+				await store.getJson("project-a/trace/trace-1/event.json"),
+				{ ok: true },
+			);
+		},
+		{
+			bucketObjects: new Map([
+				["demo-project.firebasestorage.app", alternateObjects],
+			]),
+		},
+	);
+});
+
 test("Firebase store sink writes under the default agentpond prefix", async () => {
 	const objects = new Map<string, string>();
 	await withFakeFirebaseProject(objects, async () => {
-		const store = FirebaseStorageObjectStore.fromCliProject(testProject);
+		const store = await FirebaseStorageObjectStore.fromCliProject(testProject);
 
 		await store.toSink().writeEvents({
 			projectId: "project-a",
@@ -457,20 +511,27 @@ test("Firebase emulator env still writes to the configured Firebase store", asyn
 	}
 });
 
-function createBucket(objects: Map<string, string>) {
+function createBucket(objects: Map<string, string>, missing = false) {
 	return {
 		file: (name: string) => ({
 			save: async (data: string, options: { contentType: string }) => {
+				if (missing) throw missingBucketError();
 				assert.equal(options.contentType, "application/json");
 				objects.set(name, data);
 			},
-			download: async () => [Buffer.from(objects.get(name) ?? "", "utf8")],
+			download: async () => {
+				if (missing) throw missingBucketError();
+				return [Buffer.from(objects.get(name) ?? "", "utf8")];
+			},
 		}),
-		getFiles: async ({ prefix }: { prefix: string }) => [
-			[...objects.keys()]
-				.filter((key) => key.startsWith(prefix))
-				.map((name) => ({ name })),
-		],
+		getFiles: async ({ prefix }: { prefix: string }) => {
+			if (missing) throw missingBucketError();
+			return [
+				[...objects.keys()]
+					.filter((key) => key.startsWith(prefix))
+					.map((name) => ({ name })),
+			];
+		},
 	};
 }
 
@@ -480,6 +541,10 @@ async function withFakeFirebaseProject<T>(
 		initializedApps: unknown[];
 		selectedBuckets: Array<string | undefined>;
 	}) => Promise<T>,
+	options: {
+		bucketObjects?: Map<string, Map<string, string>>;
+		missingBuckets?: Set<string>;
+	} = {},
 ): Promise<T> {
 	const originalCwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-fake-firebase-"));
@@ -522,7 +587,14 @@ exports.getStorage = () => globalThis.__agentpondFirebaseTest.storage;
 		storage: {
 			bucket: (name?: string) => {
 				selectedBuckets.push(name);
-				return createBucket(objects);
+				const bucketObjects =
+					name === undefined
+						? objects
+						: (options.bucketObjects?.get(name) ?? objects);
+				return createBucket(
+					bucketObjects,
+					name !== undefined && options.missingBuckets?.has(name) === true,
+				);
 			},
 		},
 	};
@@ -535,6 +607,12 @@ exports.getStorage = () => globalThis.__agentpondFirebaseTest.storage;
 		delete (globalThis as { __agentpondFirebaseTest?: unknown })
 			.__agentpondFirebaseTest;
 	}
+}
+
+function missingBucketError(): Error & { code: number } {
+	const error = new Error("No such bucket") as Error & { code: number };
+	error.code = 404;
+	return error;
 }
 
 function createResponse() {

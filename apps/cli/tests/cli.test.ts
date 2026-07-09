@@ -1367,7 +1367,7 @@ test("CLI env init writes Vercel store files from --store", async () => {
 	}
 });
 
-test("CLI object storage auto-detects Firebase projects from .firebaserc", () => {
+test("CLI object storage auto-detects Firebase projects from .firebaserc", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-auto-"));
 	const originalFromCliProject = FirebaseStorageObjectStore.fromCliProject;
@@ -1382,12 +1382,12 @@ test("CLI object storage auto-detects Firebase projects from .firebaserc", () =>
 			JSON.stringify({ projects: { default: "firebase-demo" } }),
 			"utf8",
 		);
-		FirebaseStorageObjectStore.fromCliProject = ((project) => {
+		FirebaseStorageObjectStore.fromCliProject = (async (project) => {
 			projectId = project.projectId;
 			return store;
 		}) as typeof FirebaseStorageObjectStore.fromCliProject;
 
-		const storage = objectStorageForConfig(configFromEnv());
+		const storage = await objectStorageForConfig(configFromEnv());
 
 		assert.equal(storage.store, store);
 		assert.equal(storage.projectId, "firebase-demo");
@@ -1404,7 +1404,7 @@ test("CLI object storage auto-detects Firebase projects from .firebaserc", () =>
 	}
 });
 
-test("CLI object storage auto-detects Firebase monorepos from firebase.json", () => {
+test("CLI object storage auto-detects Firebase monorepos from firebase.json", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-json-"));
 	const nested = join(root, "packages", "functions");
@@ -1423,12 +1423,12 @@ test("CLI object storage auto-detects Firebase monorepos from firebase.json", ()
 		);
 		mkdirSync(nested, { recursive: true });
 		process.chdir(nested);
-		FirebaseStorageObjectStore.fromCliProject = ((project) => {
+		FirebaseStorageObjectStore.fromCliProject = (async (project) => {
 			projectId = project.projectId;
 			return store;
 		}) as typeof FirebaseStorageObjectStore.fromCliProject;
 
-		const storage = objectStorageForConfig(configFromEnv());
+		const storage = await objectStorageForConfig(configFromEnv());
 
 		assert.equal(storage.store, store);
 		assert.equal(storage.projectId, "firebase-json-project");
@@ -1493,7 +1493,7 @@ test("CLI uses Firebase project ids as local cache environment names", () => {
 	}
 });
 
-test("CLI explicit non-Firebase store wins over .firebaserc detection", () => {
+test("CLI explicit non-Firebase store wins over .firebaserc detection", async () => {
 	const cwd = process.cwd();
 	const root = realpathSync(
 		mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-explicit-")),
@@ -1509,7 +1509,7 @@ test("CLI explicit non-Firebase store wins over .firebaserc detection", () => {
 		process.env.AGENTPOND_STORE = "local";
 
 		const config = configForCommand({});
-		const storage = objectStorageForConfig(configFromEnv());
+		const storage = await objectStorageForConfig(configFromEnv());
 
 		assert.equal(config.environment?.name, "firebase-demo");
 		assert.equal(
@@ -1532,7 +1532,7 @@ test("CLI explicit non-Firebase store wins over .firebaserc detection", () => {
 	}
 });
 
-test("CLI explicit Firebase store does not trigger .firebaserc detection", () => {
+test("CLI explicit Firebase store does not trigger .firebaserc detection", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-ignored-"));
 	const originalEnvStore = process.env.AGENTPOND_STORE;

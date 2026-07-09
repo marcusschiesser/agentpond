@@ -4,7 +4,7 @@ import { findAncestorDirectory } from "@agentpond/core";
 
 export type FirebaseCliProjectConfig = {
 	projectId: string;
-	bucket: string;
+	bucket?: string;
 };
 
 export function isFirebaseProjectDirectory(cwd = process.cwd()): boolean {
@@ -28,8 +28,11 @@ export function firebaseCliProjectConfigFromCwd(
 		);
 	}
 
+	const runtimeConfig = firebaseRuntimeConfig(env.FIREBASE_CONFIG);
 	const projectId =
-		firebaseProjectIdFromRc(root) ?? firebaseProjectIdFromEnv(env);
+		firebaseProjectIdFromRc(root) ??
+		runtimeConfig?.projectId ??
+		firebaseProjectIdFromEnv(env);
 	if (!projectId) {
 		throw new Error(
 			"Could not determine Firebase project id. Run firebase use <project> to write .firebaserc, or set FIREBASE_CONFIG, GCLOUD_PROJECT, GCP_PROJECT, or GOOGLE_CLOUD_PROJECT.",
@@ -38,7 +41,9 @@ export function firebaseCliProjectConfigFromCwd(
 
 	return {
 		projectId,
-		bucket: `${projectId}.firebasestorage.app`,
+		...(runtimeConfig?.storageBucket
+			? { bucket: runtimeConfig.storageBucket }
+			: {}),
 	};
 }
 
@@ -76,22 +81,33 @@ function firebaseProjectIdFromRc(root: string): string | undefined {
 
 function firebaseProjectIdFromEnv(env: NodeJS.ProcessEnv): string | undefined {
 	return (
-		firebaseProjectIdFromFirebaseConfig(env.FIREBASE_CONFIG) ??
+		firebaseRuntimeConfig(env.FIREBASE_CONFIG)?.projectId ??
 		env.GCLOUD_PROJECT ??
 		env.GCP_PROJECT ??
 		env.GOOGLE_CLOUD_PROJECT
 	);
 }
 
-function firebaseProjectIdFromFirebaseConfig(
-	config: string | undefined,
-): string | undefined {
+function firebaseRuntimeConfig(config: string | undefined):
+	| {
+			projectId?: string;
+			storageBucket?: string;
+	  }
+	| undefined {
 	if (!config) return undefined;
 	try {
-		const parsed = JSON.parse(config) as { projectId?: unknown };
-		return typeof parsed.projectId === "string" && parsed.projectId
-			? parsed.projectId
-			: undefined;
+		const parsed = JSON.parse(config) as {
+			projectId?: unknown;
+			storageBucket?: unknown;
+		};
+		return {
+			...(typeof parsed.projectId === "string" && parsed.projectId
+				? { projectId: parsed.projectId }
+				: {}),
+			...(typeof parsed.storageBucket === "string" && parsed.storageBucket
+				? { storageBucket: parsed.storageBucket }
+				: {}),
+		};
 	} catch {
 		return undefined;
 	}

@@ -6,7 +6,6 @@ import {
 } from "@agentpond/core";
 import { type GcsBucket, GcsObjectStore } from "@agentpond/google";
 import {
-	type FirebaseStorage,
 	firebaseStorageForAppOptions,
 	firebaseStorageForInitializedApp,
 } from "./firebase-admin.js";
@@ -24,8 +23,6 @@ export type FirebaseStorageObjectStoreConfig = {
 	prefix?: string;
 };
 
-type FirebaseBucket = ReturnType<FirebaseStorage["bucket"]>;
-
 export class FirebaseStorageObjectStore implements ObjectStore {
 	private readonly store: GcsObjectStore;
 
@@ -38,31 +35,40 @@ export class FirebaseStorageObjectStore implements ObjectStore {
 		};
 		return new FirebaseStorageObjectStore(
 			config,
-			firebaseStorageForInitializedApp().bucket(config.bucket),
+			GcsObjectStore.fromBucket(
+				firebaseStorageForInitializedApp().bucket(config.bucket) as GcsBucket,
+			),
 		);
 	}
 
-	static fromCliProject(
+	static async fromCliProject(
 		project: FirebaseCliProjectConfig,
-	): FirebaseStorageObjectStore {
+	): Promise<FirebaseStorageObjectStore> {
 		const storage = firebaseStorageForAppOptions(
 			{
 				projectId: project.projectId,
-				storageBucket: project.bucket,
+				...(project.bucket ? { storageBucket: project.bucket } : {}),
 			},
 			"Firebase Admin is required for FirebaseStorageObjectStore.fromCliProject(); install firebase-admin in the Firebase project and authenticate with credentials supported by Firebase Admin",
 		);
+		const stores = firebaseCliBucketCandidates(project).map((bucketName) =>
+			GcsObjectStore.fromBucket(storage.bucket(bucketName) as GcsBucket),
+		);
+		const store = await selectFirebaseCliStore(
+			stores,
+			normalizePrefix(defaultFirebaseStoragePrefix),
+		);
 		return new FirebaseStorageObjectStore(
 			{ prefix: defaultFirebaseStoragePrefix },
-			storage.bucket(),
+			store,
 		);
 	}
 
 	private constructor(
 		readonly config: FirebaseStorageConfig,
-		bucket: FirebaseBucket,
+		store: GcsObjectStore,
 	) {
-		this.store = GcsObjectStore.fromBucket(bucket as GcsBucket);
+		this.store = store;
 	}
 
 	toSink(options: ObjectStoreIngestionSinkOptions = {}): IngestionSink {
@@ -83,4 +89,41 @@ export class FirebaseStorageObjectStore implements ObjectStore {
 	async listKeys(prefix: string): Promise<string[]> {
 		return this.store.listKeys(prefix);
 	}
+}
+
+function firebaseCliBucketCandidates(
+	project: FirebaseCliProjectConfig,
+): string[] {
+	if (project.bucket) return [project.bucket];
+	return [
+		`${project.projectId}.appspot.com`,
+		`${project.projectId}.firebasestorage.app`,
+	];
+}
+
+async function selectFirebaseCliStore(
+	stores: GcsObjectStore[],
+	prefix: string,
+): Promise<GcsObjectStore> {
+	let firstExistingStore: GcsObjectStore | undefined;
+	let lastMissingBucketError: unknown;
+	for (const store of stores) {
+		try {
+			const keys = await store.listKeys(prefix);
+			if (keys.length > 0) return store;
+			firstExistingStore ??= store;
+		} catch (error) {
+			if (!isMissingBucketError(error)) throw error;
+			lastMissingBucketError = error;
+		}
+	}
+	if (firstExistingStore) return firstExistingStore;
+	if (lastMissingBucketError) throw lastMissingBucketError;
+	throw new Error("Firebase storage object store has no buckets");
+}
+
+function isMissingBucketError(error: unknown): boolean {
+	if (!error || typeof error !== "object") return false;
+	const maybeCode = (error as { code?: unknown }).code;
+	return maybeCode === 404 || maybeCode === "404";
 }

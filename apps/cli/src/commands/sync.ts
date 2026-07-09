@@ -28,7 +28,7 @@ export function registerSyncCommand(program: Command): void {
 				);
 			}
 			const db = new AgentPondCache(config.dbPath);
-			const storage = objectStorageForConfig(config);
+			const storage = await objectStorageForConfig(config);
 			try {
 				const result = await db.syncFromStore({
 					store: storage.store,

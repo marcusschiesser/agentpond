@@ -127,7 +127,7 @@ export async function createTrace(
 		print({ traceId, ...result }, json);
 		return;
 	}
-	const storage = objectStorageForConfig(config);
+	const storage = await objectStorageForConfig(config);
 	const object = await writeOtelAndSyncCache(config, storage, resourceSpans);
 	print({ traceId, object }, json);
 }

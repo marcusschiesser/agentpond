@@ -115,7 +115,7 @@ agentpond sync
 
 The CLI detects `.firebaserc` or an ancestor `firebase.json`, so it also works from nested function packages in Firebase monorepos. 
 When `.firebaserc` is present, AgentPond uses `projects.default` from `firebase use`. When only `firebase.json` is present, set a Firebase/Google project environment variable such as `GOOGLE_CLOUD_PROJECT`, `GCLOUD_PROJECT`, `GCP_PROJECT`, or `FIREBASE_CONFIG`. 
-AgentPond reads the default bucket `${projectId}.firebasestorage.app` under `agentpond/`. 
+When `FIREBASE_CONFIG` includes `storageBucket`, AgentPond syncs that bucket; otherwise it checks the Firebase default `${projectId}.appspot.com` and `${projectId}.firebasestorage.app` buckets under `agentpond/`. 
 
 ## Vercel
 

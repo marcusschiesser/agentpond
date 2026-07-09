@@ -25,13 +25,13 @@ export function usesAgentPondDevServer(config: AgentPondConfig): boolean {
 	return config.environment?.name === "dev" && !usesProjectObjectStore(config);
 }
 
-export function objectStorageForConfig(
+export async function objectStorageForConfig(
 	config: AgentPondConfig,
-): ObjectStorageContext {
+): Promise<ObjectStorageContext> {
 	if (usesProjectObjectStore(config)) {
 		const project = firebaseCliProjectConfigFromCwd();
 		return {
-			store: FirebaseStorageObjectStore.fromCliProject(project),
+			store: await FirebaseStorageObjectStore.fromCliProject(project),
 			projectId: project.projectId,
 			prefix: normalizePrefix(defaultFirebaseStoragePrefix),
 		};
