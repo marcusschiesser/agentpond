@@ -14,7 +14,6 @@ import {
 	type AgentPondConfig,
 	type AgentPondStorageContext,
 	acquireDevServerLock,
-	configFromEnv,
 	eventTypes,
 	type IngestionEvent,
 	initAgentPondEnvironment,
@@ -28,8 +27,8 @@ import {
 	createDevLoggerOptions,
 	listenOnAvailablePort,
 } from "../src/commands/dev.js";
-import { CLI_VERSION, createOtelTraceId, main } from "../src/index.js";
 import { environmentContextForCommand } from "../src/environment-context.js";
+import { CLI_VERSION, createOtelTraceId, main } from "../src/index.js";
 import { manualTraceResourceSpans } from "../src/otel-trace.js";
 import { writeEventsAndSyncCache } from "../src/sync-write.js";
 import {
