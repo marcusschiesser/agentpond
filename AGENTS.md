@@ -21,5 +21,7 @@ This repository uses Changesets to generate package changelogs.
 ## Commits
 
 - Use the normal `git commit` path so Husky pre-commit hooks run.
-- Do not use `git commit --no-verify` or disable hooks with `HUSKY=0` unless the user explicitly asks for it.
+- Never use `git commit --no-verify` for commits in this repository.
+- Never disable Git hooks with `HUSKY=0` or equivalent environment overrides for commits in this repository.
+- If a hook fails, fix the underlying issue and retry the normal `git commit`; do not bypass the hook.
 - If a hook changes files, review and stage those hook updates before committing again.
