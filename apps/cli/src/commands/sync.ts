@@ -6,19 +6,15 @@ import {
 	commandContext,
 	type GlobalOptions,
 } from "../command-support.js";
-import {
-	objectStorageForConfig,
-	usesAgentPondDevServer,
-} from "../object-store.js";
 
 export function registerSyncCommand(program: Command): void {
 	addGlobalOptions(program.command("sync"))
 		.description("sync object storage into the local DuckDB cache")
 		.action(async (_options: GlobalOptions, command: Command) => {
-			const { config, json } = commandContext(
+			const { context, json } = commandContext(
 				command.optsWithGlobals<GlobalOptions>(),
 			);
-			if (usesAgentPondDevServer(config)) {
+			if (context.usesAgentPondDevServer) {
 				return print(
 					{
 						skipped: true,
@@ -27,14 +23,10 @@ export function registerSyncCommand(program: Command): void {
 					json,
 				);
 			}
-			const db = new AgentPondCache(config.dbPath);
-			const storage = await objectStorageForConfig(config);
+			const db = new AgentPondCache(context.config.dbPath);
+			const storage = await context.resolveStorage();
 			try {
-				const result = await db.syncFromStore({
-					store: storage.store,
-					projectId: storage.projectId,
-					prefix: storage.prefix,
-				});
+				const result = await db.syncFromStore(storage);
 				return print(result, json);
 			} finally {
 				await db.close();

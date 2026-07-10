@@ -1,4 +1,4 @@
-import type { ObjectStore } from "@agentpond/core";
+import type { AgentPondStorageContext } from "@agentpond/core";
 
 export type SyncResult = {
 	manifestsProcessed: number;
@@ -23,9 +23,6 @@ export type SyncProgress = SyncResult & {
 	currentObjectKey?: string;
 };
 
-export type SyncFromStoreParams = {
-	store: ObjectStore;
-	projectId: string;
-	prefix: string;
+export type SyncFromStoreParams = AgentPondStorageContext & {
 	onProgress?: (progress: SyncProgress) => void;
 };

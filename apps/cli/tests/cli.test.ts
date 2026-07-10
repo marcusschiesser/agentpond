@@ -12,8 +12,8 @@ import { join } from "node:path";
 import test from "node:test";
 import {
 	type AgentPondConfig,
+	type AgentPondStorageContext,
 	acquireDevServerLock,
-	configFromEnv,
 	eventTypes,
 	type IngestionEvent,
 	initAgentPondEnvironment,
@@ -27,11 +27,8 @@ import {
 	createDevLoggerOptions,
 	listenOnAvailablePort,
 } from "../src/commands/dev.js";
+import { environmentContextForCommand } from "../src/environment-context.js";
 import { CLI_VERSION, createOtelTraceId, main } from "../src/index.js";
-import {
-	type ObjectStorageContext,
-	objectStorageForConfig,
-} from "../src/object-store.js";
 import { manualTraceResourceSpans } from "../src/otel-trace.js";
 import { writeEventsAndSyncCache } from "../src/sync-write.js";
 import {
@@ -99,7 +96,7 @@ function testConfig(dbPath: string): AgentPondConfig {
 function testStorageContext(
 	config: AgentPondConfig,
 	store: ObjectStore,
-): ObjectStorageContext {
+): AgentPondStorageContext {
 	return {
 		store,
 		projectId: config.projectId,
@@ -1387,8 +1384,16 @@ test("CLI object storage auto-detects Firebase projects from .firebaserc", async
 			return store;
 		}) as typeof FirebaseStorageObjectStore.fromCliProject;
 
-		const storage = await objectStorageForConfig(configFromEnv());
+		const context = environmentContextForCommand();
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "changed-after-resolution" } }),
+			"utf8",
+		);
+		const storage = await context.resolveStorage();
 
+		assert.equal(context.kind, "firebase");
+		assert.equal(context.usesAgentPondDevServer, false);
 		assert.equal(storage.store, store);
 		assert.equal(storage.projectId, "firebase-demo");
 		assert.equal(storage.prefix, "agentpond/");
@@ -1428,7 +1433,8 @@ test("CLI object storage auto-detects Firebase monorepos from firebase.json", as
 			return store;
 		}) as typeof FirebaseStorageObjectStore.fromCliProject;
 
-		const storage = await objectStorageForConfig(configFromEnv());
+		const context = environmentContextForCommand();
+		const storage = await context.resolveStorage();
 
 		assert.equal(storage.store, store);
 		assert.equal(storage.projectId, "firebase-json-project");
@@ -1519,23 +1525,10 @@ test("CLI Firebase commands use the Firebase project directory for AgentPond fil
 			join(root, ".agentpond", "envs", "firebase-demo", "cache.duckdb"),
 		);
 
-		await captureStdout(async () => {
-			await main([
-				"node",
-				"agentpond",
-				"env",
-				"init",
-				"staging",
-				"--store",
-				"local",
-			]);
-			await main(["node", "agentpond", "env", "use", "staging"]);
-		});
-
-		assert.equal(
-			existsSync(join(root, ".agentpond", "envs", "staging.env")),
-			true,
+		await captureStdout(() =>
+			main(["node", "agentpond", "env", "use", "staging"]),
 		);
+
 		assert.equal(existsSync(join(root, ".agentpond", "current-env")), true);
 		assert.equal(existsSync(join(functionsDir, ".agentpond")), false);
 	} finally {
@@ -1543,12 +1536,48 @@ test("CLI Firebase commands use the Firebase project directory for AgentPond fil
 	}
 });
 
-test("CLI explicit non-Firebase store wins over .firebaserc detection", async () => {
+test("CLI env init rejects store configuration in Firebase projects", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-env-init-")),
+	);
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "firebase-demo" } }),
+			"utf8",
+		);
+
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "env", "init", "staging", "--store", "local"]),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(
+			stderr,
+			/agentpond env init is not available for firebase projects/,
+		);
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "staging.env")),
+			false,
+		);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI Firebase context ignores explicit non-Firebase stores", async () => {
 	const cwd = process.cwd();
 	const root = realpathSync(
 		mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-explicit-")),
 	);
 	const originalEnvStore = process.env.AGENTPOND_STORE;
+	const originalFromCliProject = FirebaseStorageObjectStore.fromCliProject;
+	const store = new MemoryObjectStore();
 	try {
 		process.chdir(root);
 		writeFileSync(
@@ -1557,22 +1586,23 @@ test("CLI explicit non-Firebase store wins over .firebaserc detection", async ()
 			"utf8",
 		);
 		process.env.AGENTPOND_STORE = "local";
+		FirebaseStorageObjectStore.fromCliProject = (async () =>
+			store) as typeof FirebaseStorageObjectStore.fromCliProject;
 
-		const config = configForCommand({});
-		const storage = await objectStorageForConfig(configFromEnv());
+		const context = environmentContextForCommand();
+		const storage = await context.resolveStorage();
+		const { config } = context;
 
 		assert.equal(config.environment?.name, "firebase-demo");
 		assert.equal(
 			config.dbPath,
 			join(root, ".agentpond", "envs", "firebase-demo", "cache.duckdb"),
 		);
-		assert.equal(storage.projectId, "default-project");
-		assert.equal(storage.prefix, "");
-		assert.notEqual(
-			storage.store.constructor.name,
-			"FirebaseStorageObjectStore",
-		);
+		assert.equal(storage.store, store);
+		assert.equal(storage.projectId, "firebase-demo");
+		assert.equal(storage.prefix, "agentpond/");
 	} finally {
+		FirebaseStorageObjectStore.fromCliProject = originalFromCliProject;
 		if (originalEnvStore === undefined) {
 			delete process.env.AGENTPOND_STORE;
 		} else {
@@ -1582,10 +1612,12 @@ test("CLI explicit non-Firebase store wins over .firebaserc detection", async ()
 	}
 });
 
-test("CLI explicit Firebase store does not trigger .firebaserc detection", async () => {
+test("CLI Firebase context ignores invalid AgentPond store values", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-ignored-"));
 	const originalEnvStore = process.env.AGENTPOND_STORE;
+	const originalFromCliProject = FirebaseStorageObjectStore.fromCliProject;
+	const store = new MemoryObjectStore();
 	try {
 		process.chdir(root);
 		writeFileSync(
@@ -1594,9 +1626,35 @@ test("CLI explicit Firebase store does not trigger .firebaserc detection", async
 			"utf8",
 		);
 		process.env.AGENTPOND_STORE = "firebase";
+		FirebaseStorageObjectStore.fromCliProject = (async () =>
+			store) as typeof FirebaseStorageObjectStore.fromCliProject;
 
-		assert.throws(
-			() => objectStorageForConfig(configFromEnv()),
+		const context = environmentContextForCommand();
+		assert.equal((await context.resolveStorage()).store, store);
+	} finally {
+		FirebaseStorageObjectStore.fromCliProject = originalFromCliProject;
+		if (originalEnvStore === undefined) {
+			delete process.env.AGENTPOND_STORE;
+		} else {
+			process.env.AGENTPOND_STORE = originalEnvStore;
+		}
+		process.chdir(cwd);
+	}
+});
+
+test("CLI default context validates stores only when storage is resolved", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-default-context-"));
+	const originalEnvStore = process.env.AGENTPOND_STORE;
+	try {
+		process.chdir(root);
+		process.env.AGENTPOND_STORE = "invalid-default-store";
+		const context = environmentContextForCommand();
+
+		assert.equal(context.kind, "agentpond");
+		assert.equal(context.usesAgentPondDevServer, true);
+		await assert.rejects(
+			context.resolveStorage(),
 			/AGENTPOND_STORE must be "local", "s3", "gcs", or "vercel"/,
 		);
 	} finally {

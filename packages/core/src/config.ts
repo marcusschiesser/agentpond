@@ -1,7 +1,6 @@
 import { join } from "node:path";
 import {
 	type AgentPondEnvironment,
-	type AgentPondStoreType,
 	parseEnvFile,
 	resolveAgentPondEnvironment,
 } from "./environment.js";
@@ -28,7 +27,6 @@ export type AgentPondRuntimeConfig = Pick<
 export type ConfigFromEnvOptions = {
 	cwd?: string;
 	envName?: string;
-	storeType?: AgentPondStoreType;
 };
 
 export function configFromEnv(
@@ -40,10 +38,6 @@ export function configFromEnv(
 	});
 	const fileEnv = parseEnvFile(environment.envFilePath);
 	const env = envValue(fileEnv);
-	const storeType =
-		options.storeType ??
-		storeTypeFromValue(env("AGENTPOND_STORE")) ??
-		environment.storeType;
 	const dbPath = join(environment.envDir, "cache.duckdb");
 	const projectId = env("AGENTPOND_PROJECT_ID") ?? "default-project";
 	const prefix = normalizePrefix(
@@ -67,7 +61,6 @@ export function configFromEnv(
 		environment: {
 			...environment,
 			dbPath,
-			storeType,
 		},
 	};
 }
@@ -120,21 +113,4 @@ export function envValue(
 
 export function nonEmpty(value: string | undefined): string | undefined {
 	return value === undefined || value === "" ? undefined : value;
-}
-
-function storeTypeFromValue(
-	value: string | undefined,
-): AgentPondStoreType | undefined {
-	if (value === undefined) return undefined;
-	if (
-		value === "local" ||
-		value === "s3" ||
-		value === "gcs" ||
-		value === "vercel"
-	) {
-		return value;
-	}
-	throw new Error(
-		`AGENTPOND_STORE must be "local", "s3", "gcs", or "vercel", got "${value}"`,
-	);
 }

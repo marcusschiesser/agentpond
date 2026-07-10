@@ -2,14 +2,14 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
 	type AgentPondConfig,
-	configFromEnv,
+	type AgentPondEnvironmentContext,
 	DEV_SERVER_RUNNING_MESSAGE,
 	isDevServerRunning,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
-import { firebaseCliProjectConfigFromCwdIfAvailable } from "@agentpond/firebase";
 import type { Command } from "commander";
 import { CliError } from "./cli-support.js";
+import { environmentContextForCommand } from "./environment-context.js";
 
 export type GlobalOptions = {
 	env?: string;
@@ -17,7 +17,7 @@ export type GlobalOptions = {
 };
 
 export type CommandContext = {
-	config: AgentPondConfig;
+	context: AgentPondEnvironmentContext;
 	json: boolean;
 };
 
@@ -28,26 +28,14 @@ export function addGlobalOptions(command: Command): Command {
 }
 
 export function commandContext(options: GlobalOptions): CommandContext {
-	const config = configForCommand(options);
+	const context = environmentContextForCommand({ envName: options.env });
 	const json = Boolean(options.json);
-	logImplicitEnvironment(options, config, json);
-	return { config, json };
+	logImplicitEnvironment(options, context.config, json);
+	return { context, json };
 }
 
 export function configForCommand(options: GlobalOptions): AgentPondConfig {
-	const firebaseProject = firebaseCliProjectConfigFromCwdIfAvailable();
-	return configFromEnv({
-		cwd: firebaseProject?.root,
-		envName: options.env ?? firebaseProject?.projectId,
-	});
-}
-
-export function environmentCwdForCommand(): string {
-	return firebaseCliProjectConfigFromCwdIfAvailable()?.root ?? process.cwd();
-}
-
-export function isDevEnvironment(config: AgentPondConfig): boolean {
-	return config.environment?.name === "dev";
+	return environmentContextForCommand({ envName: options.env }).config;
 }
 
 export function cacheForRead(config: AgentPondConfig): AgentPondCache {

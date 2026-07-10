@@ -2,6 +2,7 @@ export * from "./auth.js";
 export * from "./config.js";
 export * from "./dev-lock.js";
 export * from "./environment.js";
+export * from "./environment-context.js";
 export * from "./object-store.js";
 export * from "./otel.js";
 export * from "./schemas.js";

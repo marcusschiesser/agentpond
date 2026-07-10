@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { AgentPondConfig } from "@agentpond/core";
+import type { AgentPondEnvironmentContext } from "@agentpond/core";
 import { type AgentPondCache, DuckDbIngestionSink } from "@agentpond/duckdb";
 import type { Command } from "commander";
 import { CliError, limit, print, stringFlag } from "../cli-support.js";
@@ -10,10 +10,6 @@ import {
 	commandContext,
 	type GlobalOptions,
 } from "../command-support.js";
-import {
-	objectStorageForConfig,
-	usesAgentPondDevServer,
-} from "../object-store.js";
 import { manualTraceResourceSpans } from "../otel-trace.js";
 import { sql } from "../sql.js";
 import { writeOtelAndSyncCache } from "../sync-write.js";
@@ -44,20 +40,20 @@ export function registerTracesCommand(program: Command): void {
 		.option("--input <json-or-string>", "trace input")
 		.option("--output <json-or-string>", "trace output")
 		.action(async (options: TraceOptions, command: Command) => {
-			const { config, json } = commandContext(
+			const { context, json } = commandContext(
 				command.optsWithGlobals<GlobalOptions>(),
 			);
-			return createTrace(options, config, json);
+			return createTrace(options, context, json);
 		});
 
 	addGlobalOptions(traces.command("list"))
 		.description("list recent traces")
 		.option("--limit <n>", "maximum row count", "100")
 		.action(async (options: TraceOptions, command: Command) => {
-			const { config, json } = commandContext(
+			const { context, json } = commandContext(
 				command.optsWithGlobals<GlobalOptions>(),
 			);
-			const db = cacheForRead(config);
+			const db = cacheForRead(context.config);
 			try {
 				const rows = await readTraceCommand(db, "list", [], options);
 				return print(rows, json);
@@ -74,10 +70,10 @@ export function registerTracesCommand(program: Command): void {
 				_options: GlobalOptions,
 				command: Command,
 			) => {
-				const { config, json } = commandContext(
+				const { context, json } = commandContext(
 					command.optsWithGlobals<GlobalOptions>(),
 				);
-				const db = cacheForRead(config);
+				const db = cacheForRead(context.config);
 				try {
 					const rows = await readTraceCommand(db, "get", [id ?? ""], {});
 					return print(rows, json);
@@ -109,14 +105,15 @@ async function readTraceCommand(
 
 export async function createTrace(
 	options: TraceOptions,
-	config: AgentPondConfig,
+	context: AgentPondEnvironmentContext,
 	json: boolean,
 ): Promise<void> {
+	const { config } = context;
 	assertDevServerNotRunning(config);
 	const now = new Date().toISOString();
 	const traceId = stringFlag(options, "id") ?? createOtelTraceId();
 	const resourceSpans = manualTraceResourceSpans(options, traceId, now);
-	if (usesAgentPondDevServer(config)) {
+	if (context.usesAgentPondDevServer) {
 		const result = await new DuckDbIngestionSink(
 			config.dbPath,
 		).writeOtelResourceSpans({
@@ -127,7 +124,7 @@ export async function createTrace(
 		print({ traceId, ...result }, json);
 		return;
 	}
-	const storage = await objectStorageForConfig(config);
+	const storage = await context.resolveStorage();
 	const object = await writeOtelAndSyncCache(config, storage, resourceSpans);
 	print({ traceId, object }, json);
 }

@@ -38,7 +38,6 @@ test("config defaults to the dev environment DuckDB cache", () => {
 			join(process.cwd(), ".agentpond", "envs", "dev", "cache.duckdb"),
 		);
 		assert.equal(configFromEnv().environment?.name, "dev");
-		assert.equal(configFromEnv().environment?.storeType, "s3");
 	} finally {
 		process.chdir(originalCwd);
 		restoreEnv(originalEnv);
@@ -136,14 +135,6 @@ test("generated environment files document local, GCS, and Vercel settings", () 
 		assert.doesNotMatch(vercelFile, /AGENTPOND_S3_BUCKET/);
 		assert.doesNotMatch(vercelFile, /AGENTPOND_GCS_BUCKET/);
 		assert.equal(configFromEnv({ envName: "local-env" }).prefix, "");
-		assert.equal(
-			configFromEnv({ envName: "gcs-env" }).environment?.storeType,
-			"gcs",
-		);
-		assert.equal(
-			configFromEnv({ envName: "vercel-env" }).environment?.storeType,
-			"vercel",
-		);
 		assert.equal(configFromEnv({ envName: "gcs-env" }).prefix, "");
 	} finally {
 		process.chdir(originalCwd);
@@ -151,7 +142,7 @@ test("generated environment files document local, GCS, and Vercel settings", () 
 	}
 });
 
-test("config accepts cloud store values and rejects unknown stores", () => {
+test("config ignores store selection until storage is resolved", () => {
 	const originalCwd = process.cwd();
 	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-"));
@@ -171,7 +162,6 @@ test("config accepts cloud store values and rejects unknown stores", () => {
 		);
 		const config = configFromEnv({ envName: "production" });
 
-		assert.equal(config.environment?.storeType, "gcs");
 		assert.equal(config.prefix, "prod/");
 
 		writeFileSync(
@@ -184,14 +174,12 @@ test("config accepts cloud store values and rejects unknown stores", () => {
 			].join("\n"),
 			"utf8",
 		);
-		assert.equal(
-			configFromEnv({ envName: "production" }).environment?.storeType,
-			"vercel",
-		);
+		assert.doesNotThrow(() => configFromEnv({ envName: "production" }));
 
 		process.env.AGENTPOND_STORE = "azure";
+		const invalidStoreConfig = configFromEnv({ envName: "production" });
 		assert.throws(
-			() => configFromEnv({ envName: "production" }),
+			() => sinkForConfig(invalidStoreConfig, {}),
 			/AGENTPOND_STORE must be "local", "s3", "gcs", or "vercel"/,
 		);
 	} finally {

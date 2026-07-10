@@ -16,7 +16,6 @@ export type AgentPondEnvironment = {
 	envFilePath: string;
 	envDir: string;
 	dbPath: string;
-	storeType: AgentPondStoreType;
 };
 
 export type ResolveEnvironmentOptions = {
@@ -86,7 +85,6 @@ export function resolveAgentPondEnvironment(
 		envFilePath: join(root, "envs", `${name}.env`),
 		envDir,
 		dbPath: join(envDir, "cache.duckdb"),
-		storeType: "s3",
 	};
 }
 

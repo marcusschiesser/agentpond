@@ -9,11 +9,9 @@ import { buildServer } from "@agentpond/fastify-ingest";
 import type { Command } from "commander";
 import type { FastifyInstance, FastifyLoggerOptions } from "fastify";
 import { CliError, parsePort } from "../cli-support.js";
-import {
-	addGlobalOptions,
-	environmentCwdForCommand,
-} from "../command-support.js";
+import { addGlobalOptions } from "../command-support.js";
 import { devSdkEnvironment } from "../dev-env.js";
+import { environmentContextForCommand } from "../environment-context.js";
 
 type DevOptions = {
 	host?: string;
@@ -33,7 +31,7 @@ export function registerDevCommand(program: Command): void {
 export async function startDevServer(options: DevOptions): Promise<void> {
 	const host = options.host ?? "127.0.0.1";
 	const startPort = parsePort(options.port ?? "4318");
-	const cwd = environmentCwdForCommand();
+	const cwd = environmentContextForCommand({ envName: "dev" }).rootDir;
 	const environment = initAgentPondEnvironment("dev", { cwd });
 	selectAgentPondEnvironment(environment.name, { cwd });
 	const devConfig = configFromEnv({
