@@ -1,5 +1,18 @@
 # @agentpond/duckdb
 
+## 0.3.5
+
+### Patch Changes
+
+- 871339c: Unify CLI storage behavior behind environment contexts.
+
+  Breaking: `AgentPondEnvironment` no longer exposes `storeType`; storage selection is resolved separately when an object store is needed.
+
+- Updated dependencies [59084e9]
+- Updated dependencies [d00fb6a]
+- Updated dependencies [871339c]
+  - @agentpond/core@0.4.1
+
 ## 0.3.4
 
 ### Patch Changes

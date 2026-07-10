@@ -1,5 +1,15 @@
 # @agentpond/ingest
 
+## 0.3.4
+
+### Patch Changes
+
+- d00fb6a: Add zero-config support for Firebase: Firebase optimized ingest function and storage (using the storage bucket assigned to the project, so no new infrastructure needed). Includes auto-detection of Firebase environments (works also for monorepos).
+- Updated dependencies [59084e9]
+- Updated dependencies [d00fb6a]
+- Updated dependencies [871339c]
+  - @agentpond/core@0.4.1
+
 ## 0.3.3
 
 ### Patch Changes
