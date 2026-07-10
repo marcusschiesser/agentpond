@@ -10,8 +10,8 @@ import {
 	firebaseStorageForInitializedApp,
 } from "./firebase-admin.js";
 import {
-	firebaseFunctionsSourceDirectories,
 	type FirebaseCliProjectConfig,
+	firebaseFunctionsSourceDirectories,
 } from "./firebase-env.js";
 
 export const defaultFirebaseStoragePrefix = "agentpond";
