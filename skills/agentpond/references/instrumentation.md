@@ -39,7 +39,17 @@ await processor.forceFlush();
 await sdk.shutdown();
 ```
 
-For OpenInference, provide the same exporter as the OpenTelemetry Node SDK's `traceExporter` or wrap it in the desired span processor. Use the provider adapter matching the deployment: `S3ObjectStore`, `GcsObjectStore`, `VercelBlobObjectStore`, `FirebaseStorageObjectStore`, or `FileSystemObjectStore`.
+For OpenInference, provide the same exporter as the OpenTelemetry Node SDK's `traceExporter` or wrap it in the desired span processor. Use the provider adapter matching the deployment: `S3ObjectStore`, `GcsObjectStore`, `VercelBlobObjectStore`, or `FileSystemObjectStore`.
+
+For Firebase, initialize the default Firebase Admin app and use the convenience factory. It derives the project ID and storage bucket from the app and keeps the default `agentpond/` prefix:
+
+```ts
+import { createFirebaseSpanExporter } from "@agentpond/firebase";
+import { initializeApp } from "firebase-admin/app";
+
+initializeApp();
+const exporter = createFirebaseSpanExporter();
+```
 
 The exporter uses the store's existing prefix behavior and accepts an explicit `prefix` where overrides are supported. Configure the CLI with the same project id, bucket, and prefix. No Langfuse URL or ingestion keys are required for spans, but scores and other Langfuse client operations still require a compatible API endpoint or AgentPond CLI commands.
 

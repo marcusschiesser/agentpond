@@ -8,7 +8,8 @@
 	"references": [
 		{ "path": "../core" },
 		{ "path": "../google" },
-		{ "path": "../ingest" }
+		{ "path": "../ingest" },
+		{ "path": "../otel" }
 	],
 	"include": ["src/**/*.ts"]
 }

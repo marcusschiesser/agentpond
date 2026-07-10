@@ -9,8 +9,14 @@ import {
 	MemoryObjectStore,
 	sinkFromStore,
 } from "@agentpond/core";
+import { AgentPondCache } from "@agentpond/duckdb";
+import {
+	BasicTracerProvider,
+	SimpleSpanProcessor,
+} from "@opentelemetry/sdk-trace-base";
 import {
 	createFirebaseIngestFunction,
+	createFirebaseSpanExporter,
 	FirebaseStorageObjectStore,
 	firebaseAuthFromRuntimeEnv,
 	firebaseCliProjectConfigFromCwd,
@@ -286,6 +292,133 @@ test("Firebase programmatic store passes custom buckets to initialized storage",
 			assert.deepEqual(initializedApps, []);
 			assert.deepEqual(selectedBuckets, ["custom-bucket"]);
 		},
+	);
+});
+
+test("Firebase span exporter derives the default app project and bucket and syncs its trace", async () => {
+	const objects = new Map<string, string>();
+	await withFakeFirebaseProject(
+		objects,
+		async ({ selectedBuckets }) => {
+			const exporter = createFirebaseSpanExporter();
+			const traceId = await emitTestSpan(exporter);
+
+			const objectKeys = [...objects.keys()];
+			assert.equal(selectedBuckets[0], "demo-project.firebasestorage.app");
+			assert.equal(objectKeys.length, 1);
+			assert.match(
+				objectKeys[0],
+				/^agentpond\/otel\/demo-project\/\d{4}\/\d{2}\/\d{2}\/\d{2}\/\d{2}\/[0-9a-f-]+\.json$/,
+			);
+
+			const store = FirebaseStorageObjectStore.fromConfig({
+				bucket: "demo-project.firebasestorage.app",
+			});
+			const db = new AgentPondCache(
+				join(
+					mkdtempSync(join(tmpdir(), "agentpond-firebase-exporter-")),
+					"cache.duckdb",
+				),
+			);
+			try {
+				const syncResult = await db.syncFromStore({
+					store,
+					projectId: "demo-project",
+					prefix: "agentpond/",
+				});
+				const traces = await db.query<{ id: string; name: string }>(
+					"select id, name from traces",
+				);
+				assert.equal(syncResult.objectsProcessed, 1);
+				assert.deepEqual(traces, [
+					{ id: traceId, name: "firebase direct span" },
+				]);
+			} finally {
+				await db.close();
+			}
+		},
+		{
+			defaultAppOptions: {
+				projectId: "demo-project",
+				storageBucket: "demo-project.firebasestorage.app",
+			},
+		},
+	);
+});
+
+test("Firebase span exporter supports a custom object prefix", async () => {
+	const objects = new Map<string, string>();
+	await withFakeFirebaseProject(
+		objects,
+		async () => {
+			await emitTestSpan(createFirebaseSpanExporter({ prefix: "custom" }));
+
+			assert.equal(
+				[...objects.keys()].some((key) =>
+					key.startsWith("custom/otel/demo-project/"),
+				),
+				true,
+			);
+			assert.equal(
+				[...objects.keys()].some((key) => key.startsWith("agentpond/")),
+				false,
+			);
+		},
+		{
+			defaultAppOptions: {
+				projectId: "demo-project",
+				storageBucket: "demo-project.firebasestorage.app",
+			},
+		},
+	);
+});
+
+test("Firebase span exporter requires an initialized default app", async () => {
+	await withFakeFirebaseProject(
+		new Map(),
+		async () => {
+			assert.throws(
+				() => createFirebaseSpanExporter(),
+				/default Firebase app.*initializeApp\(\)/i,
+			);
+		},
+		{ defaultAppOptions: null },
+	);
+});
+
+test("Firebase span exporter reports how to install Firebase Admin", () => {
+	const originalCwd = process.cwd();
+	const root = mkdtempSync(
+		join(tmpdir(), "agentpond-firebase-exporter-missing-"),
+	);
+	try {
+		process.chdir(root);
+		assert.throws(
+			() => createFirebaseSpanExporter(),
+			/install firebase-admin.*initializeApp\(\)/i,
+		);
+	} finally {
+		process.chdir(originalCwd);
+	}
+});
+
+test("Firebase span exporter requires the default app project id", async () => {
+	await withFakeFirebaseProject(
+		new Map(),
+		async () => {
+			assert.throws(() => createFirebaseSpanExporter(), /no projectId/);
+		},
+		{ defaultAppOptions: { storageBucket: "demo-project.appspot.com" } },
+	);
+});
+
+test("Firebase span exporter requires the default app storage bucket", async () => {
+	await withFakeFirebaseProject(
+		new Map(),
+		async () => {
+			assert.throws(() => createFirebaseSpanExporter(), /no storageBucket/);
+		},
+		{ defaultAppOptions: { projectId: "demo-project" } },
 	);
 });
 
@@ -628,6 +761,7 @@ async function withFakeFirebaseProject<T>(
 	}) => Promise<T>,
 	options: {
 		bucketObjects?: Map<string, Map<string, string>>;
+		defaultAppOptions?: { projectId?: string; storageBucket?: string } | null;
 		firebaseAdminDirectory?: string;
 		existingApps?: unknown[];
 		functionsSource?: string;
@@ -638,6 +772,13 @@ async function withFakeFirebaseProject<T>(
 	const root = mkdtempSync(join(tmpdir(), "agentpond-fake-firebase-"));
 	const selectedBuckets: Array<string | undefined> = [];
 	const initializedApps = [...(options.existingApps ?? [])];
+	const firebaseApps = [...(options.existingApps ?? [])];
+	if (options.defaultAppOptions) {
+		firebaseApps.push({
+			name: "[DEFAULT]",
+			options: options.defaultAppOptions,
+		});
+	}
 	const firebaseAdminRoot = join(
 		root,
 		options.firebaseAdminDirectory ?? "node_modules",
@@ -661,7 +802,11 @@ async function withFakeFirebaseProject<T>(
 		`
 exports.getApps = () => globalThis.__agentpondFirebaseTest.apps;
 exports.initializeApp = (options) => {
-	globalThis.__agentpondFirebaseTest.apps.push(options ?? {});
+	globalThis.__agentpondFirebaseTest.initializedApps.push(options ?? {});
+	globalThis.__agentpondFirebaseTest.apps.push({
+		name: "[DEFAULT]",
+		options: options ?? {},
+	});
 };
 `,
 		"utf8",
@@ -678,11 +823,13 @@ exports.getStorage = () => globalThis.__agentpondFirebaseTest.storage;
 		globalThis as typeof globalThis & {
 			__agentpondFirebaseTest?: {
 				apps: unknown[];
+				initializedApps: unknown[];
 				storage: { bucket: (name?: string) => ReturnType<typeof createBucket> };
 			};
 		}
 	).__agentpondFirebaseTest = {
-		apps: initializedApps,
+		apps: firebaseApps,
+		initializedApps,
 		storage: {
 			bucket: (name?: string) => {
 				selectedBuckets.push(name);
@@ -706,6 +853,22 @@ exports.getStorage = () => globalThis.__agentpondFirebaseTest.storage;
 		delete (globalThis as { __agentpondFirebaseTest?: unknown })
 			.__agentpondFirebaseTest;
 	}
+}
+
+async function emitTestSpan(
+	exporter: ReturnType<typeof createFirebaseSpanExporter>,
+): Promise<string> {
+	const provider = new BasicTracerProvider({
+		spanProcessors: [new SimpleSpanProcessor(exporter)],
+	});
+	const span = provider
+		.getTracer("agentpond-firebase-test")
+		.startSpan("firebase direct span");
+	const traceId = span.spanContext().traceId;
+	span.end();
+	await provider.forceFlush();
+	await provider.shutdown();
+	return traceId;
 }
 
 function missingBucketError(): Error & { code: number } {

@@ -19,6 +19,8 @@ In this mode, do not deploy an AgentPond container or ingestion function, and do
 
 See [Direct OpenTelemetry Object-Store Export](./direct-object-store-export.md) for installation and Langfuse and OpenInference examples.
 
+Firebase Functions can call `createFirebaseSpanExporter()` after `initializeApp()` to derive the project ID and storage bucket from the default Firebase Admin app automatically.
+
 For Langfuse instrumentation, pass the exporter as `new LangfuseSpanProcessor({ exporter })`. For OpenInference or other standard OpenTelemetry instrumentation, use it as the Node SDK's `traceExporter` or wrap it in an OpenTelemetry span processor. The exporter stores OTLP JSON resource spans under the existing `otel/<project-id>/...` layout, so `agentpond sync` reads them without any CLI or storage migration.
 
 This path exports spans and traces only. Scores and other Langfuse client API operations still require a compatible API endpoint or AgentPond CLI commands. Because the application writes directly to storage, protect provider credentials as application secrets and grant only the bucket permissions it needs.

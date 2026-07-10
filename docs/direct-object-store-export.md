@@ -64,10 +64,24 @@ Use the matching adapter for the deployment:
 - `S3ObjectStore.fromRuntimeEnv()` from `@agentpond/aws`
 - `GcsObjectStore.fromRuntimeEnv()` from `@agentpond/google`
 - `VercelBlobObjectStore.fromRuntimeEnv()` from `@agentpond/vercel`
-- `FirebaseStorageObjectStore.fromConfig()` from `@agentpond/firebase`
+- `createFirebaseSpanExporter()` from `@agentpond/firebase`
 - `new FileSystemObjectStore(path)` from `@agentpond/core`
 
 The application needs write credentials for the selected object store. Provider-specific prefix defaults and `AGENTPOND_PREFIX` continue to apply; an explicit `prefix` can be passed to the exporter where the store supports overrides.
+
+### Firebase
+
+After initializing the default Firebase Admin app, use the Firebase factory instead of constructing the store and project configuration manually:
+
+```ts
+import { createFirebaseSpanExporter } from "@agentpond/firebase";
+import { initializeApp } from "firebase-admin/app";
+
+initializeApp();
+const exporter = createFirebaseSpanExporter();
+```
+
+The factory derives `projectId` and `storageBucket` from the initialized app and uses the `agentpond/` prefix. Pass `{ prefix: "custom" }` to select a different prefix. Firebase environments outside Functions must initialize the default app with both options explicitly if they are not supplied by `FIREBASE_CONFIG`.
 
 Configure the AgentPond CLI with the same project, bucket, and prefix. After the application exports a trace, sync and inspect it:
 
