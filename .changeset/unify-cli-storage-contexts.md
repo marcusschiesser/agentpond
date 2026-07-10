@@ -1,6 +1,6 @@
 ---
 "agentpond": patch
-"@agentpond/core": major
+"@agentpond/core": patch 
 "@agentpond/duckdb": patch
 "@agentpond/firebase": patch
 ---
