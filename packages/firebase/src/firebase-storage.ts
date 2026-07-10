@@ -9,7 +9,10 @@ import {
 	firebaseStorageForAppOptions,
 	firebaseStorageForInitializedApp,
 } from "./firebase-admin.js";
-import type { FirebaseCliProjectConfig } from "./firebase-env.js";
+import {
+	firebaseFunctionsSourceDirectories,
+	type FirebaseCliProjectConfig,
+} from "./firebase-env.js";
 
 export const defaultFirebaseStoragePrefix = "agentpond";
 
@@ -44,12 +47,14 @@ export class FirebaseStorageObjectStore implements ObjectStore {
 	static async fromCliProject(
 		project: FirebaseCliProjectConfig,
 	): Promise<FirebaseStorageObjectStore> {
+		const moduleDirectories = firebaseFunctionsSourceDirectories(project.root);
 		const storage = firebaseStorageForAppOptions(
 			{
 				projectId: project.projectId,
 				...(project.bucket ? { storageBucket: project.bucket } : {}),
 			},
 			"Firebase Admin is required for FirebaseStorageObjectStore.fromCliProject(); install firebase-admin in the Firebase project and authenticate with credentials supported by Firebase Admin",
+			{ moduleDirectories },
 		);
 		const stores = firebaseCliBucketCandidates(project).map((bucketName) =>
 			GcsObjectStore.fromBucket(storage.bucket(bucketName) as GcsBucket),

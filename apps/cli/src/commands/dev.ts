@@ -9,7 +9,10 @@ import { buildServer } from "@agentpond/fastify-ingest";
 import type { Command } from "commander";
 import type { FastifyInstance, FastifyLoggerOptions } from "fastify";
 import { CliError, parsePort } from "../cli-support.js";
-import { addGlobalOptions } from "../command-support.js";
+import {
+	addGlobalOptions,
+	environmentCwdForCommand,
+} from "../command-support.js";
 import { devSdkEnvironment } from "../dev-env.js";
 
 type DevOptions = {
@@ -30,9 +33,11 @@ export function registerDevCommand(program: Command): void {
 export async function startDevServer(options: DevOptions): Promise<void> {
 	const host = options.host ?? "127.0.0.1";
 	const startPort = parsePort(options.port ?? "4318");
-	const environment = initAgentPondEnvironment("dev");
-	selectAgentPondEnvironment(environment.name);
+	const cwd = environmentCwdForCommand();
+	const environment = initAgentPondEnvironment("dev", { cwd });
+	selectAgentPondEnvironment(environment.name, { cwd });
 	const devConfig = configFromEnv({
+		cwd,
 		envName: environment.name,
 	});
 	const devEnvironment = devConfig.environment;
@@ -49,6 +54,7 @@ export async function startDevServer(options: DevOptions): Promise<void> {
 			createServer: () => {
 				const candidate = buildServer({
 					sink: DuckDbIngestionSink.fromAgentPondEnv({
+						cwd,
 						name: environment.name,
 					}),
 					auth: false,

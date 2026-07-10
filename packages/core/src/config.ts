@@ -26,6 +26,7 @@ export type AgentPondRuntimeConfig = Pick<
 >;
 
 export type ConfigFromEnvOptions = {
+	cwd?: string;
 	envName?: string;
 	storeType?: AgentPondStoreType;
 };
@@ -34,6 +35,7 @@ export function configFromEnv(
 	options: ConfigFromEnvOptions = {},
 ): AgentPondConfig {
 	const environment = resolveAgentPondEnvironment({
+		cwd: options.cwd,
 		name: options.envName,
 	});
 	const fileEnv = parseEnvFile(environment.envFilePath);

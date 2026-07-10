@@ -67,6 +67,16 @@ jobs:
           fail-on-scopes: runtime
           license-check: true
           allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+          allow-dependencies-licenses: >-
+            pkg:npm/jackspeak@3.4.3,
+            pkg:npm/lodash.includes@4.3.0,
+            pkg:npm/lodash.isinteger@4.0.4,
+            pkg:npm/lodash.isplainobject@4.0.6,
+            pkg:npm/lodash.once@4.1.1,
+            pkg:npm/lru-cache@11.5.1,
+            pkg:npm/minipass@7.1.3,
+            pkg:npm/package-json-from-dist@1.0.1,
+            pkg:npm/path-scurry@1.11.1
 
   codeql:
     name: codeql

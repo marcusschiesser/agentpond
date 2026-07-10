@@ -90,8 +90,11 @@ export function resolveAgentPondEnvironment(
 	};
 }
 
-export function selectAgentPondEnvironment(name: string): AgentPondEnvironment {
-	const environment = resolveAgentPondEnvironment({ name });
+export function selectAgentPondEnvironment(
+	name: string,
+	options: Pick<ResolveEnvironmentOptions, "cwd"> = {},
+): AgentPondEnvironment {
+	const environment = resolveAgentPondEnvironment({ name, cwd: options.cwd });
 	mkdirSync(environment.agentpondDir, { recursive: true });
 	writeFileSync(
 		join(environment.agentpondDir, "current-env"),
@@ -103,9 +106,9 @@ export function selectAgentPondEnvironment(name: string): AgentPondEnvironment {
 
 export function initAgentPondEnvironment(
 	name: string,
-	options: { storeType?: AgentPondStoreType } = {},
+	options: { cwd?: string; storeType?: AgentPondStoreType } = {},
 ): AgentPondEnvironment {
-	const environment = resolveAgentPondEnvironment({ name });
+	const environment = resolveAgentPondEnvironment({ name, cwd: options.cwd });
 	mkdirSync(environment.envDir, { recursive: true });
 	mkdirSync(join(environment.agentpondDir, "envs"), { recursive: true });
 	if (environment.name !== "dev" && !existsSync(environment.envFilePath)) {

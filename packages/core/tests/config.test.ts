@@ -466,7 +466,10 @@ test("environment list resolves from the workspace root", () => {
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-workspace-"));
 	const packageDir = join(cwd, "packages", "app");
 	mkdirSync(packageDir, { recursive: true });
-	writeFileSync(join(cwd, "pnpm-workspace.yaml"), "packages:\n  - packages/*\n");
+	writeFileSync(
+		join(cwd, "pnpm-workspace.yaml"),
+		"packages:\n  - packages/*\n",
+	);
 	mkdirSync(join(cwd, ".agentpond", "envs", "dev"), { recursive: true });
 	mkdirSync(join(cwd, ".agentpond", "envs"), { recursive: true });
 	writeFileSync(join(cwd, ".agentpond", "envs", "production.env"), "");

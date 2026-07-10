@@ -15,6 +15,7 @@ import {
 	firebaseAuthFromRuntimeEnv,
 	firebaseCliProjectConfigFromCwd,
 	firebaseCliProjectConfigFromCwdIfAvailable,
+	firebaseFunctionsSourceDirectories,
 	isFirebaseProjectDirectory,
 } from "../src/index.js";
 
@@ -26,6 +27,7 @@ const auth: AuthConfig = {
 
 const testProject = {
 	projectId: "demo-project",
+	root: process.cwd(),
 };
 
 function authHeader(): string {
@@ -83,9 +85,11 @@ test("Firebase CLI project config reads .firebaserc from cwd", () => {
 	assert.equal(isFirebaseProjectDirectory(cwd), true);
 	assert.deepEqual(firebaseCliProjectConfigFromCwd(cwd), {
 		projectId: "demo-project",
+		root: cwd,
 	});
 	assert.deepEqual(firebaseCliProjectConfigFromCwdIfAvailable(cwd), {
 		projectId: "demo-project",
+		root: cwd,
 	});
 });
 
@@ -102,8 +106,28 @@ test("Firebase CLI project config walks up to Firebase project roots", () => {
 		} as NodeJS.ProcessEnv),
 		{
 			projectId: "env-project",
+			root,
 		},
 	);
+});
+
+test("Firebase CLI project config finds Functions source directories", () => {
+	const root = mkdtempSync(join(tmpdir(), "agentpond-firebase-functions-"));
+	writeFileSync(
+		join(root, "firebase.json"),
+		JSON.stringify({
+			functions: [
+				{ source: "packages/functions" },
+				{ source: "packages/worker" },
+			],
+		}),
+		"utf8",
+	);
+
+	assert.deepEqual(firebaseFunctionsSourceDirectories(root), [
+		join(root, "packages/functions"),
+		join(root, "packages/worker"),
+	]);
 });
 
 test("Firebase CLI project config reads Firebase config storage buckets", () => {
@@ -120,6 +144,7 @@ test("Firebase CLI project config reads Firebase config storage buckets", () => 
 		} as NodeJS.ProcessEnv),
 		{
 			projectId: "firebase-config-project",
+			root: cwd,
 			bucket: "firebase-config-project.firebasestorage.app",
 		},
 	);
@@ -135,6 +160,7 @@ test("Firebase CLI project config reads Firebase standard env project ids", () =
 		} as NodeJS.ProcessEnv),
 		{
 			projectId: "gcloud-project",
+			root: cwd,
 		},
 	);
 	assert.deepEqual(
@@ -143,6 +169,7 @@ test("Firebase CLI project config reads Firebase standard env project ids", () =
 		} as NodeJS.ProcessEnv),
 		{
 			projectId: "gcp-project",
+			root: cwd,
 		},
 	);
 });
@@ -183,6 +210,48 @@ test("Firebase CLI store reads the default bucket from the initialized project",
 			]);
 		},
 	);
+});
+
+test("Firebase CLI store loads Firebase Admin from a configured Functions source", async () => {
+	await withFakeFirebaseProject(
+		new Map(),
+		async ({ root, initializedApps }) => {
+			await FirebaseStorageObjectStore.fromCliProject({
+				projectId: "demo-project",
+				root,
+			});
+
+			assert.deepEqual(initializedApps, [{ projectId: "demo-project" }]);
+		},
+		{
+			firebaseAdminDirectory: join("packages", "functions", "node_modules"),
+			functionsSource: "packages/functions",
+		},
+	);
+});
+
+test("Firebase CLI store reports how to install Firebase Admin", async () => {
+	const originalCwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-firebase-admin-missing-"));
+	try {
+		writeFileSync(
+			join(root, "firebase.json"),
+			JSON.stringify({ functions: [{ source: "packages/functions" }] }),
+			"utf8",
+		);
+		mkdirSync(join(root, "packages", "functions"), { recursive: true });
+		process.chdir(root);
+
+		await assert.rejects(
+			FirebaseStorageObjectStore.fromCliProject({
+				projectId: "demo-project",
+				root,
+			}),
+			/Install firebase-admin in a declared Functions source package, or add firebase-admin to this workspace's devDependencies/,
+		);
+	} finally {
+		process.chdir(originalCwd);
+	}
 });
 
 test("Firebase programmatic store uses an already initialized app by default", async () => {
@@ -538,11 +607,14 @@ function createBucket(objects: Map<string, string>, missing = false) {
 async function withFakeFirebaseProject<T>(
 	objects: Map<string, string>,
 	run: (context: {
+		root: string;
 		initializedApps: unknown[];
 		selectedBuckets: Array<string | undefined>;
 	}) => Promise<T>,
 	options: {
 		bucketObjects?: Map<string, Map<string, string>>;
+		firebaseAdminDirectory?: string;
+		functionsSource?: string;
 		missingBuckets?: Set<string>;
 	} = {},
 ): Promise<T> {
@@ -550,13 +622,24 @@ async function withFakeFirebaseProject<T>(
 	const root = mkdtempSync(join(tmpdir(), "agentpond-fake-firebase-"));
 	const selectedBuckets: Array<string | undefined> = [];
 	const initializedApps: unknown[] = [];
-	const firebaseAdminRoot = join(root, "node_modules", "firebase-admin");
+	const firebaseAdminRoot = join(
+		root,
+		options.firebaseAdminDirectory ?? "node_modules",
+		"firebase-admin",
+	);
 	mkdirSync(firebaseAdminRoot, { recursive: true });
 	writeFileSync(
 		join(root, ".firebaserc"),
 		JSON.stringify({ projects: { default: "demo-project" } }),
 		"utf8",
 	);
+	if (options.functionsSource) {
+		writeFileSync(
+			join(root, "firebase.json"),
+			JSON.stringify({ functions: [{ source: options.functionsSource }] }),
+			"utf8",
+		);
+	}
 	writeFileSync(
 		join(firebaseAdminRoot, "app.js"),
 		`
@@ -601,7 +684,7 @@ exports.getStorage = () => globalThis.__agentpondFirebaseTest.storage;
 
 	try {
 		process.chdir(root);
-		return await run({ initializedApps, selectedBuckets });
+		return await run({ root, initializedApps, selectedBuckets });
 	} finally {
 		process.chdir(originalCwd);
 		delete (globalThis as { __agentpondFirebaseTest?: unknown })

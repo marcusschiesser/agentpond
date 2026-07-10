@@ -11,7 +11,11 @@ import {
 import { select } from "@inquirer/prompts";
 import type { Command } from "commander";
 import { CliError, print } from "../cli-support.js";
-import { addGlobalOptions, type GlobalOptions } from "../command-support.js";
+import {
+	addGlobalOptions,
+	environmentCwdForCommand,
+	type GlobalOptions,
+} from "../command-support.js";
 import {
 	devSdkEnvironment,
 	type EnvFamily,
@@ -52,6 +56,7 @@ export function registerEnvCommand(
 		.action((_commandOptions: EnvOptions, command: Command) => {
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
 			const environment = resolveAgentPondEnvironment({
+				cwd: environmentCwdForCommand(),
 				name: globalOptions.env,
 			});
 			if (globalOptions.json) {
@@ -72,10 +77,12 @@ export function registerEnvCommand(
 		.description("list local environments")
 		.action((_commandOptions: EnvOptions, command: Command) => {
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
+			const cwd = environmentCwdForCommand();
 			const selected = resolveAgentPondEnvironment({
+				cwd,
 				name: globalOptions.env,
 			}).name;
-			const names = listAgentPondEnvironments();
+			const names = listAgentPondEnvironments(cwd);
 			const rows = (names.length > 0 ? names : [selected]).map((name) => ({
 				name,
 				selected: name === selected,
@@ -92,6 +99,7 @@ export function registerEnvCommand(
 					storeFromValue(commandOptions.store) ??
 					(await promptForStore(promptStore));
 				const environment = initAgentPondEnvironment(name, {
+					cwd: environmentCwdForCommand(),
 					storeType: store,
 				});
 				return print(
@@ -116,7 +124,9 @@ export function registerEnvCommand(
 			) => {
 				const selectedName =
 					name ?? (await promptForEnvironmentName(promptSelect));
-				const environment = selectAgentPondEnvironment(selectedName);
+				const environment = selectAgentPondEnvironment(selectedName, {
+					cwd: environmentCwdForCommand(),
+				});
 				return print(
 					{ selected: environment.name },
 					Boolean(command.optsWithGlobals<GlobalOptions>().json),
@@ -165,8 +175,9 @@ async function promptForEnvironmentName(
 	if (!process.stdin.isTTY || !process.stdout.isTTY) {
 		throw new CliError("Missing environment name");
 	}
-	const current = resolveAgentPondEnvironment();
-	const names = listAgentPondEnvironments();
+	const cwd = environmentCwdForCommand();
+	const current = resolveAgentPondEnvironment({ cwd });
+	const names = listAgentPondEnvironments(cwd);
 	const choices = (names.length > 0 ? names : [current.name]).map((name) => ({
 		name,
 		value: name,
@@ -189,7 +200,10 @@ function printEnvironmentExports(name: string, options: EnvOptions): void {
 }
 
 function devSdkEnvironmentForCurrentServer(family: EnvFamily): EnvVar[] {
-	const environment = resolveAgentPondEnvironment({ name: "dev" });
+	const environment = resolveAgentPondEnvironment({
+		cwd: environmentCwdForCommand(),
+		name: "dev",
+	});
 	const lock = readDevServerLock(environment);
 	if (!lock?.host || !lock.port) {
 		throw new CliError(
@@ -209,7 +223,10 @@ function envFamilyFromOptions(options: EnvOptions): EnvFamily {
 }
 
 function readEnvironmentFileExports(name: string): EnvVar[] {
-	const environment = resolveAgentPondEnvironment({ name });
+	const environment = resolveAgentPondEnvironment({
+		cwd: environmentCwdForCommand(),
+		name,
+	});
 	if (!existsSync(environment.envFilePath)) {
 		throw new CliError(
 			`Environment "${environment.name}" is not initialized; run agentpond env init ${environment.name}`,

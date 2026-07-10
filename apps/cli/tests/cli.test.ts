@@ -1493,6 +1493,56 @@ test("CLI uses Firebase project ids as local cache environment names", () => {
 	}
 });
 
+test("CLI Firebase commands use the Firebase project directory for AgentPond files", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-project-root-")),
+	);
+	const functionsDir = join(root, "packages", "functions");
+	try {
+		mkdirSync(functionsDir, { recursive: true });
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "firebase-demo" } }),
+			"utf8",
+		);
+		writeFileSync(
+			join(root, "firebase.json"),
+			JSON.stringify({ functions: [{ source: "packages/functions" }] }),
+			"utf8",
+		);
+		process.chdir(functionsDir);
+
+		const config = configForCommand({});
+		assert.equal(
+			config.dbPath,
+			join(root, ".agentpond", "envs", "firebase-demo", "cache.duckdb"),
+		);
+
+		await captureStdout(async () => {
+			await main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"staging",
+				"--store",
+				"local",
+			]);
+			await main(["node", "agentpond", "env", "use", "staging"]);
+		});
+
+		assert.equal(
+			existsSync(join(root, ".agentpond", "envs", "staging.env")),
+			true,
+		);
+		assert.equal(existsSync(join(root, ".agentpond", "current-env")), true);
+		assert.equal(existsSync(join(functionsDir, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+	}
+});
+
 test("CLI explicit non-Firebase store wins over .firebaserc detection", async () => {
 	const cwd = process.cwd();
 	const root = realpathSync(

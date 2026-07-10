@@ -35,9 +35,15 @@ export function commandContext(options: GlobalOptions): CommandContext {
 }
 
 export function configForCommand(options: GlobalOptions): AgentPondConfig {
-	if (options.env) return configFromEnv({ envName: options.env });
 	const firebaseProject = firebaseCliProjectConfigFromCwdIfAvailable();
-	return configFromEnv({ envName: firebaseProject?.projectId });
+	return configFromEnv({
+		cwd: firebaseProject?.root,
+		envName: options.env ?? firebaseProject?.projectId,
+	});
+}
+
+export function environmentCwdForCommand(): string {
+	return firebaseCliProjectConfigFromCwdIfAvailable()?.root ?? process.cwd();
 }
 
 export function isDevEnvironment(config: AgentPondConfig): boolean {

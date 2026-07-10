@@ -4,6 +4,7 @@ import { findAncestorDirectory } from "@agentpond/core";
 
 export type FirebaseCliProjectConfig = {
 	projectId: string;
+	root: string;
 	bucket?: string;
 };
 
@@ -41,10 +42,30 @@ export function firebaseCliProjectConfigFromCwd(
 
 	return {
 		projectId,
+		root,
 		...(runtimeConfig?.storageBucket
 			? { bucket: runtimeConfig.storageBucket }
 			: {}),
 	};
+}
+
+export function firebaseFunctionsSourceDirectories(root: string): string[] {
+	const configPath = join(root, "firebase.json");
+	if (!existsSync(configPath)) return [];
+
+	try {
+		const config = JSON.parse(readFileSync(configPath, "utf8")) as {
+			functions?: unknown;
+		};
+		return firebaseFunctionsSources(config.functions).map((source) =>
+			join(root, source),
+		);
+	} catch (error) {
+		throw new Error(
+			"Could not read Firebase Functions source directories from firebase.json",
+			{ cause: error },
+		);
+	}
 }
 
 export function firebaseCliProjectConfigFromCwdIfAvailable(
@@ -60,6 +81,18 @@ function isFirebaseProjectRoot(dir: string): boolean {
 		existsSync(join(dir, ".firebaserc")) ||
 		existsSync(join(dir, "firebase.json"))
 	);
+}
+
+function firebaseFunctionsSources(functions: unknown): string[] {
+	if (typeof functions === "string") return [functions];
+	if (Array.isArray(functions)) {
+		return functions.flatMap(firebaseFunctionsSources);
+	}
+	if (functions && typeof functions === "object") {
+		const source = (functions as { source?: unknown }).source;
+		return typeof source === "string" ? [source] : [];
+	}
+	return [];
 }
 
 function firebaseProjectIdFromRc(root: string): string | undefined {
