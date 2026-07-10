@@ -50,7 +50,9 @@ function ensureDefaultFirebaseApp(
 	resolution?: FirebaseAdminModuleResolutionOptions,
 ): void {
 	const app = requireFirebaseAdminApp(resolution);
-	if (app.getApps().length > 0) return;
+	if (app.getApps().some((existingApp) => existingApp.name === "[DEFAULT]")) {
+		return;
+	}
 	app.initializeApp(options);
 }
 

@@ -212,6 +212,21 @@ test("Firebase CLI store reads the default bucket from the initialized project",
 	);
 });
 
+test("Firebase CLI store initializes the default app when only named apps exist", async () => {
+	await withFakeFirebaseProject(
+		new Map(),
+		async ({ initializedApps }) => {
+			await FirebaseStorageObjectStore.fromCliProject(testProject);
+
+			assert.deepEqual(initializedApps, [
+				{ name: "existing-named-app" },
+				{ projectId: "demo-project" },
+			]);
+		},
+		{ existingApps: [{ name: "existing-named-app" }] },
+	);
+});
+
 test("Firebase CLI store loads Firebase Admin from a configured Functions source", async () => {
 	await withFakeFirebaseProject(
 		new Map(),
@@ -614,6 +629,7 @@ async function withFakeFirebaseProject<T>(
 	options: {
 		bucketObjects?: Map<string, Map<string, string>>;
 		firebaseAdminDirectory?: string;
+		existingApps?: unknown[];
 		functionsSource?: string;
 		missingBuckets?: Set<string>;
 	} = {},
@@ -621,7 +637,7 @@ async function withFakeFirebaseProject<T>(
 	const originalCwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-fake-firebase-"));
 	const selectedBuckets: Array<string | undefined> = [];
-	const initializedApps: unknown[] = [];
+	const initializedApps = [...(options.existingApps ?? [])];
 	const firebaseAdminRoot = join(
 		root,
 		options.firebaseAdminDirectory ?? "node_modules",
