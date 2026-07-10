@@ -69,14 +69,13 @@ export function parseEnvFileEntries(filePath: string): EnvFileEntry[] {
 }
 
 export function agentPondDir(cwd = process.cwd()): string {
-	return join(cwd, ".agentpond");
+	return join(agentPondWorkspaceRoot(cwd), ".agentpond");
 }
 
 export function resolveAgentPondEnvironment(
 	options: ResolveEnvironmentOptions = {},
 ): AgentPondEnvironment {
-	const cwd = agentPondWorkspaceRoot(options.cwd);
-	const root = agentPondDir(cwd);
+	const root = agentPondDir(options.cwd);
 	const name = normalizeEnvironmentName(
 		options.name ?? readSelectedEnvironment(root) ?? "dev",
 	);
