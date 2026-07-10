@@ -2,6 +2,11 @@ import type { Dirent } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import type { AgentPondEnvironment } from "../environment.js";
+import {
+	type IngestionSink,
+	type ObjectStoreIngestionSinkOptions,
+	sinkFromStore,
+} from "./ingestion-handler.js";
 import type { ObjectStore } from "./types.js";
 
 export class FileSystemObjectStore implements ObjectStore {
@@ -22,6 +27,10 @@ export class FileSystemObjectStore implements ObjectStore {
 
 	constructor(rootPath: string) {
 		this.root = resolve(rootPath);
+	}
+
+	toSink(options: ObjectStoreIngestionSinkOptions = {}): IngestionSink {
+		return sinkFromStore(this, options);
 	}
 
 	async putJson(key: string, value: unknown): Promise<void> {

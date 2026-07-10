@@ -282,6 +282,43 @@ test("AWS Lambda ingest handler accepts JSON ingestion batches", async () => {
 	assert.equal((await store.listKeys("project-a/")).length > 0, true);
 });
 
+test("AWS Lambda ingest handler accepts object stores", async () => {
+	const store = new MemoryObjectStore();
+	const handler = createLambdaIngestHandler({ auth, store });
+	const response = await handler({
+		rawPath: "/api/public/ingestion",
+		requestContext: { http: { method: "POST" } },
+		headers: {
+			Authorization: authHeader(),
+			"content-type": "application/json",
+		},
+		body: JSON.stringify({
+			batch: [
+				{
+					id: "event-aws-store-1",
+					timestamp: "2026-06-14T00:00:00.000Z",
+					type: eventTypes.TRACE_CREATE,
+					body: { id: "trace-aws-store-1" },
+				},
+			],
+		}),
+	});
+
+	assert.equal(response.statusCode, 207);
+	assert.equal((await store.listKeys("project-a/")).length > 0, true);
+});
+
+test("AWS Lambda ingest handler rejects both store and sink", () => {
+	assert.throws(
+		() =>
+			createLambdaIngestHandler({
+				store: new MemoryObjectStore(),
+				sink: sinkFromStore(new MemoryObjectStore()),
+			}),
+		/AgentPond ingest options cannot include both store and sink/,
+	);
+});
+
 test("AWS Lambda ingest handler accepts base64 gzip OTEL JSON", async () => {
 	const handler = createLambdaIngestHandler({
 		auth,

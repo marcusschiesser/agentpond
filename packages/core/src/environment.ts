@@ -22,7 +22,6 @@ export type AgentPondEnvironment = {
 export type ResolveEnvironmentOptions = {
 	name?: string;
 	cwd?: string;
-	resolveWorkspace?: boolean;
 };
 
 export type EnvFileEntry = {
@@ -70,16 +69,13 @@ export function parseEnvFileEntries(filePath: string): EnvFileEntry[] {
 }
 
 export function agentPondDir(cwd = process.cwd()): string {
-	return join(cwd, ".agentpond");
+	return join(agentPondWorkspaceRoot(cwd), ".agentpond");
 }
 
 export function resolveAgentPondEnvironment(
 	options: ResolveEnvironmentOptions = {},
 ): AgentPondEnvironment {
-	const cwd = options.resolveWorkspace
-		? agentPondWorkspaceRoot(options.cwd)
-		: options.cwd;
-	const root = agentPondDir(cwd);
+	const root = agentPondDir(options.cwd);
 	const name = normalizeEnvironmentName(
 		options.name ?? readSelectedEnvironment(root) ?? "dev",
 	);
@@ -94,8 +90,11 @@ export function resolveAgentPondEnvironment(
 	};
 }
 
-export function selectAgentPondEnvironment(name: string): AgentPondEnvironment {
-	const environment = resolveAgentPondEnvironment({ name });
+export function selectAgentPondEnvironment(
+	name: string,
+	options: Pick<ResolveEnvironmentOptions, "cwd"> = {},
+): AgentPondEnvironment {
+	const environment = resolveAgentPondEnvironment({ name, cwd: options.cwd });
 	mkdirSync(environment.agentpondDir, { recursive: true });
 	writeFileSync(
 		join(environment.agentpondDir, "current-env"),
@@ -107,9 +106,9 @@ export function selectAgentPondEnvironment(name: string): AgentPondEnvironment {
 
 export function initAgentPondEnvironment(
 	name: string,
-	options: { storeType?: AgentPondStoreType } = {},
+	options: { cwd?: string; storeType?: AgentPondStoreType } = {},
 ): AgentPondEnvironment {
-	const environment = resolveAgentPondEnvironment({ name });
+	const environment = resolveAgentPondEnvironment({ name, cwd: options.cwd });
 	mkdirSync(environment.envDir, { recursive: true });
 	mkdirSync(join(environment.agentpondDir, "envs"), { recursive: true });
 	if (environment.name !== "dev" && !existsSync(environment.envFilePath)) {

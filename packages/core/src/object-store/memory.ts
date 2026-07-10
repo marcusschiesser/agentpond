@@ -1,8 +1,17 @@
+import {
+	type IngestionSink,
+	type ObjectStoreIngestionSinkOptions,
+	sinkFromStore,
+} from "./ingestion-handler.js";
 import type { ObjectStore } from "./types.js";
 
 export class MemoryObjectStore implements ObjectStore {
 	readonly writes: string[] = [];
 	private readonly objects = new Map<string, unknown>();
+
+	toSink(options: ObjectStoreIngestionSinkOptions = {}): IngestionSink {
+		return sinkFromStore(this, options);
+	}
 
 	async putJson(key: string, value: unknown): Promise<void> {
 		this.writes.push(key);

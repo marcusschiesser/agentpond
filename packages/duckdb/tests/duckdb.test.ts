@@ -374,7 +374,6 @@ test("DuckDB ingestion sink resolves AgentPond environments from a pnpm workspac
 	const sink = DuckDbIngestionSink.fromAgentPondEnv({
 		name: "dev",
 		cwd: nested,
-		resolveWorkspace: true,
 	});
 	await sink.writeEvents({
 		projectId: "project-a",

@@ -20,17 +20,28 @@ export type AgentPondConfig = {
 	environment?: AgentPondEnvironment;
 };
 
+export type AgentPondRuntimeConfig = Pick<
+	AgentPondConfig,
+	"projectId" | "prefix" | "auth"
+>;
+
+export type ConfigFromEnvOptions = {
+	cwd?: string;
+	envName?: string;
+	storeType?: AgentPondStoreType;
+};
+
 export function configFromEnv(
-	overrides: Partial<{
-		envName: string;
-		storeType: AgentPondStoreType;
-	}> = {},
+	options: ConfigFromEnvOptions = {},
 ): AgentPondConfig {
-	const environment = resolveAgentPondEnvironment({ name: overrides.envName });
+	const environment = resolveAgentPondEnvironment({
+		cwd: options.cwd,
+		name: options.envName,
+	});
 	const fileEnv = parseEnvFile(environment.envFilePath);
 	const env = envValue(fileEnv);
 	const storeType =
-		overrides.storeType ??
+		options.storeType ??
 		storeTypeFromValue(env("AGENTPOND_STORE")) ??
 		environment.storeType;
 	const dbPath = join(environment.envDir, "cache.duckdb");
@@ -57,6 +68,30 @@ export function configFromEnv(
 			...environment,
 			dbPath,
 			storeType,
+		},
+	};
+}
+
+export function configFromRuntimeEnv(
+	env: NodeJS.ProcessEnv = process.env,
+): AgentPondRuntimeConfig {
+	const projectId = env.AGENTPOND_PROJECT_ID ?? "default-project";
+	const prefix = normalizePrefix(
+		env.AGENTPOND_PREFIX ??
+			env.AGENTPOND_S3_PREFIX ??
+			env.AGENTPOND_GCS_PREFIX ??
+			"",
+	);
+	const publicKey = env.LANGFUSE_PUBLIC_KEY ?? "pk-agentpond";
+	const secretKey = env.LANGFUSE_SECRET_KEY ?? "sk-agentpond";
+
+	return {
+		projectId,
+		prefix,
+		auth: {
+			projectId,
+			publicKey,
+			secretKey,
 		},
 	};
 }

@@ -13,7 +13,6 @@ import type {
 export type DuckDbIngestionSinkEnvParams = {
 	name: string;
 	cwd?: string;
-	resolveWorkspace?: boolean;
 };
 
 export class DuckDbIngestionSink implements IngestionSink {

@@ -3,6 +3,7 @@
 	"references": [
 		{ "path": "./packages/core" },
 		{ "path": "./packages/aws" },
+		{ "path": "./packages/firebase" },
 		{ "path": "./packages/google" },
 		{ "path": "./packages/vercel" },
 		{ "path": "./packages/ingest" },

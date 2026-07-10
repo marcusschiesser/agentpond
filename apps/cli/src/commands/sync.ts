@@ -5,9 +5,11 @@ import {
 	addGlobalOptions,
 	commandContext,
 	type GlobalOptions,
-	isDevEnvironment,
 } from "../command-support.js";
-import { objectStoreForConfig } from "../object-store.js";
+import {
+	objectStorageForConfig,
+	usesAgentPondDevServer,
+} from "../object-store.js";
 
 export function registerSyncCommand(program: Command): void {
 	addGlobalOptions(program.command("sync"))
@@ -16,7 +18,7 @@ export function registerSyncCommand(program: Command): void {
 			const { config, json } = commandContext(
 				command.optsWithGlobals<GlobalOptions>(),
 			);
-			if (isDevEnvironment(config)) {
+			if (usesAgentPondDevServer(config)) {
 				return print(
 					{
 						skipped: true,
@@ -26,11 +28,12 @@ export function registerSyncCommand(program: Command): void {
 				);
 			}
 			const db = new AgentPondCache(config.dbPath);
+			const storage = await objectStorageForConfig(config);
 			try {
 				const result = await db.syncFromStore({
-					store: objectStoreForConfig(config),
-					projectId: config.projectId,
-					prefix: config.prefix,
+					store: storage.store,
+					projectId: storage.projectId,
+					prefix: storage.prefix,
 				});
 				return print(result, json);
 			} finally {

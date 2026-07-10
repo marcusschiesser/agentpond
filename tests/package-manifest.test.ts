@@ -29,6 +29,7 @@ const publishablePackages = [
 	"packages/ingest",
 	"packages/fastify-ingest",
 	"packages/aws",
+	"packages/firebase",
 	"packages/google",
 	"packages/vercel",
 	"packages/duckdb",

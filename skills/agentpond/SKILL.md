@@ -85,7 +85,16 @@ npx agentpond env init staging --store vercel
 npx agentpond env init staging --store local
 ```
 
-Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings. GCS environments use Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`. Vercel environments use `AGENTPOND_STORE=vercel`, `AGENTPOND_BLOB_ACCESS=private`, and Vercel Blob credentials from `BLOB_READ_WRITE_TOKEN` or OIDC (`BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`). Do not ask users to paste secrets into chat.
+Then tell the user to edit `.agentpond/envs/staging.env` with SDK and object-store settings.
+
+Provider notes:
+- GCS: Use Google Application Default Credentials or `GOOGLE_APPLICATION_CREDENTIALS`.
+- Firebase: Do not add Firebase bucket or prefix settings to AgentPond env files. Run AgentPond inside the Firebase project directory or a nested package. It detects `.firebaserc` or an ancestor `firebase.json`, reads the project id from `.firebaserc` or Firebase/Google project env, resolves `firebase-admin` from the configured Functions source, syncs `FIREBASE_CONFIG.storageBucket` when present or checks the default Firebase buckets otherwise, uses the fixed `agentpond/` prefix, and uses the Firebase project id as the local cache environment name when `--env` is not passed. Read `references/cli.md` for details.
+- Vercel Blob: Use `AGENTPOND_STORE=vercel`, `AGENTPOND_BLOB_ACCESS=private`, and credentials from `BLOB_READ_WRITE_TOKEN` or OIDC (`BLOB_STORE_ID` with `VERCEL_OIDC_TOKEN`).
+
+For Firebase setup, also deny client SDK access to `agentpond/` in `storage.rules` with `allow read, write: if false;`. Firebase Admin writes from Functions and CLI sync bypass those rules.
+
+Do not ask users to paste secrets into chat.
 
 For Hugging Face Storage Buckets, use the S3-compatible endpoint and checksum settings from <https://huggingface.co/docs/hub/storage-buckets-s3>.
 
@@ -119,7 +128,7 @@ For local development, start the dev ingestion server:
 npx agentpond dev
 ```
 
-This selects the `dev` environment and writes directly to `.agentpond/envs/dev/cache.duckdb`. Keep the process running while SDKs send traces.
+This selects the `dev` environment and writes directly to `.agentpond/envs/dev/cache.duckdb` in the current workspace root, or current directory outside a workspace. Keep the process running while SDKs send traces.
 
 If the default port `4318` is already in use, `npx agentpond dev` automatically tries the next open port. Only one dev server can run per AgentPond directory, and `npx agentpond env get dev` returns SDK environment values for that running server. If no dev server is running, `env get dev` fails.
 
@@ -149,4 +158,4 @@ Use `npx agentpond env get dev --otel` for only OpenTelemetry variables and `npx
 
 These variables configure SDK ingestion. They are not credentials for using the AgentPond CLI to query Langfuse Cloud. The AgentPond CLI reads from object storage and the local DuckDB cache.
 
-For serverless deployments, AWS infrastructure can use `lambdaIngestHandler` and `S3ObjectStore.fromRuntimeEnv().toSink()` from `@agentpond/aws`, Google infrastructure can use `httpIngestFunction`, `createHttpIngestFunction`, and `GcsObjectStore.fromRuntimeEnv().toSink()` from `@agentpond/google`, and Vercel infrastructure can use `VercelBlobObjectStore.fromRuntimeEnv().toSink()` from `@agentpond/vercel`. Firebase Functions should use `createHttpIngestFunction` with `pathPrefix` and a GCS sink to strip Firebase function URL prefixes and write to the configured object store. These handlers expose the same Langfuse-compatible ingestion endpoints.
+For serverless deployments, AWS infrastructure can use `lambdaIngestHandler` and `S3ObjectStore.fromRuntimeEnv()` from `@agentpond/aws`, Google infrastructure can use `httpIngestFunction`, `createHttpIngestFunction`, and `GcsObjectStore.fromRuntimeEnv()` from `@agentpond/google`, Firebase Functions can use `createFirebaseIngestFunction()` from `@agentpond/firebase`, and Vercel infrastructure can use `VercelBlobObjectStore.fromRuntimeEnv().toSink()` from `@agentpond/vercel`. These handlers expose the same Langfuse-compatible ingestion endpoints. For Firebase Functions, configure the application SDK `LANGFUSE_BASE_URL` with the exported function endpoint, for example `https://<region>-<project>.cloudfunctions.net/telemetryIngest/api/public/otel/v1/traces`.

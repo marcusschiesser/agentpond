@@ -9,9 +9,11 @@ import {
 	cacheForRead,
 	commandContext,
 	type GlobalOptions,
-	isDevEnvironment,
 } from "../command-support.js";
-import { objectStoreForConfig } from "../object-store.js";
+import {
+	objectStorageForConfig,
+	usesAgentPondDevServer,
+} from "../object-store.js";
 import { manualTraceResourceSpans } from "../otel-trace.js";
 import { sql } from "../sql.js";
 import { writeOtelAndSyncCache } from "../sync-write.js";
@@ -114,7 +116,7 @@ export async function createTrace(
 	const now = new Date().toISOString();
 	const traceId = stringFlag(options, "id") ?? createOtelTraceId();
 	const resourceSpans = manualTraceResourceSpans(options, traceId, now);
-	if (isDevEnvironment(config)) {
+	if (usesAgentPondDevServer(config)) {
 		const result = await new DuckDbIngestionSink(
 			config.dbPath,
 		).writeOtelResourceSpans({
@@ -125,8 +127,8 @@ export async function createTrace(
 		print({ traceId, ...result }, json);
 		return;
 	}
-	const store = objectStoreForConfig(config);
-	const object = await writeOtelAndSyncCache(config, store, resourceSpans);
+	const storage = await objectStorageForConfig(config);
+	const object = await writeOtelAndSyncCache(config, storage, resourceSpans);
 	print({ traceId, object }, json);
 }
 

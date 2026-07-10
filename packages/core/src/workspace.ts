@@ -2,11 +2,18 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 export function agentPondWorkspaceRoot(cwd = process.cwd()): string {
+	return findAncestorDirectory(cwd, isWorkspaceRoot) ?? cwd;
+}
+
+export function findAncestorDirectory(
+	cwd: string,
+	matches: (dir: string) => boolean,
+): string | undefined {
 	let dir = cwd;
 	for (;;) {
-		if (isWorkspaceRoot(dir)) return dir;
+		if (matches(dir)) return dir;
 		const parent = dirname(dir);
-		if (parent === dir) return cwd;
+		if (parent === dir) return undefined;
 		dir = parent;
 	}
 }
