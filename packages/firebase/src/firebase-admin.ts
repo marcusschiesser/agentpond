@@ -1,6 +1,11 @@
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import type { AppOptions, getApps, initializeApp } from "firebase-admin/app";
+import type {
+	App,
+	AppOptions,
+	getApps,
+	initializeApp,
+} from "firebase-admin/app";
 import type {
 	Storage as FirebaseAdminStorage,
 	getStorage,
@@ -16,6 +21,35 @@ export type FirebaseStorage = FirebaseAdminStorage;
 export type FirebaseAdminModuleResolutionOptions = {
 	moduleDirectories?: readonly string[];
 };
+
+export type InitializedFirebaseAppConfig = {
+	projectId: string;
+	storageBucket: string;
+};
+
+export function configForInitializedFirebaseApp(
+	resolution?: FirebaseAdminModuleResolutionOptions,
+): InitializedFirebaseAppConfig {
+	let firebaseApp: FirebaseAppModule;
+	try {
+		firebaseApp = requireFirebaseAdminApp(resolution);
+	} catch (error) {
+		throw new Error(
+			`createFirebaseSpanExporter() requires Firebase Admin. Install firebase-admin and call initializeApp() before creating the exporter. ${errorDetail(error)}`,
+			{ cause: error },
+		);
+	}
+
+	const app = firebaseApp
+		.getApps()
+		.find((existingApp) => existingApp.name === "[DEFAULT]");
+	if (!app) {
+		throw new Error(
+			"createFirebaseSpanExporter() requires the default Firebase app. Call initializeApp() before creating the exporter.",
+		);
+	}
+	return validatedInitializedAppConfig(app);
+}
 
 export function firebaseStorageForInitializedApp(
 	resolution?: FirebaseAdminModuleResolutionOptions,
@@ -71,6 +105,22 @@ function requireFirebaseAdminApp(
 		"firebase-admin/app",
 		resolution,
 	) as FirebaseAppModule;
+}
+
+function validatedInitializedAppConfig(
+	app: Pick<App, "options">,
+): InitializedFirebaseAppConfig {
+	const projectId = app.options.projectId;
+	if (!projectId) {
+		throw new Error("The initialized default Firebase app has no projectId");
+	}
+	const storageBucket = app.options.storageBucket;
+	if (!storageBucket) {
+		throw new Error(
+			"The initialized default Firebase app has no storageBucket",
+		);
+	}
+	return { projectId, storageBucket };
 }
 
 function requireFirebaseAdminModule(

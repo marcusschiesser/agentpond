@@ -1,6 +1,6 @@
 ---
 name: agentpond
-description: Work with AgentPond trace analytics. Use when needing to inspect traces, observations, sessions, or scores (e.g. annotations), run local SQL analysis, switch AgentPond environments, start the local dev ingestion server, or configure Langfuse-compatible SDK ingestion into AgentPond.
+description: Work with AgentPond trace analytics. Use when needing to inspect traces, observations, sessions, or scores (e.g. annotations), run local SQL analysis, switch AgentPond environments, start the local dev ingestion server, or configure SDK trace export into AgentPond through ingestion or direct object storage.
 allowed-tools:
   - Bash(npx agentpond --help *)
   - Bash(npx agentpond --version *)
@@ -41,7 +41,7 @@ Follow these principles for AgentPond work:
 
 - CLI usage and configuration: [references/cli.md](references/cli.md)
 - DuckDB tables and SQL examples: [references/duckdb-schema.md](references/duckdb-schema.md)
-- Langfuse SDK ingestion into AgentPond: [references/instrumentation.md](references/instrumentation.md)
+- SDK trace export into AgentPond: [references/instrumentation.md](references/instrumentation.md)
 - Trace investigation and error analysis: [references/error-analysis.md](references/error-analysis.md)
 
 ## AgentPond CLI
@@ -120,7 +120,7 @@ Run SQL against the local DuckDB cache:
 npx agentpond sql "select id, name, session_id, total_cost from traces order by start_time desc limit 10"
 ```
 
-## Langfuse-Compatible Ingestion
+## SDK Trace Export
 
 For local development, start the dev ingestion server:
 
@@ -128,7 +128,9 @@ For local development, start the dev ingestion server:
 npx agentpond dev
 ```
 
-This selects the `dev` environment and writes directly to `.agentpond/envs/dev/cache.duckdb` in the current workspace root, or current directory outside a workspace. Keep the process running while SDKs send traces.
+Only use this server for the HTTP ingestion path. Applications using `AgentPondSpanExporter` to write directly to object storage do not run `agentpond dev`.
+
+The command selects the `dev` environment and writes directly to `.agentpond/envs/dev/cache.duckdb` in the current workspace root, or current directory outside a workspace. Keep the process running while SDKs send traces.
 
 If the default port `4318` is already in use, `npx agentpond dev` automatically tries the next open port. Only one dev server can run per AgentPond directory, and `npx agentpond env get dev` returns SDK environment values for that running server. If no dev server is running, `env get dev` fails.
 
@@ -157,5 +159,7 @@ export LANGFUSE_SECRET_KEY=sk-agentpond-dev
 Use `npx agentpond env get dev --otel` for only OpenTelemetry variables and `npx agentpond env get dev --langfuse` for only Langfuse-compatible variables.
 
 These variables configure SDK ingestion. They are not credentials for using the AgentPond CLI to query Langfuse Cloud. The AgentPond CLI reads from object storage and the local DuckDB cache.
+
+For Node.js deployments that already have object-store write access, `AgentPondSpanExporter` from `@agentpond/otel` can bypass the ingestion service. Inject the selected AgentPond `ObjectStore` and matching project id, pass the exporter to `LangfuseSpanProcessor({ exporter })` or a standard OpenTelemetry span processor, and sync the same bucket and prefix with the CLI. In Firebase, call `createFirebaseSpanExporter()` after `initializeApp()` to derive the default app's project id and storage bucket automatically. This direct path exports spans and traces only; scores and other Langfuse client API calls still need an API endpoint or AgentPond CLI commands. Read `references/instrumentation.md` for the exact setup.
 
 For serverless deployments, AWS infrastructure can use `lambdaIngestHandler` and `S3ObjectStore.fromRuntimeEnv()` from `@agentpond/aws`, Google infrastructure can use `httpIngestFunction`, `createHttpIngestFunction`, and `GcsObjectStore.fromRuntimeEnv()` from `@agentpond/google`, Firebase Functions can use `createFirebaseIngestFunction()` from `@agentpond/firebase`, and Vercel infrastructure can use `VercelBlobObjectStore.fromRuntimeEnv().toSink()` from `@agentpond/vercel`. These handlers expose the same Langfuse-compatible ingestion endpoints. For Firebase Functions, configure the application SDK `LANGFUSE_BASE_URL` with the exported function endpoint, for example `https://<region>-<project>.cloudfunctions.net/telemetryIngest/api/public/otel/v1/traces`.

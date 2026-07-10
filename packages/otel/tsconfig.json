@@ -5,11 +5,6 @@
 		"rootDir": "src",
 		"outDir": "dist"
 	},
-	"references": [
-		{ "path": "../core" },
-		{ "path": "../google" },
-		{ "path": "../ingest" },
-		{ "path": "../otel" }
-	],
+	"references": [{ "path": "../core" }],
 	"include": ["src/**/*.ts"]
 }

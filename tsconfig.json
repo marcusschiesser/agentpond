@@ -2,6 +2,7 @@
 	"files": [],
 	"references": [
 		{ "path": "./packages/core" },
+		{ "path": "./packages/otel" },
 		{ "path": "./packages/aws" },
 		{ "path": "./packages/firebase" },
 		{ "path": "./packages/google" },
