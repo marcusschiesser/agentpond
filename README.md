@@ -38,6 +38,7 @@ This gives you durable remote storage without requiring an always-on analytical 
 ## Features
 
 - Langfuse-compatible ingestion endpoints for SDK and OTLP traces
+- Direct Node.js OpenTelemetry export to object storage without an ingestion service
 - Use AWS S3, Google Cloud Storage, Vercel Blob or local filesystem as raw event storage
 - UTC bucket discovery and incremental synchronization
 - Local DuckDB cache containing:
@@ -114,7 +115,9 @@ Each scenario README includes prerequisites and run commands.
 
 ## Use AgentPond in your project
 
-To use AgentPond in your project, your app sends traces to an AgentPond server, and your coding agent uses the AgentPond CLI to analyze those traces.
+This walkthrough uses the AgentPond ingestion service: your app sends traces to the service, and your coding agent uses the AgentPond CLI to analyze them.
+
+As an alternative, Node.js applications can skip the ingestion service and write spans directly to object storage. See [Direct OpenTelemetry object-store export](./docs/direct-object-store-export.md) for that setup.
 
 ### Sending traces
 
@@ -139,7 +142,7 @@ For complete examples, see the [LLM compliance workflow](./examples/llm-complian
 
 ### Storing traces
 
-AgentPond provides a local ingestion server, so you can receive traces for your development environment. To start it, just call:
+AgentPond provides a local ingestion server for receiving development traces. To start it, call:
 
 ```sh
 agentpond dev
@@ -172,7 +175,7 @@ Analyze why the last agent run for user 32423 did not return a result
 
 AgentPond keeps data separated by your deployment environment (e.g. dev, staging, prod).
 
-For staging and production services, deploy the AgentPond ingestion service together with an object store in your infrastructure. Docker images are published to `ghcr.io/marcusschiesser/agentpond`, and [docker-compose.yml](./docker-compose.yml) provides a template that you can run locally with `docker compose up`. See [Deployment](./docs/deployment.md) for real AWS, Google Cloud, Vercel Blob, and other infrastructure options.
+For staging and production, deploy the AgentPond ingestion service with an object store in your infrastructure. Docker images are published to `ghcr.io/marcusschiesser/agentpond`, and [docker-compose.yml](./docker-compose.yml) provides a template that you can run locally with `docker compose up`. See [Deployment](./docs/deployment.md) for real AWS, Google Cloud, Vercel Blob, Firebase, and other infrastructure options.
 
 To point AgentPond to this service, call the `env init` command in your project:
 

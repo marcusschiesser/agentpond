@@ -1,15 +1,46 @@
 # Deployment
 
-Deploy the AgentPond ingestion service together with an object store of your choice (e.g. AWS S3) in your infrastructure. 
+AgentPond supports two deployment modes. Choose the one that matches how the application can access object storage:
 
-All deployment targets expose the same Langfuse-compatible ingestion endpoints:
+1. **Direct object-store export:** the application writes spans to object storage with `@agentpond/otel`. No AgentPond server is deployed or run.
+2. **HTTP ingestion:** the application sends OTLP or Langfuse-compatible requests to an AgentPond container or serverless function, which writes to object storage.
 
-- `POST /api/public/ingestion` accepts non-OTEL Langfuse-compatible ingestion 
+## Direct OpenTelemetry Export
+
+Node.js applications that can hold object-store write credentials may use `AgentPondSpanExporter` from `@agentpond/otel` instead of deploying an ingestion service. Inject an `ObjectStore` from `@agentpond/aws`, `@agentpond/google`, `@agentpond/vercel`, `@agentpond/firebase`, or `@agentpond/core`, and configure the exporter with the same project id and prefix used by the CLI environment.
+
+The direct-export data flow is:
+
+```text
+Node.js application -> object storage -> agentpond sync -> local DuckDB
+```
+
+In this mode, do not deploy an AgentPond container or ingestion function, and do not run `agentpond dev`. The `agentpond dev` command is only a local HTTP ingestion server; it is not part of direct object-store export.
+
+See [Direct OpenTelemetry Object-Store Export](./direct-object-store-export.md) for installation and Langfuse and OpenInference examples.
+
+For Langfuse instrumentation, pass the exporter as `new LangfuseSpanProcessor({ exporter })`. For OpenInference or other standard OpenTelemetry instrumentation, use it as the Node SDK's `traceExporter` or wrap it in an OpenTelemetry span processor. The exporter stores OTLP JSON resource spans under the existing `otel/<project-id>/...` layout, so `agentpond sync` reads them without any CLI or storage migration.
+
+This path exports spans and traces only. Scores and other Langfuse client API operations still require a compatible API endpoint or AgentPond CLI commands. Because the application writes directly to storage, protect provider credentials as application secrets and grant only the bucket permissions it needs.
+
+## HTTP Ingestion Service
+
+Use HTTP ingestion when the application cannot hold object-store credentials, is not running Node.js, or needs Langfuse-compatible API operations in addition to span export.
+
+The ingestion data flow is:
+
+```text
+Application -> AgentPond HTTP service -> object storage -> agentpond sync -> local DuckDB
+```
+
+All HTTP ingestion targets expose the same Langfuse-compatible endpoints:
+
+- `POST /api/public/ingestion` accepts non-OTEL Langfuse-compatible events such as scores.
 - `POST /api/public/otel/v1/traces` accepts OTLP trace export payloads as JSON, gzip JSON, or protobuf.
 
-non-OTEL is just used for sending scores, traces are send via the OLTP endpoint.
+The URL of the deployed ingestion service becomes the `LANGFUSE_BASE_URL` used by the Langfuse SDK. Requests are authenticated with the `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` configured in the deployment.
 
-The URL of the deployed ingestion service becomes the `LANGFUSE_BASE_URL` used by the Langfuse SDK in your application. The access will be authenticated by the `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` values that you configure in your deployment.
+The provider sections below describe HTTP ingestion deployments backed by each object store. Direct exporters use the corresponding object-store adapter without deploying these containers or functions.
 
 ## AWS
 

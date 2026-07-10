@@ -26,6 +26,7 @@ type PackageManifest = {
 
 const publishablePackages = [
 	"packages/core",
+	"packages/otel",
 	"packages/ingest",
 	"packages/fastify-ingest",
 	"packages/aws",

@@ -1,0 +1,43 @@
+{
+	"name": "@agentpond/otel",
+	"version": "0.0.0",
+	"description": "OpenTelemetry exporter for writing AgentPond traces directly to object storage",
+	"license": "MIT",
+	"type": "module",
+	"files": [
+		"dist"
+	],
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/marcusschiesser/agentpond.git",
+		"directory": "packages/otel"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"dependencies": {
+		"@agentpond/core": "workspace:*",
+		"@opentelemetry/core": "^2.9.0",
+		"@opentelemetry/otlp-transformer": "^0.220.0",
+		"@opentelemetry/sdk-trace-base": "^2.9.0"
+	},
+	"devDependencies": {
+		"@arizeai/openinference-core": "^2.4.0",
+		"@langfuse/otel": "^5.4.1",
+		"@langfuse/tracing": "^5.4.1",
+		"@opentelemetry/api": "^1.9.0",
+		"@opentelemetry/exporter-trace-otlp-http": "^0.220.0",
+		"@opentelemetry/resources": "^2.9.0",
+		"@opentelemetry/sdk-node": "^0.220.0"
+	},
+	"peerDependencies": {
+		"@opentelemetry/api": ">=1.3.0 <1.10.0"
+	}
+}

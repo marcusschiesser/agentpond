@@ -15,6 +15,8 @@ AgentPond also supports a small mapper set for common framework telemetry:
 - OpenInference `openinference.span.kind` maps supported values such as `LLM`, `CHAIN`, `TOOL`, and `EMBEDDING` to AgentPond observation event types.
 - Vercel AI SDK `operation.name` or `ai.operationId` maps tool calls to `tool-create`, and generation or embedding operations to their matching event types when model information is present.
 
+These mappings apply identically whether resource spans arrive through an OTLP ingestion endpoint or through `AgentPondSpanExporter` writing directly to object storage.
+
 Currently, for Vercel AI SDK, prefer the Langfuse SDK integration path: enable AI SDK telemetry and use `@langfuse/otel` / `@langfuse/tracing` to emit Langfuse-compatible telemetry where possible.
 
 ## Rationale
