@@ -26,8 +26,8 @@ export function registerObservationsCommand(program: Command): void {
 		.option("--limit <n>", "maximum row count", "100")
 		.action(async (options: ObservationListOptions, command: Command) => {
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
-			const { config, json } = commandContext(globalOptions);
-			const db = cacheForRead(config);
+			const { context, json } = commandContext(globalOptions);
+			const db = cacheForRead(context.config);
 			try {
 				const rows = await db.query(
 					// Keep this query chronological and cheap. A full parent-before-child tree

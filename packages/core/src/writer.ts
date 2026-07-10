@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { ObjectStore } from "./object-store.js";
+import type { AgentPondStorageContext } from "./object-store.js";
 import type { EntityType, IngestionEvent } from "./schemas.js";
 import { bodyIdForEvent, entityTypeForEvent } from "./schemas.js";
 import { utcMinutePath } from "./time.js";
@@ -26,9 +26,10 @@ export type OtelStorageObject = {
 	spanCount: number;
 };
 
-export type AcceptedEventWriterOptions = {
-	store: ObjectStore;
-	projectId: string;
+export type AcceptedEventWriterOptions = Omit<
+	AgentPondStorageContext,
+	"prefix"
+> & {
 	prefix?: string;
 };
 

@@ -9,3 +9,9 @@ export type ObjectStore = {
 	getJson<T>(key: string): Promise<T>;
 	listKeys(prefix: string): Promise<string[]>;
 };
+
+export type AgentPondStorageContext = {
+	store: ObjectStore;
+	projectId: string;
+	prefix: string;
+};

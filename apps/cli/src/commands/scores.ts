@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
-	type AgentPondConfig,
+	type AgentPondEnvironmentContext,
 	eventTypes,
 	type IngestionEvent,
 } from "@agentpond/core";
@@ -14,10 +14,6 @@ import {
 	commandContext,
 	type GlobalOptions,
 } from "../command-support.js";
-import {
-	objectStorageForConfig,
-	usesAgentPondDevServer,
-} from "../object-store.js";
 import { sql } from "../sql.js";
 import { writeEventsAndSyncCache } from "../sync-write.js";
 
@@ -56,10 +52,10 @@ export function registerScoresCommand(program: Command): void {
 		.option("--source <source>", "score source", "API")
 		.option("--comment <comment>", "score comment")
 		.action(async (options: ScoreCreateOptions, command: Command) => {
-			const { config, json } = commandContext(
+			const { context, json } = commandContext(
 				command.optsWithGlobals<GlobalOptions>(),
 			);
-			return createScore(options, config, json);
+			return createScore(options, context, json);
 		});
 
 	addGlobalOptions(scores.command("list"))
@@ -68,10 +64,10 @@ export function registerScoresCommand(program: Command): void {
 		.option("--observationId <observation-id>", "observation id")
 		.option("--limit <n>", "maximum row count", "100")
 		.action(async (options: ScoreOptions, command: Command) => {
-			const { config, json } = commandContext(
+			const { context, json } = commandContext(
 				command.optsWithGlobals<GlobalOptions>(),
 			);
-			const db = cacheForRead(config);
+			const db = cacheForRead(context.config);
 			try {
 				const rows = await readScoreCommand(db, "list", options);
 				return print(rows, json);
@@ -104,9 +100,10 @@ async function readScoreCommand(
 
 export async function createScore(
 	options: ScoreCreateOptions,
-	config: AgentPondConfig,
+	context: AgentPondEnvironmentContext,
 	json: boolean,
 ): Promise<void> {
+	const { config } = context;
 	assertDevServerNotRunning(config);
 	const source = stringFlag(options, "source") ?? "API";
 	if (source === "EVAL") {
@@ -143,7 +140,7 @@ export async function createScore(
 		},
 	};
 
-	if (usesAgentPondDevServer(config)) {
+	if (context.usesAgentPondDevServer) {
 		const result = await new DuckDbIngestionSink(config.dbPath).writeEvents({
 			projectId: config.projectId,
 			events: [event],
@@ -152,7 +149,7 @@ export async function createScore(
 		print({ eventId: event.id, scoreId: event.body.id, ...result }, json);
 		return;
 	}
-	const storage = await objectStorageForConfig(config);
+	const storage = await context.resolveStorage();
 	const manifest = await writeEventsAndSyncCache(config, storage, [event]);
 	print(
 		{ eventId: event.id, scoreId: event.body.id, objects: manifest.objects },

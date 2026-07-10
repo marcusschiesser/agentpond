@@ -1,4 +1,8 @@
-import { manifestPrefix, type ObjectStore, otelPrefix } from "@agentpond/core";
+import {
+	type AgentPondStorageContext,
+	manifestPrefix,
+	otelPrefix,
+} from "@agentpond/core";
 import {
 	bucketScanWindowFromState,
 	currentBucketScanWindow,
@@ -15,12 +19,11 @@ export type SyncStateStore = {
 	listKeysForScanWindow(source: SyncStateSource): Promise<string[]>;
 };
 
-export function createSyncStateStore(params: {
-	store: ObjectStore;
-	prefix: string;
-	projectId: string;
-	db: DuckDbOperations;
-}): SyncStateStore {
+export function createSyncStateStore(
+	params: AgentPondStorageContext & {
+		db: DuckDbOperations;
+	},
+): SyncStateStore {
 	const scanWindow = currentBucketScanWindow();
 	return {
 		async getLastFinalized(source) {

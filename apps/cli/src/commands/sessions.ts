@@ -23,10 +23,10 @@ export function registerSessionsCommand(program: Command): void {
 		.description("list recent sessions")
 		.option("--limit <n>", "maximum row count", "100")
 		.action(async (options: SessionListOptions, command: Command) => {
-			const { config, json } = commandContext(
+			const { context, json } = commandContext(
 				command.optsWithGlobals<GlobalOptions>(),
 			);
-			const db = cacheForRead(config);
+			const db = cacheForRead(context.config);
 			try {
 				const rows = await db.query(
 					`SELECT * FROM sessions ORDER BY last_seen_at DESC LIMIT ${limit(options)}`,
@@ -46,10 +46,10 @@ export function registerSessionsCommand(program: Command): void {
 				command: Command,
 			) => {
 				if (!id) throw new CliError("Missing session id");
-				const { config, json } = commandContext(
+				const { context, json } = commandContext(
 					command.optsWithGlobals<GlobalOptions>(),
 				);
-				const db = cacheForRead(config);
+				const db = cacheForRead(context.config);
 				try {
 					const rows = await db.query(
 						`SELECT * FROM sessions WHERE id = ${sql(id)} LIMIT 1`,

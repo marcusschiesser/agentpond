@@ -18,10 +18,10 @@ export function registerSqlCommand(program: Command): void {
 			) => {
 				const query = queryParts.join(" ");
 				if (!query) throw new CliError("Missing SQL query");
-				const { config, json } = commandContext(
+				const { context, json } = commandContext(
 					command.optsWithGlobals<GlobalOptions>(),
 				);
-				const db = cacheForRead(config);
+				const db = cacheForRead(context.config);
 				try {
 					const rows = await db.query(query);
 					return print(rows, json);

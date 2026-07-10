@@ -15,6 +15,7 @@ import {
 	firebaseAuthFromRuntimeEnv,
 	firebaseCliProjectConfigFromCwd,
 	firebaseCliProjectConfigFromCwdIfAvailable,
+	firebaseEnvironmentContextFromCwdIfAvailable,
 	firebaseFunctionsSourceDirectories,
 	isFirebaseProjectDirectory,
 } from "../src/index.js";
@@ -191,6 +192,31 @@ test("Firebase CLI project config rejects Firebase roots without project ids", (
 		() => firebaseCliProjectConfigFromCwd(cwd, {}),
 		/Could not determine Firebase project id/,
 	);
+});
+
+test("Firebase environment context owns storage and dev behavior", async () => {
+	const originalEnv = saveEnv(FIREBASE_ENV_KEYS);
+	try {
+		process.env.AGENTPOND_STORE = "invalid-project-store";
+		process.env.AGENTPOND_PREFIX = "ignored-prefix";
+		await withFakeFirebaseProject(new Map(), async ({ root }) => {
+			const context = firebaseEnvironmentContextFromCwdIfAvailable({
+				cwd: root,
+				envName: "dev",
+			});
+			assert.ok(context);
+			assert.equal(context.kind, "firebase");
+			assert.equal(context.rootDir, root);
+			assert.equal(context.config.environment?.name, "dev");
+			assert.equal(context.usesAgentPondDevServer, false);
+
+			const storage = await context.resolveStorage();
+			assert.equal(storage.projectId, "demo-project");
+			assert.equal(storage.prefix, "agentpond/");
+		});
+	} finally {
+		restoreEnv(originalEnv);
+	}
 });
 
 test("Firebase CLI store reads the default bucket from the initialized project", async () => {
@@ -737,6 +763,7 @@ function createResponse() {
 const FIREBASE_ENV_KEYS = [
 	"AGENTPOND_FIREBASE_STORAGE_BUCKET",
 	"AGENTPOND_PREFIX",
+	"AGENTPOND_STORE",
 	"FUNCTIONS_EMULATOR",
 ] as const;
 

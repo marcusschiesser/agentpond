@@ -1,10 +1,13 @@
 ---
 "agentpond": patch
 "@agentpond/aws": patch
-"@agentpond/core": patch
+"@agentpond/core": patch 
+"@agentpond/duckdb": patch
 "@agentpond/firebase": patch
 "@agentpond/google": patch
 "@agentpond/ingest": patch
 ---
 
-Add zero-config support for Firebase: Firebase optimized ingest function and storage (using the storage bucket assigned to the project, so no new infrastructure needed). Includes auto-detection of Firebase environments (works also for monorepos).
+Add zero-config Firebase ingestion and storage with monorepo detection, and unify CLI storage behavior behind environment contexts.
+
+Breaking: `AgentPondEnvironment` no longer exposes `storeType`; storage selection is resolved separately when an object store is needed.

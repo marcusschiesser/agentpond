@@ -110,6 +110,7 @@ GCS environments use `AGENTPOND_STORE=gcs`, `AGENTPOND_GCS_BUCKET`, and optional
 
 Agentpond automatically detects the [Cloud Storage](https://firebase.google.com/docs/storage) used by your Firebase project and uses it to store and read traces.
 It loads your `firebase.json` file for configuration and finds the `firebase-admin` package in your project to access the store (make sure the package exists).
+When Firebase is detected, it always owns trace storage: `AGENTPOND_STORE`, backend-specific storage settings, and `AGENTPOND_PREFIX` do not override Firebase Storage or its fixed `agentpond/` prefix.
 
 ### Vercel Blob Store
 

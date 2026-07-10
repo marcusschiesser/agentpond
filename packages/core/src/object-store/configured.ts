@@ -1,8 +1,13 @@
-import { type AgentPondConfig, configFromRuntimeEnv } from "../config.js";
+import {
+	type AgentPondConfig,
+	configFromRuntimeEnv,
+	envValue,
+} from "../config.js";
 import type {
 	AgentPondEnvironment,
 	AgentPondStoreType,
 } from "../environment.js";
+import { parseEnvFile } from "../environment.js";
 import { FileSystemObjectStore } from "./filesystem.js";
 import { type IngestionSink, sinkFromStore } from "./ingestion-handler.js";
 import type { ObjectStore } from "./types.js";
@@ -25,7 +30,7 @@ export function objectStoreForConfig(
 	config: AgentPondConfig,
 	factories: ConfiguredObjectStoreFactories,
 ): ObjectStore {
-	const storeType = config.environment?.storeType ?? "local";
+	const storeType = configuredStoreType(config.environment);
 	const configuredFactories = {
 		local: FileSystemObjectStore.fromEnvironment,
 		...factories,
@@ -34,6 +39,31 @@ export function objectStoreForConfig(
 	if (factory) return factory(config.environment);
 
 	throw new Error(`No object-store factory configured for "${storeType}"`);
+}
+
+function configuredStoreType(
+	environment: AgentPondEnvironment | undefined,
+): AgentPondStoreType {
+	if (!environment) return "local";
+	const env = envValue(parseEnvFile(environment.envFilePath));
+	return storeTypeFromValue(env("AGENTPOND_STORE")) ?? "s3";
+}
+
+function storeTypeFromValue(
+	value: string | undefined,
+): AgentPondStoreType | undefined {
+	if (value === undefined) return undefined;
+	if (
+		value === "local" ||
+		value === "s3" ||
+		value === "gcs" ||
+		value === "vercel"
+	) {
+		return value;
+	}
+	throw new Error(
+		`AGENTPOND_STORE must be "local", "s3", "gcs", or "vercel", got "${value}"`,
+	);
 }
 
 export function sinkForConfig(

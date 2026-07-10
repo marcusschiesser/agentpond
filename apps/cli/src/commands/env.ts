@@ -11,17 +11,14 @@ import {
 import { select } from "@inquirer/prompts";
 import type { Command } from "commander";
 import { CliError, print } from "../cli-support.js";
-import {
-	addGlobalOptions,
-	environmentCwdForCommand,
-	type GlobalOptions,
-} from "../command-support.js";
+import { addGlobalOptions, type GlobalOptions } from "../command-support.js";
 import {
 	devSdkEnvironment,
 	type EnvFamily,
 	type EnvVar,
 	filterEnvEntries,
 } from "../dev-env.js";
+import { environmentContextForCommand } from "../environment-context.js";
 
 export type SelectPrompt<T extends string> = (config: {
 	message: string;
@@ -55,10 +52,10 @@ export function registerEnvCommand(
 		.description("print the selected environment")
 		.action((_commandOptions: EnvOptions, command: Command) => {
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
-			const environment = resolveAgentPondEnvironment({
-				cwd: environmentCwdForCommand(),
-				name: globalOptions.env,
-			});
+			const environment = environmentContextForCommand({
+				envName: globalOptions.env,
+			}).config.environment;
+			if (!environment) throw new CliError("Missing environment configuration");
 			if (globalOptions.json) {
 				return print(environment, true);
 			}
@@ -70,18 +67,19 @@ export function registerEnvCommand(
 		.option("--langfuse", "print only Langfuse-compatible SDK exports")
 		.option("--otel", "print only OpenTelemetry SDK exports")
 		.action((name: string, commandOptions: EnvOptions) => {
-			printEnvironmentExports(name, commandOptions);
+			const context = environmentContextForCommand({ envName: name });
+			printEnvironmentExports(name, commandOptions, context.rootDir);
 		});
 
 	addGlobalOptions(env.command("list"))
 		.description("list local environments")
 		.action((_commandOptions: EnvOptions, command: Command) => {
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
-			const cwd = environmentCwdForCommand();
-			const selected = resolveAgentPondEnvironment({
-				cwd,
-				name: globalOptions.env,
-			}).name;
+			const context = environmentContextForCommand({
+				envName: globalOptions.env,
+			});
+			const cwd = context.rootDir;
+			const selected = context.config.environment?.name ?? "dev";
 			const names = listAgentPondEnvironments(cwd);
 			const rows = (names.length > 0 ? names : [selected]).map((name) => ({
 				name,
@@ -95,11 +93,17 @@ export function registerEnvCommand(
 		.option("--store <store>", "object store: s3, gcs, vercel, or local")
 		.action(
 			async (name: string, commandOptions: EnvOptions, command: Command) => {
+				const context = environmentContextForCommand({ envName: name });
+				if (context.kind !== "agentpond") {
+					throw new CliError(
+						`agentpond env init is not available for ${context.kind} projects; the project environment is detected automatically`,
+					);
+				}
 				const store =
 					storeFromValue(commandOptions.store) ??
 					(await promptForStore(promptStore));
 				const environment = initAgentPondEnvironment(name, {
-					cwd: environmentCwdForCommand(),
+					cwd: context.rootDir,
 					storeType: store,
 				});
 				return print(
@@ -122,10 +126,12 @@ export function registerEnvCommand(
 				_commandOptions: EnvOptions,
 				command: Command,
 			) => {
+				const context = environmentContextForCommand({ envName: name });
 				const selectedName =
-					name ?? (await promptForEnvironmentName(promptSelect));
+					name ??
+					(await promptForEnvironmentName(promptSelect, context.rootDir));
 				const environment = selectAgentPondEnvironment(selectedName, {
-					cwd: environmentCwdForCommand(),
+					cwd: context.rootDir,
 				});
 				return print(
 					{ selected: environment.name },
@@ -171,11 +177,11 @@ async function promptForStore(
 
 async function promptForEnvironmentName(
 	promptSelect: SelectEnvironmentPrompt,
+	cwd: string,
 ): Promise<string> {
 	if (!process.stdin.isTTY || !process.stdout.isTTY) {
 		throw new CliError("Missing environment name");
 	}
-	const cwd = environmentCwdForCommand();
 	const current = resolveAgentPondEnvironment({ cwd });
 	const names = listAgentPondEnvironments(cwd);
 	const choices = (names.length > 0 ? names : [current.name]).map((name) => ({
@@ -188,20 +194,27 @@ async function promptForEnvironmentName(
 	});
 }
 
-function printEnvironmentExports(name: string, options: EnvOptions): void {
+function printEnvironmentExports(
+	name: string,
+	options: EnvOptions,
+	cwd: string,
+): void {
 	const family = envFamilyFromOptions(options);
 	const entries =
 		name === "dev"
-			? devSdkEnvironmentForCurrentServer(family)
-			: filterEnvEntries(readEnvironmentFileExports(name), family);
+			? devSdkEnvironmentForCurrentServer(family, cwd)
+			: filterEnvEntries(readEnvironmentFileExports(name, cwd), family);
 	for (const entry of entries) {
 		console.log(`export ${entry.key}=${shellValue(entry.value)}`);
 	}
 }
 
-function devSdkEnvironmentForCurrentServer(family: EnvFamily): EnvVar[] {
+function devSdkEnvironmentForCurrentServer(
+	family: EnvFamily,
+	cwd: string,
+): EnvVar[] {
 	const environment = resolveAgentPondEnvironment({
-		cwd: environmentCwdForCommand(),
+		cwd,
 		name: "dev",
 	});
 	const lock = readDevServerLock(environment);
@@ -222,9 +235,9 @@ function envFamilyFromOptions(options: EnvOptions): EnvFamily {
 	return "all";
 }
 
-function readEnvironmentFileExports(name: string): EnvVar[] {
+function readEnvironmentFileExports(name: string, cwd: string): EnvVar[] {
 	const environment = resolveAgentPondEnvironment({
-		cwd: environmentCwdForCommand(),
+		cwd,
 		name,
 	});
 	if (!existsSync(environment.envFilePath)) {
