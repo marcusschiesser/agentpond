@@ -16,7 +16,7 @@
 		"lint": "biome lint . --files-ignore-unknown=true",
 		"biome:ci": "biome ci . --files-ignore-unknown=true",
 		"prepare": "husky",
-		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts && pnpm -r --filter './apps/*' --filter './packages/*' --if-present test",
+		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts && pnpm -r --filter './apps/**' --reporter=append-only --if-present test && pnpm -r --filter './packages/**' --reporter=append-only --if-present test",
 		"typecheck": "tsc --noEmit --pretty false",
 		"changeset": "changeset",
 		"version-packages": "changeset version",
@@ -40,6 +40,6 @@
 		"jscpd": "^5.0.11",
 		"tsup": "^8.5.1",
 		"tsx": "^4.21.0",
-		"typescript": "^5.9.3"
+		"typescript": "^7.0.2"
 	}
 }
