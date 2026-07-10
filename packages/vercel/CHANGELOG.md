@@ -1,5 +1,15 @@
 # @agentpond/vercel
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [59084e9]
+- Updated dependencies [d00fb6a]
+- Updated dependencies [871339c]
+  - @agentpond/core@0.4.1
+  - @agentpond/ingest@0.3.4
+
 ## 0.4.0
 
 ### Minor Changes
