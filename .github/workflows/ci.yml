@@ -46,3 +46,43 @@ jobs:
 
       - name: Run tests
         run: pnpm test
+
+  cli-node-22:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.7.0
+
+      - name: Setup Node.js for installation and build
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace
+        run: pnpm build
+
+      - name: Setup Node.js 22 runtime
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+
+      - name: Run CLI tests on Node.js 22
+        run: env NODE_ENV=test node --test --import tsx apps/cli/tests/*.test.ts
+
+      - name: Smoke test built CLI on Node.js 22
+        run: |
+          node apps/cli/dist/index.js --help
+          node apps/cli/dist/index.js --version

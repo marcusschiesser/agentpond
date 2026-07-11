@@ -11,6 +11,7 @@ import {
 	type SelectEnvironmentPrompt,
 	type SelectStorePrompt,
 } from "./commands/env.js";
+import { registerInitCommand, type SkillsInstaller } from "./commands/init.js";
 import { registerObservationsCommand } from "./commands/observations.js";
 import { registerScoresCommand } from "./commands/scores.js";
 import { registerSessionsCommand } from "./commands/sessions.js";
@@ -29,6 +30,7 @@ const packageJson = require("../package.json") as { version: string };
 export const CLI_VERSION = packageJson.version;
 
 export type ProgramOptions = {
+	installSkills?: SkillsInstaller;
 	selectEnvironment?: SelectEnvironmentPrompt;
 	selectStore?: SelectStorePrompt;
 	updateCheck?: CliUpdateCheckOptions | false;
@@ -38,7 +40,7 @@ export function createProgram(options: ProgramOptions = {}): Command {
 	const program = new Command();
 	program
 		.name("agentpond")
-		.description("local Langfuse-compatible trace analytics")
+		.description("Store agent traces remotely. Analyze them locally.")
 		.version(CLI_VERSION)
 		.showHelpAfterError()
 		.showSuggestionAfterError()
@@ -53,6 +55,7 @@ export function createProgram(options: ProgramOptions = {}): Command {
 		});
 
 	addGlobalOptions(program);
+	registerInitCommand(program, { installSkills: options.installSkills });
 	registerDevCommand(program);
 	registerEnvCommand(program, {
 		selectEnvironment: options.selectEnvironment,

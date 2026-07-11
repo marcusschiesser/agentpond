@@ -1,8 +1,8 @@
 # Direct OpenTelemetry Object-Store Export
 
-Node.js applications can skip the AgentPond ingestion service and write OpenTelemetry spans directly to the same object storage read by `agentpond sync`.
+Node.js applications can skip the AgentPond ingestion service and write OpenTelemetry spans directly to the same object storage read by `npx agentpond sync`.
 
-This path does not use an AgentPond server or `agentpond dev`. The application writes to object storage, and the CLI later reads that storage with `agentpond sync`.
+This path does not use an AgentPond server or `npx agentpond dev`. The application writes to object storage, and the CLI later reads that storage with `npx agentpond sync`.
 
 ## Install
 
@@ -71,25 +71,14 @@ The application needs write credentials for the selected object store. Provider-
 
 ### Firebase
 
-After initializing the default Firebase Admin app, use the Firebase factory instead of constructing the store and project configuration manually:
+Firebase users should start with `npx agentpond init`. The installed instrumentation skill owns the default-app, exporter, trusted-runtime, and Storage Rules workflow; see its [Firebase reference](../skills/agentpond-instrumentation/references/firebase.md).
 
-```ts
-import { createFirebaseSpanExporter } from "@agentpond/firebase";
-import { initializeApp } from "firebase-admin/app";
-
-initializeApp();
-const exporter = createFirebaseSpanExporter();
-```
-
-The factory derives `projectId` and `storageBucket` from the initialized app and uses the `agentpond/` prefix. Pass `{ prefix: "custom" }` to select a different prefix. Firebase environments outside Functions must initialize the default app with both options explicitly if they are not supplied by `FIREBASE_CONFIG`.
-
-Configure the AgentPond CLI with the same project, bucket, and prefix. After the application exports a trace, sync and inspect it:
+After the application exports a trace, select the Firebase project, sync, and inspect it:
 
 ```sh
-agentpond sync
-agentpond traces list --limit 25
-agentpond traces get <trace-id>
-agentpond observations list --traceId <trace-id>
+firebase use <alias-or-project-id>
+npx agentpond sync
+npx agentpond traces list --limit 25
 ```
 
 ## Scope

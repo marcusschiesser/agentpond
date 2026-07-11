@@ -21,7 +21,7 @@ function requireLangfuseEnv() {
 	if (missing.length > 0) {
 		throw new Error(
 			`Missing required Langfuse environment variables: ${missing.join(", ")}. ` +
-				'Run eval "$(agentpond env get dev)" before running this example.',
+				'Run eval "$(npx agentpond env get dev)" before running this example.',
 		);
 	}
 }
@@ -141,10 +141,10 @@ function printSummary(checkoutTraceId: string) {
 	console.log(`- generation costDetails total: ${COST_DETAILS.total}`);
 	console.log("");
 	console.log("Inspect checkout trace cost, observations, and scores:");
-	console.log("agentpond sync");
-	console.log(`agentpond traces get ${checkoutTraceId}`);
-	console.log(`agentpond observations list --traceId ${checkoutTraceId}`);
-	console.log(`agentpond scores list --traceId ${checkoutTraceId}`);
+	console.log("npx agentpond sync");
+	console.log(`npx agentpond traces get ${checkoutTraceId}`);
+	console.log(`npx agentpond observations list --traceId ${checkoutTraceId}`);
+	console.log(`npx agentpond scores list --traceId ${checkoutTraceId}`);
 }
 
 async function main() {

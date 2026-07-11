@@ -17,7 +17,7 @@ def require_langfuse_env():
     if missing:
         raise RuntimeError(
             f"Missing required Langfuse environment variables: {', '.join(missing)}. "
-            'Run eval "$(agentpond env get dev)" before running this example.'
+            'Run eval "$(npx agentpond env get dev)" before running this example.'
         )
 
 
@@ -47,8 +47,8 @@ def main():
     print(f"Added {EXPECTED_SCORE_NAME}={EXPECTED_SCORE_VALUE} to trace {trace_id}")
     print("")
     print("Inspect scores:")
-    print("agentpond sync")
-    print(f"agentpond scores list --traceId {trace_id}")
+    print("npx agentpond sync")
+    print(f"npx agentpond scores list --traceId {trace_id}")
 
 
 if __name__ == "__main__":

@@ -18,7 +18,8 @@ export function registerSyncCommand(program: Command): void {
 				return print(
 					{
 						skipped: true,
-						reason: "calling agentpond sync is not needed for agentpond dev",
+						reason:
+							"calling npx agentpond sync is not needed for npx agentpond dev",
 					},
 					json,
 				);

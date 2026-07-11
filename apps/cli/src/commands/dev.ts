@@ -94,7 +94,7 @@ export async function startDevServer(options: DevOptions): Promise<void> {
 	}
 	console.log("");
 	console.log(
-		'Or call `eval "$(agentpond env get dev)"` before calling your dev server.',
+		'Or call `eval "$(npx agentpond env get dev)"` before calling your dev server.',
 	);
 }
 

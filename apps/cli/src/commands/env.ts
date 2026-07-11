@@ -96,7 +96,7 @@ export function registerEnvCommand(
 				const context = environmentContextForCommand({ envName: name });
 				if (context.kind !== "agentpond") {
 					throw new CliError(
-						`agentpond env init is not available for ${context.kind} projects; the project environment is detected automatically`,
+						`npx agentpond env init is not available for ${context.kind} projects; the project environment is detected automatically`,
 					);
 				}
 				const store =
@@ -220,7 +220,7 @@ function devSdkEnvironmentForCurrentServer(
 	const lock = readDevServerLock(environment);
 	if (!lock?.host || !lock.port) {
 		throw new CliError(
-			"dev server is not running; start it with agentpond dev",
+			"dev server is not running; start it with npx agentpond dev",
 		);
 	}
 	return devSdkEnvironment(lock.host, lock.port, family);
@@ -242,7 +242,7 @@ function readEnvironmentFileExports(name: string, cwd: string): EnvVar[] {
 	});
 	if (!existsSync(environment.envFilePath)) {
 		throw new CliError(
-			`Environment "${environment.name}" is not initialized; run agentpond env init ${environment.name}`,
+			`Environment "${environment.name}" is not initialized; run npx agentpond env init ${environment.name}`,
 		);
 	}
 	return parseEnvFileEntries(environment.envFilePath);

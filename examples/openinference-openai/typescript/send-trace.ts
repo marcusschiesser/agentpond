@@ -17,7 +17,7 @@ function requireEnv() {
 	if (missing.length > 0) {
 		throw new Error(
 			`Missing required environment variables: ${missing.join(", ")}. ` +
-				'Set OPENAI_API_KEY and run eval "$(agentpond env get dev --otel)" before running this example.',
+				'Set OPENAI_API_KEY and run eval "$(npx agentpond env get dev --otel)" before running this example.',
 		);
 	}
 }
@@ -45,9 +45,9 @@ function printSummary(answer: string | null | undefined) {
 	console.log(answer ?? "(empty response)");
 	console.log("");
 	console.log("Inspect the latest OpenInference trace:");
-	console.log("agentpond traces list --limit 1");
+	console.log("npx agentpond traces list --limit 1");
 	console.log("Use that trace id to inspect observations:");
-	console.log("agentpond observations list --traceId <trace-id>");
+	console.log("npx agentpond observations list --traceId <trace-id>");
 }
 
 async function main() {

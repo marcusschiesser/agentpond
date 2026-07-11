@@ -21,7 +21,7 @@ Non-OTEL ingestion remains for Langfuse SDK scores. Accepted non-OTEL events are
 
 ## Sync Flow
 
-`agentpond sync` scans UTC bucket windows for both sources:
+`npx agentpond sync` scans UTC bucket windows for both sources:
 
 - OTEL objects are read directly from `otel/<project-id>/...` and normalized during sync.
 - Non-OTEL manifests are read from `<project-id>/manifests/...`; sync then reads their referenced event objects.
