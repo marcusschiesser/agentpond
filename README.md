@@ -14,7 +14,7 @@
   <a href="https://www.npmjs.com/package/agentpond"><img src="https://img.shields.io/node/v/agentpond.svg" alt="Node.js version"></a>
 </p>
 
-AgentPond is a lightweight trace backend and CLI for AI applications. It keeps raw traces in object storage you control and syncs them into a local DuckDB cache for fast analysis by developers and coding agents.
+AgentPond is a lightweight trace backend and CLI for AI applications. It keeps raw traces in object storage you control and syncs them into a local DuckDB cache for fast analysis by developers and coding agents. Use it with Firebase Storage, Amazon S3, Google Cloud Storage, Vercel Blob, or custom infrastructure. Firebase includes an automated one-command setup; other deployments use the manual setup path.
 
 ## How it works
 
@@ -22,7 +22,7 @@ AgentPond is a lightweight trace backend and CLI for AI applications. It keeps r
 
 Object storage is the durable source of truth. The local DuckDB database is a rebuildable analytical cache, so production traces stay in your infrastructure without requiring an always-on analytics database.
 
-## Get started with Firebase
+## Quick start: Firebase in one command
 
 You need Node.js 22 or newer and an initialized Firebase project with an active project selected through `firebase use`.
 
@@ -48,7 +48,7 @@ npx agentpond traces list --limit 10
 
 See [Firebase setup](./docs/getting-started/firebase.md) for prerequisites and troubleshooting.
 
-> Not using Firebase? See [Manual deployment setup](./docs/getting-started/manual-setup.md) for AWS, Google Cloud, Vercel, and custom infrastructure.
+> For Amazon S3, Google Cloud Storage, Vercel Blob, or custom infrastructure, see [Manual deployment setup](./docs/getting-started/manual-setup.md).
 
 ## Analyze traces
 
