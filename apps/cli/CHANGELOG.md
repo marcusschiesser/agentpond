@@ -1,5 +1,15 @@
 # agentpond
 
+## 0.5.2
+
+### Patch Changes
+
+- 05f8478: Show AgentPond branding before the bundled Skills setup flow.
+- 05f8478: Stop Firebase setup when AgentPond skill installation is cancelled or incomplete.
+- 05f8478: Honor active Firebase CLI project selections even when `.firebaserc` is absent.
+- Updated dependencies [05f8478]
+  - @agentpond/firebase@0.4.2
+
 ## 0.5.1
 
 ### Patch Changes

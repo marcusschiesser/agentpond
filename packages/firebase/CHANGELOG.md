@@ -1,5 +1,11 @@
 # @agentpond/firebase
 
+## 0.4.2
+
+### Patch Changes
+
+- 05f8478: Honor active Firebase CLI project selections even when `.firebaserc` is absent.
+
 ## 0.4.1
 
 ### Patch Changes
