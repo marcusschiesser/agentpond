@@ -80,7 +80,7 @@ jobs:
           node-version: 22
 
       - name: Run CLI tests on Node.js 22
-        run: NODE_ENV=test node --test --import tsx apps/cli/tests/*.test.ts
+        run: env NODE_ENV=test node --test --import tsx apps/cli/tests/*.test.ts
 
       - name: Smoke test built CLI on Node.js 22
         run: |
