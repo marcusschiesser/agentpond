@@ -21,13 +21,13 @@ The compliance rule is intentionally graded instead of binary:
 Start AgentPond in one terminal:
 
 ```sh
-agentpond dev
+npx agentpond dev
 ```
 
 Load the local Langfuse-compatible credentials in a second terminal that will run the example:
 
 ```sh
-eval "$(agentpond env get dev)"
+eval "$(npx agentpond env get dev)"
 ```
 
 Set an OpenAI API key:
@@ -44,7 +44,7 @@ Run the Python example with `uv`:
 uv run --project examples/llm-compliance/python python examples/llm-compliance/python/compliance_workflow.py
 ```
 
-The script prints the structured compliance result, generated trace ID, and `agentpond` commands for inspecting the trace and observations.
+The script prints the structured compliance result, generated trace ID, and `npx agentpond` commands for inspecting the trace and observations.
 
 It also prints a follow-up command for adding the expected trace score. You can run that command directly, or call the score script with any trace ID:
 

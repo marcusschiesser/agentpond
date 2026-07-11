@@ -12,7 +12,7 @@
 		"README.md"
 	],
 	"engines": {
-		"node": ">=24"
+		"node": ">=22"
 	},
 	"scripts": {
 		"build": "tsup",
@@ -37,6 +37,7 @@
 		"commander": "15.0.0",
 		"fastify": "^5.6.2",
 		"protobufjs": "^7.6.4",
+		"skills": "1.5.9",
 		"zod": "^4.3.6"
 	}
 }

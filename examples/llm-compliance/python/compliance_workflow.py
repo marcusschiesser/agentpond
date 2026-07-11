@@ -36,7 +36,7 @@ def require_env():
     if missing:
         raise RuntimeError(
             f"Missing required environment variables: {', '.join(missing)}. "
-            'Set OPENAI_API_KEY and run eval "$(agentpond env get dev)" before running this example.'
+            'Set OPENAI_API_KEY and run eval "$(npx agentpond env get dev)" before running this example.'
         )
 
 
@@ -122,9 +122,9 @@ def print_summary(trace_id, result):
     print(f"Sent 1 LLM compliance trace ({trace_id})")
     print("")
     print("Inspect the trace and observations:")
-    print("agentpond sync")
-    print(f"agentpond traces get {trace_id}")
-    print(f"agentpond observations list --traceId {trace_id}")
+    print("npx agentpond sync")
+    print(f"npx agentpond traces get {trace_id}")
+    print(f"npx agentpond observations list --traceId {trace_id}")
     print("")
     print("Add the expected score:")
     print(f"uv run --project examples/llm-compliance/python python examples/llm-compliance/python/add_expected_score.py {trace_id}")

@@ -25,7 +25,7 @@ def require_env():
     if missing:
         raise RuntimeError(
             f"Missing required environment variables: {', '.join(missing)}. "
-            'Set OPENAI_API_KEY and run eval "$(agentpond env get dev --otel)" before running this example.'
+            'Set OPENAI_API_KEY and run eval "$(npx agentpond env get dev --otel)" before running this example.'
         )
 
 
@@ -62,9 +62,9 @@ def print_summary(answer):
     print(answer)
     print("")
     print("Inspect the latest OpenInference trace:")
-    print("agentpond traces list --limit 1")
+    print("npx agentpond traces list --limit 1")
     print("Use that trace id to inspect observations:")
-    print("agentpond observations list --traceId <trace-id>")
+    print("npx agentpond observations list --traceId <trace-id>")
 
 
 def main():

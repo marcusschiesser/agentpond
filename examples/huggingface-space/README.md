@@ -22,11 +22,7 @@ Deploy AgentPond's ingestion container to a Hugging Face Docker Space and store 
 hf auth login
 ```
 
-- AgentPond installed locally for inspection:
-
-```sh
-npm install -g agentpond
-```
+- Node.js 22 or newer for running AgentPond with `npx`.
 
 ## 1. Choose names
 
@@ -62,8 +58,8 @@ hf repos create "$HF_SPACE_ID" \
 Initialize a local AgentPond environment:
 
 ```sh
-agentpond env init hf-space --store s3
-agentpond env use hf-space
+npx agentpond env init hf-space --store s3
+npx agentpond env use hf-space
 ```
 
 Generate Hugging Face S3 credentials before editing the environment file:
@@ -117,7 +113,7 @@ hf spaces wait "$HF_SPACE_ID" --timeout 10m
 Load the same environment file used by the Space:
 
 ```sh
-eval "$(agentpond env get hf-space)"
+eval "$(npx agentpond env get hf-space)"
 
 uv run --project examples/basic-traces/python \
   python examples/basic-traces/python/send_traces.py
@@ -136,11 +132,11 @@ hf buckets list "$HF_NAMESPACE/$HF_BUCKET" -R
 Sync and inspect locally:
 
 ```sh
-agentpond sync
-agentpond traces list
-agentpond traces get <trace-id>
-agentpond observations list --traceId <trace-id>
-agentpond scores list --traceId <trace-id>
+npx agentpond sync
+npx agentpond traces list
+npx agentpond traces get <trace-id>
+npx agentpond observations list --traceId <trace-id>
+npx agentpond scores list --traceId <trace-id>
 ```
 
 ## Reliability note

@@ -27,6 +27,13 @@ import {
 	createDevLoggerOptions,
 	listenOnAvailablePort,
 } from "../src/commands/dev.js";
+import {
+	FIREBASE_INSTRUMENTATION_PROMPT,
+	installSkillsWithBundledCli,
+	MANUAL_SETUP_URL,
+	type SkillsInstallRequest,
+	type SkillsProcessRequest,
+} from "../src/commands/init.js";
 import { environmentContextForCommand } from "../src/environment-context.js";
 import { CLI_VERSION, createOtelTraceId, main } from "../src/index.js";
 import { manualTraceResourceSpans } from "../src/otel-trace.js";
@@ -107,6 +114,279 @@ function testStorageContext(
 function devDbPath(root: string): string {
 	return join(root, ".agentpond", "envs", "dev", "cache.duckdb");
 }
+
+test("CLI init installs AgentPond skills for a nested Firebase project", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-firebase-")),
+	);
+	const nested = join(root, "packages", "functions");
+	const originalExitCode = process.exitCode;
+	let request: SkillsInstallRequest | undefined;
+	process.exitCode = undefined;
+	try {
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "firebase-demo" } }),
+			"utf8",
+		);
+		writeFileSync(
+			join(root, "firebase.json"),
+			JSON.stringify({ functions: { source: "packages/functions" } }),
+			"utf8",
+		);
+		process.chdir(nested);
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init"], {
+				installSkills: async (installRequest) => {
+					request = installRequest;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(request, {
+			cwd: root,
+			source: "marcusschiesser/agentpond",
+			skills: ["agentpond-instrumentation", "agentpond"],
+		});
+		assert.equal(
+			output,
+			[
+				"AgentPond skills installed for Firebase project: firebase-demo",
+				"",
+				"Paste this prompt into your coding agent:",
+				"",
+				FIREBASE_INSTRUMENTATION_PROMPT,
+				"",
+			].join("\n"),
+		);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init detects a Firebase project from its root", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-firebase-root-")),
+	);
+	const originalExitCode = process.exitCode;
+	let installCwd: string | undefined;
+	process.exitCode = undefined;
+	try {
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "firebase-root-demo" } }),
+			"utf8",
+		);
+		process.chdir(root);
+
+		await captureStdout(() =>
+			main(["node", "agentpond", "init"], {
+				installSkills: async (request) => {
+					installCwd = request.cwd;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(installCwd, root);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init rejects non-Firebase projects without creating files", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-non-firebase-")),
+	);
+	const originalExitCode = process.exitCode;
+	let installerCalled = false;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "init"], {
+				installSkills: async () => {
+					installerCalled = true;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.equal(installerCalled, false);
+		assert.equal(
+			stderr,
+			[
+				"Automatic AgentPond setup currently supports Firebase projects.",
+				"",
+				"For AWS, Google Cloud, Vercel, and other deployment setups, see:",
+				MANUAL_SETUP_URL,
+				"",
+			].join("\n"),
+		);
+		assert.doesNotMatch(stderr, /local.*deployment/i);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init requires an active Firebase project", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-no-project-")),
+	);
+	const originalExitCode = process.exitCode;
+	const originalProjectEnv = {
+		FIREBASE_CONFIG: process.env.FIREBASE_CONFIG,
+		GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
+		GCP_PROJECT: process.env.GCP_PROJECT,
+		GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
+	};
+	let installerCalled = false;
+	process.exitCode = undefined;
+	try {
+		delete process.env.FIREBASE_CONFIG;
+		delete process.env.GCLOUD_PROJECT;
+		delete process.env.GCP_PROJECT;
+		delete process.env.GOOGLE_CLOUD_PROJECT;
+		writeFileSync(join(root, "firebase.json"), "{}", "utf8");
+		process.chdir(root);
+
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "init"], {
+				installSkills: async () => {
+					installerCalled = true;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.equal(installerCalled, false);
+		assert.match(stderr, /firebase use <alias-or-project-id>/);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		for (const [key, value] of Object.entries(originalProjectEnv)) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init rejects JSON output before installing skills", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-json-")),
+	);
+	const originalExitCode = process.exitCode;
+	let installerCalled = false;
+	process.exitCode = undefined;
+	try {
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "firebase-demo" } }),
+			"utf8",
+		);
+		process.chdir(root);
+
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "init", "--json"], {
+				installSkills: async () => {
+					installerCalled = true;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.equal(installerCalled, false);
+		assert.match(stderr, /--json is not supported by npx agentpond init/);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init does not print a prompt when skill installation fails", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-install-error-")),
+	);
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "firebase-demo" } }),
+			"utf8",
+		);
+		process.chdir(root);
+
+		const output = await captureStdout(async () => {
+			const stderr = await captureStderr(() =>
+				main(["node", "agentpond", "init"], {
+					installSkills: async () => {
+						throw new Error("skill installation failed");
+					},
+				}),
+			);
+			assert.match(stderr, /skill installation failed/);
+		});
+
+		assert.equal(process.exitCode, 1);
+		assert.equal(output, "");
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init invokes the bundled Skills CLI directly without agent flags", async () => {
+	let processRequest: SkillsProcessRequest | undefined;
+	await installSkillsWithBundledCli(
+		{
+			cwd: "/firebase/root",
+			source: "marcusschiesser/agentpond",
+			skills: ["agentpond-instrumentation", "agentpond"],
+		},
+		{
+			cliPath: "/package/skills/bin/cli.mjs",
+			run: async (request) => {
+				processRequest = request;
+				return 0;
+			},
+		},
+	);
+
+	assert.deepEqual(processRequest, {
+		command: process.execPath,
+		args: [
+			"/package/skills/bin/cli.mjs",
+			"add",
+			"marcusschiesser/agentpond",
+			"--skill",
+			"agentpond-instrumentation",
+			"--skill",
+			"agentpond",
+		],
+		cwd: "/firebase/root",
+	});
+	assert.equal(processRequest?.args.includes("--agent"), false);
+	assert.equal(processRequest?.args.includes("--yes"), false);
+});
 
 test("CLI trace creation builds a Langfuse-compatible OTEL root span", () => {
 	const resourceSpans = manualTraceResourceSpans(
@@ -600,7 +880,7 @@ test("CLI sync is a no-op for the dev environment", async () => {
 
 		assert.equal(process.exitCode, undefined);
 		assert.equal(result.skipped, true);
-		assert.match(result.reason, /sync is not needed for agentpond dev/);
+		assert.match(result.reason, /sync is not needed for npx agentpond dev/);
 		assert.equal(
 			existsSync(join(root, ".agentpond", "envs", "dev", "cache.duckdb")),
 			false,
@@ -746,7 +1026,7 @@ test("CLI env get dev requires a running dev server", async () => {
 		assert.equal(process.exitCode, 2);
 		assert.match(
 			stderr,
-			/dev server is not running; start it with agentpond dev/,
+			/dev server is not running; start it with npx agentpond dev/,
 		);
 		assert.equal(
 			existsSync(join(root, ".agentpond", "envs", "dev.env")),
@@ -1558,7 +1838,7 @@ test("CLI env init rejects store configuration in Firebase projects", async () =
 		assert.equal(process.exitCode, 2);
 		assert.match(
 			stderr,
-			/agentpond env init is not available for firebase projects/,
+			/npx agentpond env init is not available for firebase projects/,
 		);
 		assert.equal(
 			existsSync(join(root, ".agentpond", "envs", "staging.env")),

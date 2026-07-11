@@ -15,13 +15,13 @@ Each example sends:
 Start AgentPond in one terminal:
 
 ```sh
-agentpond dev
+npx agentpond dev
 ```
 
 Load the local Langfuse-compatible credentials in a second terminal that will run the examples:
 
 ```sh
-eval "$(agentpond env get dev)"
+eval "$(npx agentpond env get dev)"
 ```
 
 ## Python
@@ -40,4 +40,4 @@ Run the TypeScript example:
 pnpm --dir examples/basic-traces/typescript start
 ```
 
-Each example prints the generated trace ID and corresponding `agentpond` commands for inspecting its trace, observations, and annotation score.
+Each example prints the generated trace ID and corresponding `npx agentpond` commands for inspecting its trace, observations, and annotation score.

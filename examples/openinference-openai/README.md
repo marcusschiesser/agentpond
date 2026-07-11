@@ -9,16 +9,16 @@ Run commands in this README from the repository root.
 Start AgentPond in one terminal:
 
 ```sh
-agentpond dev
+npx agentpond dev
 ```
 
 Load the local OpenTelemetry exporter environment in a second terminal that will run the examples:
 
 ```sh
-eval "$(agentpond env get dev --otel)"
+eval "$(npx agentpond env get dev --otel)"
 ```
 
-If `agentpond dev` falls back to another port because `4318` is already in use, `agentpond env get dev --otel` automatically returns the running server URL for this AgentPond directory.
+If `npx agentpond dev` falls back to another port because `4318` is already in use, `npx agentpond env get dev --otel` automatically returns the running server URL for this AgentPond directory.
 
 Set your OpenAI API key:
 
@@ -47,8 +47,8 @@ pnpm --dir examples/openinference-openai/typescript start
 Each example prints the model response and commands for inspecting the latest trace:
 
 ```sh
-agentpond traces list --limit 1
-agentpond observations list --traceId <trace-id>
+npx agentpond traces list --limit 1
+npx agentpond observations list --traceId <trace-id>
 ```
 
-Use the trace id returned by `agentpond traces list --limit 1` in the observations command.
+Use the trace id returned by `npx agentpond traces list --limit 1` in the observations command.
