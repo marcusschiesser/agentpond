@@ -1,5 +1,12 @@
 # @agentpond/duckdb
 
+## 0.3.6
+
+### Patch Changes
+
+- Updated dependencies [710fd11]
+  - @agentpond/core@0.4.2
+
 ## 0.3.5
 
 ### Patch Changes

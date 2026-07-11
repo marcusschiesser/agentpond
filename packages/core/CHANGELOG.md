@@ -1,5 +1,11 @@
 # @agentpond/core
 
+## 0.4.2
+
+### Patch Changes
+
+- 710fd11: Publish the dev-server lock API with the CLI so npm installations no longer fail when loading `readDevServerLock` from `@agentpond/core`.
+
 ## 0.4.1
 
 ### Patch Changes

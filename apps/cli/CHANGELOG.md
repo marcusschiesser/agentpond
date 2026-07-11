@@ -1,5 +1,21 @@
 # agentpond
 
+## 0.5.1
+
+### Patch Changes
+
+- f6a3a25: Recommend batched OpenTelemetry span export for Firebase instrumentation so each stored object can contain multiple spans.
+- aa41a1d: Clarify that AgentPond supports multiple object stores while Firebase provides the automated one-command setup path.
+- 710fd11: Publish the dev-server lock API with the CLI so npm installations no longer fail when loading `readDevServerLock` from `@agentpond/core`.
+- Updated dependencies [710fd11]
+  - @agentpond/core@0.4.2
+  - @agentpond/aws@0.3.6
+  - @agentpond/duckdb@0.3.6
+  - @agentpond/fastify-ingest@0.3.5
+  - @agentpond/firebase@0.4.1
+  - @agentpond/google@0.3.5
+  - @agentpond/vercel@0.4.2
+
 ## 0.5.0
 
 ### Minor Changes
