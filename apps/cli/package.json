@@ -1,6 +1,6 @@
 {
 	"name": "agentpond",
-	"version": "0.5.1",
+	"version": "0.5.2",
 	"description": "Agent-native CLI for local Langfuse-compatible trace analytics",
 	"license": "MIT",
 	"type": "module",

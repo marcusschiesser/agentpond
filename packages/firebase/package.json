@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/firebase",
-	"version": "0.4.1",
+	"version": "0.4.2",
 	"description": "Firebase Storage, Functions ingestion, and direct OpenTelemetry export adapters for AgentPond",
 	"license": "MIT",
 	"type": "module",
