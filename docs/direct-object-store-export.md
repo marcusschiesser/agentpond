@@ -57,6 +57,8 @@ sdk.start();
 await sdk.shutdown();
 ```
 
+NodeSDK wraps `traceExporter` in a `BatchSpanProcessor`. AgentPond preserves each exporter invocation as one immutable object-store object, so a batch of spans is written as one object. If you configure span processors directly, prefer `BatchSpanProcessor` for production and force-flush at the application's real lifecycle boundary.
+
 ## Object Stores
 
 Use the matching adapter for the deployment:
