@@ -63,7 +63,7 @@ Stop after presenting the proposal and ask for explicit confirmation before inst
 3. Create or update one centralized server instrumentation module.
 4. Reuse an existing default Firebase Admin app. Add default initialization only when it is absent; follow [references/firebase.md](references/firebase.md).
 5. Create `createFirebaseSpanExporter()` after the default app exists.
-6. Add the exporter to the existing provider. When no provider exists, create one using APIs supported by the installed OpenTelemetry version and a processor appropriate for direct export.
+6. Add the exporter to the existing provider. When no provider exists, create one using APIs supported by the installed OpenTelemetry version and prefer NodeSDK's batched `traceExporter` configuration or an explicit `BatchSpanProcessor`.
 7. Register the selected OpenInference instrumentation before AI clients are created.
 8. Add manual CHAIN and TOOL spans only where auto-instrumentation leaves important application behavior invisible.
 9. Preserve one `session.id` across all turns in the same conversation.

@@ -51,6 +51,8 @@ test("Firebase instrumentation skill preserves the setup and verification workfl
 		/Storage Rules/i,
 		/nested block/i,
 		/framework-native/i,
+		/traceExporter/,
+		/BatchSpanProcessor/,
 		/CHAIN/,
 		/TOOL/,
 		/session\.id/,
@@ -60,4 +62,5 @@ test("Firebase instrumentation skill preserves the setup and verification workfl
 	]) {
 		assert.match(content, required);
 	}
+	assert.doesNotMatch(content, /new SimpleSpanProcessor/);
 });

@@ -17,6 +17,7 @@ import { resourceFromAttributes } from "@opentelemetry/resources";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import {
 	BasicTracerProvider,
+	BatchSpanProcessor,
 	InMemorySpanExporter,
 	type ReadableSpan,
 	SimpleSpanProcessor,
@@ -142,6 +143,40 @@ test("empty exports succeed without writing an object", async () => {
 	assert.equal(result.code, ExportResultCode.SUCCESS);
 	assert.deepEqual(store.writes, []);
 	await exporter.shutdown();
+});
+
+test("a batched exporter invocation writes multiple spans in one object", async () => {
+	const store = new MemoryObjectStore();
+	const exporter = new AgentPondSpanExporter({
+		store,
+		projectId: "project-a",
+	});
+	const provider = new BasicTracerProvider({
+		resource: resourceFromAttributes({ "service.name": "batched-export-test" }),
+		spanProcessors: [new BatchSpanProcessor(exporter)],
+	});
+	const tracer = provider.getTracer("batched-export-test");
+
+	tracer.startSpan("first span").end();
+	tracer.startSpan("second span").end();
+	await provider.forceFlush();
+
+	const keys = await store.listKeys("otel/project-a/");
+	assert.equal(keys.length, 1);
+	const resourceSpans = await store.getJson<
+		Array<{ scopeSpans?: Array<{ spans?: unknown[] }> }>
+	>(keys[0]);
+	const storedSpanCount = resourceSpans.reduce(
+		(resourceCount, resourceSpan) =>
+			resourceCount +
+			(resourceSpan.scopeSpans ?? []).reduce(
+				(scopeCount, scopeSpan) => scopeCount + (scopeSpan.spans?.length ?? 0),
+				0,
+			),
+		0,
+	);
+	assert.equal(storedSpanCount, 2);
+	await provider.shutdown();
 });
 
 test("storage failures are returned through the exporter callback", async () => {

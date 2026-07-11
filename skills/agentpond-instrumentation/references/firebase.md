@@ -41,12 +41,9 @@ When no provider exists, a typical Node SDK shape is:
 ```ts
 import { createFirebaseSpanExporter } from "@agentpond/firebase";
 import { NodeSDK } from "@opentelemetry/sdk-node";
-import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 
 const sdk = new NodeSDK({
-  spanProcessors: [
-    new SimpleSpanProcessor(createFirebaseSpanExporter()),
-  ],
+  traceExporter: createFirebaseSpanExporter(),
   instrumentations: [
     // Add the integration selected for the detected AI SDK or framework.
   ],
@@ -55,7 +52,9 @@ const sdk = new NodeSDK({
 sdk.start();
 ```
 
-Adapt the construction to the installed SDK API and project lifecycle. Initialize the module before instrumented clients. Force-flush at a real lifecycle boundary when required; do not shut down a reusable Functions instance after every request.
+NodeSDK wraps `traceExporter` in a `BatchSpanProcessor`, so each exporter invocation can contain multiple spans and AgentPond writes one object per exported batch. When constructing a provider manually or tuning queue and batch settings, create a `BatchSpanProcessor` explicitly instead. Do not use `SimpleSpanProcessor` for normal production export because it invokes the exporter separately for every ended span.
+
+Adapt the construction to the installed SDK API and project lifecycle. Initialize the module before instrumented clients. Force-flush at a real lifecycle boundary when required so queued batches finish exporting; do not shut down a reusable Functions instance after every request.
 
 ## Storage Rules review
 
