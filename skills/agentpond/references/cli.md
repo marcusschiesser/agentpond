@@ -11,7 +11,9 @@ firebase use <alias-or-project-id>
 npx agentpond sync
 ```
 
-AgentPond detects the Firebase root from `.firebaserc` or `firebase.json`, uses the active Firebase project ID for the local cache name, reads the Firebase project data, and ignores AgentPond environment selection.
+AgentPond detects the Firebase root from `.firebaserc` or `firebase.json`, follows the active selection stored by the Firebase CLI even when `.firebaserc` is absent, uses that project ID for the local cache name, reads the Firebase project data, and ignores AgentPond environment selection.
+
+`npx agentpond init` verifies that both AgentPond skills exist after installation. Cancelling the Skills CLI stops setup without printing a success message or coding-agent prompt.
 
 For non-Firebase storage, select an existing environment:
 

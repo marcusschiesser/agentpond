@@ -24,6 +24,10 @@ firebase use <alias-or-project-id>
 npx agentpond sync
 ```
 
+AgentPond follows the Firebase CLI's active project selection, including
+selections stored globally when the project has no `.firebaserc`.
+If skill installation is cancelled, `init` stops without printing the coding-agent prompt.
+
 For non-Firebase storage, inspect and select an existing AgentPond environment:
 
 ```bash

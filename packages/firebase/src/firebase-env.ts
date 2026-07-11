@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { findAncestorDirectory } from "@agentpond/core";
 
 export type FirebaseCliProjectConfig = {
@@ -31,12 +32,12 @@ export function firebaseCliProjectConfigFromCwd(
 
 	const runtimeConfig = firebaseRuntimeConfig(env.FIREBASE_CONFIG);
 	const projectId =
-		firebaseProjectIdFromRc(root) ??
+		firebaseProjectIdFromCli(root, env) ??
 		runtimeConfig?.projectId ??
 		firebaseProjectIdFromEnv(env);
 	if (!projectId) {
 		throw new Error(
-			"Could not determine Firebase project id. Run firebase use <project> to write .firebaserc, or set FIREBASE_CONFIG, GCLOUD_PROJECT, GCP_PROJECT, or GOOGLE_CLOUD_PROJECT.",
+			"Could not determine Firebase project id. Run firebase use <project> to select a project, or set FIREBASE_CONFIG, GCLOUD_PROJECT, GCP_PROJECT, or GOOGLE_CLOUD_PROJECT.",
 		);
 	}
 
@@ -95,20 +96,61 @@ function firebaseFunctionsSources(functions: unknown): string[] {
 	return [];
 }
 
-function firebaseProjectIdFromRc(root: string): string | undefined {
+function firebaseProjectIdFromCli(
+	root: string,
+	env: NodeJS.ProcessEnv,
+): string | undefined {
+	const activeProject = firebaseActiveProjectFromConfigStore(root, env);
+	if (!activeProject) return firebaseProjectIdFromRc(root);
+	return firebaseProjectIdFromRc(root, activeProject) ?? activeProject;
+}
+
+function firebaseProjectIdFromRc(
+	root: string,
+	alias = "default",
+): string | undefined {
 	const rcPath = join(root, ".firebaserc");
 	if (!existsSync(rcPath)) return undefined;
 	try {
 		const rcData = JSON.parse(readFileSync(rcPath, "utf8")) as {
-			projects?: { default?: unknown };
+			projects?: Record<string, unknown>;
 		};
-		const projectId = rcData.projects?.default;
+		const projectId = rcData.projects?.[alias];
 		return typeof projectId === "string" && projectId ? projectId : undefined;
 	} catch (error) {
 		throw new Error(
-			"Could not read Firebase project id from .firebaserc projects.default",
+			`Could not read Firebase project id from .firebaserc projects.${alias}`,
 			{ cause: error },
 		);
+	}
+}
+
+function firebaseActiveProjectFromConfigStore(
+	root: string,
+	env: NodeJS.ProcessEnv,
+): string | undefined {
+	const configHome =
+		env.XDG_CONFIG_HOME ||
+		(env.HOME ? join(env.HOME, ".config") : join(homedir(), ".config"));
+	const configPath = join(configHome, "configstore", "firebase-tools.json");
+	if (!existsSync(configPath)) return undefined;
+
+	try {
+		const config = JSON.parse(readFileSync(configPath, "utf8")) as {
+			activeProjects?: Record<string, unknown>;
+		};
+		let currentDir = resolve(root);
+		while (true) {
+			const activeProject = config.activeProjects?.[currentDir];
+			if (typeof activeProject === "string" && activeProject) {
+				return activeProject;
+			}
+			const parentDir = dirname(currentDir);
+			if (parentDir === currentDir) return undefined;
+			currentDir = parentDir;
+		}
+	} catch {
+		return undefined;
 	}
 }
 

@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 import {
 	firebaseCliProjectConfigFromCwd,
 	firebaseProjectDirectory,
@@ -18,6 +20,22 @@ export const AGENTPOND_INIT_SKILLS = [
 	"agentpond-instrumentation",
 	"agentpond",
 ] as const;
+
+export function agentPondCliHeader(): string {
+	return [
+		"AgentPond",
+		"Store agent traces remotely. Analyze them locally.",
+	].join("\n");
+}
+
+export function agentPondInitHeader(projectId: string): string {
+	return [
+		agentPondCliHeader(),
+		"",
+		`Firebase project: ${projectId}`,
+		"Installing AgentPond skills...",
+	].join("\n");
+}
 
 export const FIREBASE_INSTRUMENTATION_PROMPT = `Use $agentpond-instrumentation to inspect this Firebase project and add
 OpenInference tracing to its trusted server-side AI application.
@@ -86,6 +104,8 @@ export function registerInitCommand(
 				);
 			}
 
+			console.log(agentPondInitHeader(project.projectId));
+
 			await (options.installSkills ?? installSkillsWithBundledCli)({
 				cwd: project.root,
 				source: AGENTPOND_SKILLS_SOURCE,
@@ -94,7 +114,7 @@ export function registerInitCommand(
 
 			console.log(
 				[
-					`AgentPond skills installed for Firebase project: ${project.projectId}`,
+					`AgentPond skills ready for Firebase project: ${project.projectId}`,
 					"",
 					"Paste this prompt into your coding agent:",
 					"",
@@ -125,6 +145,16 @@ export async function installSkillsWithBundledCli(
 
 	if (exitCode !== 0) {
 		throw new CliError(`Skills CLI exited with status ${exitCode}`);
+	}
+
+	const missingSkills = request.skills.filter(
+		(skill) =>
+			!existsSync(join(request.cwd, ".agents", "skills", skill, "SKILL.md")),
+	);
+	if (missingSkills.length > 0) {
+		throw new CliError(
+			`AgentPond skill installation was cancelled or did not complete. Missing: ${missingSkills.join(", ")}`,
+		);
 	}
 }
 

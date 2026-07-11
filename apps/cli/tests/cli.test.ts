@@ -28,6 +28,7 @@ import {
 	listenOnAvailablePort,
 } from "../src/commands/dev.js";
 import {
+	agentPondInitHeader,
 	FIREBASE_INSTRUMENTATION_PROMPT,
 	installSkillsWithBundledCli,
 	MANUAL_SETUP_URL,
@@ -155,7 +156,8 @@ test("CLI init installs AgentPond skills for a nested Firebase project", async (
 		assert.equal(
 			output,
 			[
-				"AgentPond skills installed for Firebase project: firebase-demo",
+				agentPondInitHeader("firebase-demo"),
+				"AgentPond skills ready for Firebase project: firebase-demo",
 				"",
 				"Paste this prompt into your coding agent:",
 				"",
@@ -198,6 +200,51 @@ test("CLI init detects a Firebase project from its root", async () => {
 		assert.equal(installCwd, root);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init follows Firebase CLI global active project selections", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-firebase-active-")),
+	);
+	const configHome = mkdtempSync(
+		join(tmpdir(), "agentpond-cli-init-firebase-config-"),
+	);
+	const originalConfigHome = process.env.XDG_CONFIG_HOME;
+	const originalExitCode = process.exitCode;
+	let installCwd: string | undefined;
+	process.exitCode = undefined;
+	try {
+		mkdirSync(join(configHome, "configstore"), { recursive: true });
+		writeFileSync(join(root, "firebase.json"), "{}", "utf8");
+		writeFileSync(
+			join(configHome, "configstore", "firebase-tools.json"),
+			JSON.stringify({ activeProjects: { [root]: "firebase-active-demo" } }),
+			"utf8",
+		);
+		process.env.XDG_CONFIG_HOME = configHome;
+		process.chdir(root);
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init"], {
+				installSkills: async (request) => {
+					installCwd = request.cwd;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(installCwd, root);
+		assert.match(
+			output,
+			/AgentPond skills ready for Firebase project: firebase-active-demo/,
+		);
+	} finally {
+		if (originalConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+		else process.env.XDG_CONFIG_HOME = originalConfigHome;
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
@@ -346,7 +393,7 @@ test("CLI init does not print a prompt when skill installation fails", async () 
 		});
 
 		assert.equal(process.exitCode, 1);
-		assert.equal(output, "");
+		assert.equal(output, [agentPondInitHeader("firebase-demo"), ""].join("\n"));
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 	} finally {
 		process.chdir(cwd);
@@ -355,10 +402,11 @@ test("CLI init does not print a prompt when skill installation fails", async () 
 });
 
 test("CLI init invokes the bundled Skills CLI directly without agent flags", async () => {
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-skills-install-"));
 	let processRequest: SkillsProcessRequest | undefined;
 	await installSkillsWithBundledCli(
 		{
-			cwd: "/firebase/root",
+			cwd: root,
 			source: "marcusschiesser/agentpond",
 			skills: ["agentpond-instrumentation", "agentpond"],
 		},
@@ -366,6 +414,11 @@ test("CLI init invokes the bundled Skills CLI directly without agent flags", asy
 			cliPath: "/package/skills/bin/cli.mjs",
 			run: async (request) => {
 				processRequest = request;
+				for (const skill of ["agentpond-instrumentation", "agentpond"]) {
+					const skillDir = join(root, ".agents", "skills", skill);
+					mkdirSync(skillDir, { recursive: true });
+					writeFileSync(join(skillDir, "SKILL.md"), "---\n---\n", "utf8");
+				}
 				return 0;
 			},
 		},
@@ -382,10 +435,25 @@ test("CLI init invokes the bundled Skills CLI directly without agent flags", asy
 			"--skill",
 			"agentpond",
 		],
-		cwd: "/firebase/root",
+		cwd: root,
 	});
 	assert.equal(processRequest?.args.includes("--agent"), false);
 	assert.equal(processRequest?.args.includes("--yes"), false);
+});
+
+test("CLI init treats a cancelled Skills installation as incomplete", async () => {
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-skills-cancelled-"));
+
+	await assert.rejects(
+		installSkillsWithBundledCli(
+			{ cwd: root, source: "test/source", skills: ["agentpond"] },
+			{
+				cliPath: "/package/skills/bin/cli.mjs",
+				run: async () => 0,
+			},
+		),
+		/installation was cancelled or did not complete.*agentpond/,
+	);
 });
 
 test("CLI trace creation builds a Langfuse-compatible OTEL root span", () => {

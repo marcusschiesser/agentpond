@@ -53,6 +53,6 @@ Firebase owns project selection. Do not use `npx agentpond env init` or `npx age
 ## Troubleshooting
 
 - **Firebase is not detected:** Run the command from a directory below the Firebase root and confirm `.firebaserc` or `firebase.json` exists.
-- **Project ID is missing:** Run `firebase use <alias-or-project-id>` and retry.
+- **Project ID is missing:** Run `firebase use <alias-or-project-id>` and retry. AgentPond follows both `.firebaserc` aliases and the Firebase CLI's global active-project selection.
 - **No trusted server runtime exists:** Add or select a server runtime before using the Firebase Admin exporter; never move it into client code.
 - **No traces appear:** Confirm the instrumented code path ran, the provider flushed, Firebase Admin selected the default app and bucket, and then rerun `npx agentpond sync`.

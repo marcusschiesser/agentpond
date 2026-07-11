@@ -100,6 +100,61 @@ test("Firebase CLI project config reads .firebaserc from cwd", () => {
 	});
 });
 
+test("Firebase CLI project config reads global active project selections", () => {
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-firebase-active-project-"));
+	const configHome = mkdtempSync(
+		join(tmpdir(), "agentpond-firebase-config-home-"),
+	);
+	mkdirSync(join(configHome, "configstore"), { recursive: true });
+	writeFileSync(join(cwd, "firebase.json"), "{}", "utf8");
+	writeFileSync(
+		join(configHome, "configstore", "firebase-tools.json"),
+		JSON.stringify({ activeProjects: { [cwd]: "demo-project" } }),
+		"utf8",
+	);
+
+	assert.deepEqual(
+		firebaseCliProjectConfigFromCwd(cwd, {
+			XDG_CONFIG_HOME: configHome,
+		} as NodeJS.ProcessEnv),
+		{
+			projectId: "demo-project",
+			root: cwd,
+		},
+	);
+});
+
+test("Firebase CLI project config resolves globally selected aliases", () => {
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-firebase-active-alias-"));
+	const configHome = mkdtempSync(
+		join(tmpdir(), "agentpond-firebase-config-home-"),
+	);
+	mkdirSync(join(configHome, "configstore"), { recursive: true });
+	writeFileSync(join(cwd, "firebase.json"), "{}", "utf8");
+	writeFileSync(
+		join(cwd, ".firebaserc"),
+		JSON.stringify({
+			projects: { default: "prod-project", dev: "dev-project" },
+		}),
+		"utf8",
+	);
+	writeFileSync(
+		join(configHome, "configstore", "firebase-tools.json"),
+		JSON.stringify({ activeProjects: { [cwd]: "dev" } }),
+		"utf8",
+	);
+
+	assert.deepEqual(
+		firebaseCliProjectConfigFromCwd(cwd, {
+			XDG_CONFIG_HOME: configHome,
+		} as NodeJS.ProcessEnv),
+		{
+			projectId: "dev-project",
+			root: cwd,
+		},
+	);
+});
+
 test("Firebase CLI project config walks up to Firebase project roots", () => {
 	const root = mkdtempSync(join(tmpdir(), "agentpond-firebase-monorepo-"));
 	const cwd = join(root, "packages", "functions");
