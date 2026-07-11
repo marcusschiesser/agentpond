@@ -1,5 +1,11 @@
 # agentpond
 
+## 0.5.0
+
+### Minor Changes
+
+- b084c36: Add Firebase-first `npx agentpond init` onboarding that installs AgentPond's instrumentation and analytics skills, with Node.js 22 support.
+
 ## 0.4.3
 
 ### Patch Changes
