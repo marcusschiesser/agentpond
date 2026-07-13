@@ -2,13 +2,15 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import {
-	firebaseCliProjectConfigFromCwd,
-	firebaseProjectDirectory,
-} from "@agentpond/firebase";
 import type { Command } from "commander";
 import { CliError } from "../cli-support.js";
 import type { GlobalOptions } from "../command-support.js";
+import {
+	AVAILABLE_PLATFORMS,
+	initPlatformFromValue,
+	type ProviderProjectContext,
+	providerForCommand,
+} from "../providers.js";
 
 const require = createRequire(import.meta.url);
 
@@ -28,26 +30,21 @@ export function agentPondCliHeader(): string {
 	].join("\n");
 }
 
-export function agentPondInitHeader(projectId: string): string {
+export function agentPondInitHeader(context: {
+	displayName: string;
+	projectLabel: string;
+}): string {
 	return [
 		agentPondCliHeader(),
 		"",
-		`Firebase project: ${projectId}`,
+		`${context.displayName} project: ${context.projectLabel}`,
 		"Installing AgentPond skills...",
 	].join("\n");
 }
 
-export const FIREBASE_INSTRUMENTATION_PROMPT = `Use $agentpond-instrumentation to inspect this Firebase project and add
-OpenInference tracing to its trusted server-side AI application.
-
-Reuse existing Firebase Admin and OpenTelemetry initialization, export spans
-with createFirebaseSpanExporter() from @agentpond/firebase, and review Firebase
-Storage Rules so client SDKs cannot access agentpond/**.
-
-Build the application, exercise one real AI request, then use $agentpond to:
-
-  npx agentpond sync
-  npx agentpond traces list --limit 10`;
+type InitCommandOptions = {
+	platform?: string;
+};
 
 export type SkillsInstallRequest = {
 	cwd: string;
@@ -74,51 +71,62 @@ export function registerInitCommand(
 	program
 		.command("init")
 		.description("set up AgentPond for the current project")
-		.action(async (_commandOptions: unknown, command: Command) => {
+		.option(
+			"--platform <platform>",
+			`setup platform: ${AVAILABLE_PLATFORMS.join(" or ")}`,
+		)
+		.action(async (commandOptions: InitCommandOptions, command: Command) => {
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
 			if (globalOptions.json) {
 				throw new CliError("--json is not supported by npx agentpond init");
 			}
 
-			const root = firebaseProjectDirectory();
-			if (!root) {
+			const platform = initPlatformFromValue(commandOptions.platform);
+			let setup:
+				| { context: ProviderProjectContext; projectLabel: string }
+				| undefined;
+			try {
+				const context = providerForCommand({ platform });
+				setup = context
+					? { context, projectLabel: context.project.projectLabel }
+					: undefined;
+			} catch (error) {
+				throw new CliError(
+					error instanceof Error ? error.message : String(error),
+				);
+			}
+			if (!setup) {
 				throw new CliError(
 					[
-						"Automatic AgentPond setup currently supports Firebase projects.",
+						"Automatic AgentPond setup supports Firebase and Vercel projects.",
 						"",
-						"For AWS, Google Cloud, Vercel, and other deployment setups, see:",
+						"For AWS, Google Cloud, and other deployment setups, see:",
 						MANUAL_SETUP_URL,
 					].join("\n"),
 				);
 			}
+			const { context, projectLabel } = setup;
 
-			let project: ReturnType<typeof firebaseCliProjectConfigFromCwd>;
-			try {
-				project = firebaseCliProjectConfigFromCwd(root);
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				throw new CliError(
-					message.includes("Could not determine Firebase project id")
-						? "No active Firebase project is selected. Run firebase use <alias-or-project-id> and try again."
-						: message,
-				);
-			}
-
-			console.log(agentPondInitHeader(project.projectId));
+			console.log(
+				agentPondInitHeader({
+					displayName: context.provider.displayName,
+					projectLabel,
+				}),
+			);
 
 			await (options.installSkills ?? installSkillsWithBundledCli)({
-				cwd: project.root,
+				cwd: context.project.rootDir,
 				source: AGENTPOND_SKILLS_SOURCE,
 				skills: AGENTPOND_INIT_SKILLS,
 			});
 
 			console.log(
 				[
-					`AgentPond skills ready for Firebase project: ${project.projectId}`,
+					`AgentPond skills ready for ${context.provider.displayName} project: ${projectLabel}`,
 					"",
 					"Paste this prompt into your coding agent:",
 					"",
-					FIREBASE_INSTRUMENTATION_PROMPT,
+					context.provider.instrumentationPrompt,
 				].join("\n"),
 			);
 		});

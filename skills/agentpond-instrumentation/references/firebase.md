@@ -79,12 +79,17 @@ Do not declare setup complete while a broad client allow still exposes AgentPond
 
 ## Firebase project selection and verification
 
-Select the project with Firebase, not AgentPond environments:
+Select the Firebase project through AgentPond, which delegates to Firebase's
+active-project selection:
 
 ```bash
-firebase use <alias-or-project-id>
+npx agentpond env use <alias-or-project-id>
 npx agentpond sync
 npx agentpond traces list --limit 10
 ```
 
-Do not use `npx agentpond env init` or `npx agentpond env use` for Firebase projects.
+Confirm the active project at any time with `npx agentpond env current`.
+
+AgentPond manual environment operations (`get`, `list`, and `init`) and the
+local testing server are unavailable for Firebase projects. Use `env use` and
+the Firebase runtime instead.

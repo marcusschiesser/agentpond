@@ -7,37 +7,28 @@ description: Inspect and analyze AgentPond traces, observations, sessions, and s
 
 Use AgentPond to inspect collected trace data.
 
-Read these references when relevant:
+Read only the references relevant to the current task. Provider-specific
+references are authoritative for project selection, target selection, and
+credential access:
 
-- Data-access commands and environment selection: [references/cli.md](references/cli.md)
+- Provider-neutral query commands: [references/cli.md](references/cli.md)
+- Firebase data access: [references/firebase.md](references/firebase.md)
+- Vercel data access: [references/vercel.md](references/vercel.md)
 - DuckDB tables and SQL examples: [references/duckdb-schema.md](references/duckdb-schema.md)
 - Trace investigation workflow: [references/error-analysis.md](references/error-analysis.md)
 
 ## Select the data source
 
-First determine whether the current directory is inside a Firebase project.
+Determine the provider before syncing:
 
-For Firebase, select the project with Firebase:
+- For a Firebase project, read [references/firebase.md](references/firebase.md).
+- For a Vercel-linked project, read [references/vercel.md](references/vercel.md).
+- Otherwise, use an existing manual AgentPond environment as described in [references/cli.md](references/cli.md).
 
-```bash
-firebase use <alias-or-project-id>
-npx agentpond sync
-```
-
-AgentPond follows the Firebase CLI's active project selection, including
-selections stored globally when the project has no `.firebaserc`.
-If skill installation is cancelled, `init` stops without printing the coding-agent prompt.
-
-For non-Firebase storage, inspect and select an existing AgentPond environment:
-
-```bash
-npx agentpond env current
-npx agentpond env list
-npx agentpond env use <name>
-npx agentpond sync
-```
-
-Select only an existing non-Firebase environment as part of an analysis request.
+Do not create provider-choice state. Select the provider's environment with
+`npx agentpond env use <name>`: a Firebase alias or project ID, an exact Vercel
+target, or a manual AgentPond environment. Use `--env <name>` only for a
+one-command override. Confirm the selection with `npx agentpond env current`.
 
 ## Inspect traces
 
@@ -65,4 +56,4 @@ npx agentpond sql "select id, name, session_id, total_cost from traces order by 
 
 ## Report findings
 
-Separate confirmed observations from inference. Include the trace or session IDs inspected, commands or SQL used, the observed pattern, the likely cause, and the smallest useful code, prompt, or workflow change.
+Separate confirmed observations from inference. Include the provider and target inspected, trace or session IDs, commands or SQL used, the observed pattern, the likely cause, and the smallest useful code, prompt, or workflow change.

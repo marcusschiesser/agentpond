@@ -1,14 +1,9 @@
 import {
-	type AgentPondConfig,
-	type AgentPondEnvironment,
-	envValue,
 	type IngestionSink,
 	nonEmpty,
 	normalizePrefix,
 	type ObjectStore,
 	type ObjectStoreIngestionSinkOptions,
-	parseEnvFile,
-	sinkForConfig,
 	sinkFromStore,
 } from "@agentpond/core";
 import { get, list, put } from "@vercel/blob";
@@ -71,32 +66,22 @@ const defaultBlobClient: VercelBlobClient = {
 	list,
 };
 
-function vercelBlobConfigForAgentPondEnvironment(
-	envFilePath?: string,
+export function vercelBlobConfigFromEnv(
+	env: NodeJS.ProcessEnv,
 ): VercelBlobConfig {
-	const fileEnv = envFilePath ? parseEnvFile(envFilePath) : {};
-	const env = envValue(fileEnv);
 	return {
-		access: accessFromEnv(env("AGENTPOND_BLOB_ACCESS")),
-		token: nonEmpty(env("BLOB_READ_WRITE_TOKEN")),
-		storeId: nonEmpty(env("BLOB_STORE_ID")),
-		oidcToken: nonEmpty(env("VERCEL_OIDC_TOKEN")),
+		access: accessFromEnv(env.AGENTPOND_BLOB_ACCESS),
+		token: nonEmpty(env.BLOB_READ_WRITE_TOKEN),
+		storeId: nonEmpty(env.BLOB_STORE_ID),
+		oidcToken: nonEmpty(env.VERCEL_OIDC_TOKEN),
 	};
 }
 
 export function vercelBlobConfigFromRuntimeEnv(): VercelBlobConfig {
-	return vercelBlobConfigForAgentPondEnvironment();
+	return vercelBlobConfigFromEnv(process.env);
 }
 
 export class VercelBlobObjectStore implements ObjectStore {
-	static fromEnvironment(
-		environment: AgentPondEnvironment | undefined,
-	): VercelBlobObjectStore {
-		return new VercelBlobObjectStore(
-			vercelBlobConfigForAgentPondEnvironment(environment?.envFilePath),
-		);
-	}
-
 	static fromRuntimeEnv(): VercelBlobObjectStore {
 		return new VercelBlobObjectStore(vercelBlobConfigFromRuntimeEnv());
 	}
@@ -167,12 +152,6 @@ export class VercelBlobObjectStore implements ObjectStore {
 			oidcToken: this.config.oidcToken,
 		};
 	}
-}
-
-export function vercelSinkForConfig(config: AgentPondConfig): IngestionSink {
-	return sinkForConfig(config, {
-		vercel: VercelBlobObjectStore.fromEnvironment,
-	});
 }
 
 function accessFromEnv(value: string | undefined): VercelBlobAccess {

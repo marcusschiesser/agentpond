@@ -13,7 +13,7 @@ Common JavaScript surfaces include OpenAI, Anthropic, LangChain, Bedrock, Vercel
 
 ## Initialization order
 
-Set up the Firebase exporter and tracer provider, register instrumentations, and only then import or construct AI clients. Respect any framework-specific preload or bootstrap mechanism.
+Set up the selected provider's AgentPond exporter and tracer provider, register instrumentations, and only then import or construct AI clients. Respect any framework-specific preload or bootstrap mechanism.
 
 If the application already has a global provider, add the AgentPond exporter to it. Do not replace existing exporters unless the user explicitly asks.
 
@@ -35,6 +35,6 @@ Set `session.id` on the outer CHAIN or AGENT span. Generate it once at the conve
 
 - Long-running servers: keep the provider alive and flush at supported lifecycle boundaries.
 - Short-lived scripts and test commands: force-flush and shut down before process exit.
-- Firebase request handlers: do not shut down a module-level provider after every request.
+- Reusable Firebase or Vercel request handlers: do not shut down a module-level provider after every request.
 
 Run a real application request and verify the resulting trace rather than treating compilation alone as success. Confirm span kinds, inputs/outputs, parent-child relationships, tool results, and session grouping.

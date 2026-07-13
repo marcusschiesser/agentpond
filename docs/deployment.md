@@ -1,6 +1,6 @@
 # Deployment reference
 
-For deployment onboarding, start with [Manual deployment setup](./getting-started/manual-setup.md).
+For deployment onboarding, use automatic [Firebase](./getting-started/firebase.md) or [Vercel](./getting-started/vercel.md) setup, or start with [Manual deployment setup](./getting-started/manual-setup.md) for other providers.
 
 ## Write paths
 
@@ -54,13 +54,18 @@ npx agentpond env init production --store gcs
 ## Vercel
 
 - Object store: private Vercel Blob
-- Direct adapter: `VercelBlobObjectStore` from `@agentpond/vercel`
-- HTTP integration: a Node.js route using `handleIngestRequest`
+- Direct exporter: `createVercelSpanExporter()` from `@agentpond/vercel`
+- Runtime: trusted Node.js Vercel Functions, routes, or server actions; not Edge, middleware, client, or static code
 - Credentials: Vercel OIDC where available, otherwise `BLOB_READ_WRITE_TOKEN`
+- Isolation: `agentpond/otel/<vercel-project-id>-<target>/` in a shared private store
 
 ```bash
-npx agentpond env init production --store vercel
+npx agentpond init --platform vercel
+npx agentpond env use staging
+npx agentpond sync
 ```
+
+Vercel uses direct span export and does not require or create an AgentPond ingestion route. Production is the default target.
 
 ## Custom container infrastructure
 

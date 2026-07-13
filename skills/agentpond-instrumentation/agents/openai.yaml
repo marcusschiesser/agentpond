@@ -1,4 +1,4 @@
 interface:
   display_name: "AgentPond Instrumentation"
-  short_description: "Add OpenInference tracing to Firebase apps"
-  default_prompt: "Use $agentpond-instrumentation to add OpenInference tracing to this Firebase application."
+  short_description: "Trace Firebase or Vercel AI apps"
+  default_prompt: "Use $agentpond-instrumentation to add OpenInference tracing to this Firebase or Vercel application."

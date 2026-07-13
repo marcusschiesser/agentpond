@@ -5,9 +5,9 @@ import {
 	configFromEnv,
 	objectStoreForConfig as configuredObjectStoreForConfig,
 } from "@agentpond/core";
-import { firebaseEnvironmentContextFromCwdIfAvailable } from "@agentpond/firebase";
 import { GcsObjectStore } from "@agentpond/google";
-import { VercelBlobObjectStore } from "@agentpond/vercel";
+import { CliError } from "./cli-support.js";
+import { providerForCommand } from "./providers.js";
 
 export type EnvironmentContextOptions = {
 	cwd?: string;
@@ -17,10 +17,30 @@ export type EnvironmentContextOptions = {
 export function environmentContextForCommand(
 	options: EnvironmentContextOptions = {},
 ): AgentPondEnvironmentContext {
-	return (
-		firebaseEnvironmentContextFromCwdIfAvailable(options) ??
-		defaultAgentPondEnvironmentContext(options)
-	);
+	const providerContext = providerForCommand(options);
+	if (!providerContext) return defaultAgentPondEnvironmentContext(options);
+	try {
+		return providerContext.project.resolveEnvironment(options.envName);
+	} catch (error) {
+		throw new CliError(error instanceof Error ? error.message : String(error));
+	}
+}
+
+export function manualEnvironmentContextForCommand(
+	action: "dev" | "get" | "init" | "list",
+	options: EnvironmentContextOptions = {},
+): AgentPondEnvironmentContext {
+	const providerContext = providerForCommand({ cwd: options.cwd });
+	if (providerContext) {
+		const alternative =
+			action === "dev"
+				? "use the provider's runtime and direct span exporter instead"
+				: "use the provider's environment selection instead";
+		throw new CliError(
+			`npx agentpond ${action === "dev" ? "dev" : `env ${action}`} is not available for ${providerContext.provider.kind} projects; ${alternative}`,
+		);
+	}
+	return defaultAgentPondEnvironmentContext(options);
 }
 
 function defaultAgentPondEnvironmentContext(
@@ -41,7 +61,6 @@ function defaultAgentPondEnvironmentContext(
 				store: configuredObjectStoreForConfig(config, {
 					gcs: GcsObjectStore.fromEnvironment,
 					s3: S3ObjectStore.fromEnvironment,
-					vercel: VercelBlobObjectStore.fromEnvironment,
 				}),
 				projectId: config.projectId,
 				prefix: config.prefix,

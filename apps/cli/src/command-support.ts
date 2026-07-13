@@ -23,7 +23,7 @@ export type CommandContext = {
 
 export function addGlobalOptions(command: Command): Command {
 	return command
-		.option("--env <name>", "use a named AgentPond environment")
+		.option("--env <name>", "use an environment for this command")
 		.option("--json", "print machine-readable JSON output");
 }
 
@@ -62,7 +62,7 @@ function logImplicitEnvironment(
 	json: boolean,
 ): void {
 	if (json || options.env || !config.environment) return;
-	console.error(`Using AgentPond environment: ${config.environment.name}`);
+	console.error(`Using environment: ${config.environment.name}`);
 }
 
 function usesRunningDevCache(config: AgentPondConfig): boolean {

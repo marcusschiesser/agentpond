@@ -4,27 +4,25 @@ Run AgentPond through `npx` unless it is installed globally.
 
 ## Select data
 
-Firebase project selection is owned by Firebase:
-
-```bash
-firebase use <alias-or-project-id>
-npx agentpond sync
-```
-
-AgentPond detects the Firebase root from `.firebaserc` or `firebase.json`, follows the active selection stored by the Firebase CLI even when `.firebaserc` is absent, uses that project ID for the local cache name, reads the Firebase project data, and ignores AgentPond environment selection.
-
-`npx agentpond init` verifies that both AgentPond skills exist after installation. Cancelling the Skills CLI stops setup without printing a success message or coding-agent prompt.
-
-For non-Firebase storage, select an existing environment:
+Use the provider-specific reference for Firebase or Vercel. Environment
+selection uses the same commands for every provider:
 
 ```bash
 npx agentpond env current
-npx agentpond env list
-npx agentpond env use production
+npx agentpond env use <environment>
 npx agentpond --env staging sync
 ```
 
-Sync the selected environment before querying when recent data matters.
+`env use` persists through the detected provider. `--env` overrides that
+selection for one command. The provider-specific meaning and persistence are
+documented in the Firebase and Vercel references. Sync before querying when
+recent data matters.
+
+For manually configured S3 or GCS deployments, `env list`, `env init`, and
+`env get` manage AgentPond environment files. Those manual operations and the
+local testing server are unavailable when AgentPond detects Firebase or Vercel.
+
+`npx agentpond init` installs both AgentPond skills and prints a provider-specific coding-agent prompt. Cancelling skill installation stops setup without printing a success message or prompt.
 
 ## Query commands
 

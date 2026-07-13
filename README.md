@@ -14,7 +14,7 @@
   <a href="https://www.npmjs.com/package/agentpond"><img src="https://img.shields.io/node/v/agentpond.svg" alt="Node.js version"></a>
 </p>
 
-AgentPond is a lightweight trace backend and CLI for AI applications. It keeps raw traces in object storage you control and syncs them into a local DuckDB cache for fast analysis by developers and coding agents. Use it with Firebase Storage, Amazon S3, Google Cloud Storage, Vercel Blob, or custom infrastructure. Firebase includes an automated one-command setup; other deployments use the manual setup path.
+AgentPond is a lightweight trace backend and CLI for AI applications. It keeps raw traces in object storage you control and syncs them into a local DuckDB cache for fast analysis by developers and coding agents. Use it with Firebase Storage, Amazon S3, Google Cloud Storage, Vercel Blob, or custom infrastructure. Firebase and Vercel include automated setup; other deployments use the manual setup path.
 
 ## How it works
 
@@ -22,22 +22,22 @@ AgentPond is a lightweight trace backend and CLI for AI applications. It keeps r
 
 Object storage is the durable source of truth. The local DuckDB database is a rebuildable analytical cache, so production traces stay in your infrastructure without requiring an always-on analytics database.
 
-## Quick start: Firebase in one command
+## Getting started
 
-You need Node.js 22 or newer and an initialized Firebase project with an active project selected through `firebase use`.
+Start with the [Manual deployment setup](./docs/getting-started/manual-setup.md) to choose a write path, configure object storage, instrument the application, and sync its traces into AgentPond.
 
-From the Firebase project or any nested package, run:
+For Firebase and Vercel, AgentPond also provides automated quick starts:
+
+- [Firebase quick start](./docs/getting-started/firebase.md)
+- [Vercel quick start](./docs/getting-started/vercel.md)
+
+Both require Node.js 22 or newer. From the Firebase or Vercel project, run:
 
 ```sh
 npx agentpond init
 ```
 
-The command detects the Firebase project and installs two project skills:
-
-- `agentpond-instrumentation` teaches a coding agent to add OpenInference tracing and export spans directly with `createFirebaseSpanExporter()`.
-- `agentpond` teaches it to sync and analyze the resulting traces.
-
-After installation, copy the prompt printed by `npx agentpond init` into your coding agent. The agent will inspect the server-side application, propose the matching instrumentation, review Firebase Storage access, implement the change, and verify a real trace.
+The command detects the platform, installs AgentPond's instrumentation and analytics skills, and prints a prompt for your coding agent. The agent inspects the trusted Node.js application, proposes the provider-specific setup, implements it after confirmation, and verifies a real trace.
 
 Once the application has emitted a trace:
 
@@ -45,10 +45,6 @@ Once the application has emitted a trace:
 npx agentpond sync
 npx agentpond traces list --limit 10
 ```
-
-See [Firebase setup](./docs/getting-started/firebase.md) for prerequisites and troubleshooting.
-
-> For Amazon S3, Google Cloud Storage, Vercel Blob, or custom infrastructure, see [Manual deployment setup](./docs/getting-started/manual-setup.md).
 
 ## Analyze traces
 
@@ -84,6 +80,7 @@ AgentPond does not provide a web UI, hosted trace storage, prompt management, da
 ## Documentation
 
 - [Firebase setup](./docs/getting-started/firebase.md)
+- [Vercel setup](./docs/getting-started/vercel.md)
 - [Manual deployment setup](./docs/getting-started/manual-setup.md)
 - [CLI reference](./docs/cli.md)
 - [Deployment reference](./docs/deployment.md)
