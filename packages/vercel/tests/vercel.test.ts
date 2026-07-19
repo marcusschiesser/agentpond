@@ -19,6 +19,7 @@ import {
 	VercelBlobObjectStore,
 	type VercelProcessRunner,
 	vercelAgentPondProjectId,
+	vercelBlobConfigFromEnv,
 	vercelBlobConfigFromRuntimeEnv,
 	vercelCliProjectConfigFromCwd,
 	vercelEnvironmentContextFromCwdIfAvailable,
@@ -32,7 +33,7 @@ const auth: AuthConfig = {
 	secretKey: "sk",
 };
 
-test("Vercel Blob config reads provider settings from runtime env", () => {
+test("Vercel Blob runtime config leaves OIDC resolution to the SDK", () => {
 	const originalEnv = saveEnv(VERCEL_ENV_KEYS);
 
 	try {
@@ -42,7 +43,6 @@ test("Vercel Blob config reads provider settings from runtime env", () => {
 			access: "private",
 			token: undefined,
 			storeId: undefined,
-			oidcToken: undefined,
 		});
 
 		process.env.AGENTPOND_BLOB_ACCESS = "public";
@@ -51,6 +51,11 @@ test("Vercel Blob config reads provider settings from runtime env", () => {
 		process.env.VERCEL_OIDC_TOKEN = "oidc-token";
 
 		assert.deepEqual(vercelBlobConfigFromRuntimeEnv(), {
+			access: "public",
+			token: "rw-token",
+			storeId: "store_123",
+		});
+		assert.deepEqual(vercelBlobConfigFromEnv(process.env), {
 			access: "public",
 			token: "rw-token",
 			storeId: "store_123",

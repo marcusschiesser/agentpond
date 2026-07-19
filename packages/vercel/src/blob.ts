@@ -78,7 +78,12 @@ export function vercelBlobConfigFromEnv(
 }
 
 export function vercelBlobConfigFromRuntimeEnv(): VercelBlobConfig {
-	return vercelBlobConfigFromEnv(process.env);
+	const config = vercelBlobConfigFromEnv(process.env);
+	return {
+		access: config.access,
+		token: config.token,
+		storeId: config.storeId,
+	};
 }
 
 export class VercelBlobObjectStore implements ObjectStore {
