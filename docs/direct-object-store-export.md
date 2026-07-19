@@ -65,7 +65,7 @@ Use the matching adapter for the deployment:
 
 - `S3ObjectStore.fromRuntimeEnv()` from `@agentpond/aws`
 - `GcsObjectStore.fromRuntimeEnv()` from `@agentpond/google`
-- `VercelBlobObjectStore.fromRuntimeEnv()` from `@agentpond/vercel`
+- `createVercelSpanExporter()` from `@agentpond/vercel`
 - `createFirebaseSpanExporter()` from `@agentpond/firebase`
 - `new FileSystemObjectStore(path)` from `@agentpond/core`
 
@@ -78,7 +78,19 @@ Firebase users should start with `npx agentpond init`. The installed instrumenta
 After the application exports a trace, select the Firebase project, sync, and inspect it:
 
 ```sh
-firebase use <alias-or-project-id>
+npx agentpond env use <alias-or-project-id>
+npx agentpond sync
+npx agentpond traces list --limit 25
+```
+
+### Vercel
+
+Vercel users should start with `npx agentpond init --platform vercel`. The installed instrumentation skill links and provisions only after confirmation, then uses `createVercelSpanExporter()` in trusted Node.js server code. It never adds an ingestion route.
+
+The helper derives the linked project and exact deployment target from Vercel system variables and writes below `agentpond/otel/<vercel-project-id>-<target>/`. Production is the CLI default; persist another target with `env use` or override it per command:
+
+```sh
+npx agentpond env use staging
 npx agentpond sync
 npx agentpond traces list --limit 25
 ```

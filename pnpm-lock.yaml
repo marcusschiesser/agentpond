@@ -351,6 +351,9 @@ importers:
       '@agentpond/ingest':
         specifier: workspace:*
         version: link:../ingest
+      '@agentpond/otel':
+        specifier: workspace:*
+        version: link:../otel
       '@vercel/blob':
         specifier: ^2.5.0
         version: 2.5.0

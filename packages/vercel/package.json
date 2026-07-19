@@ -25,6 +25,7 @@
 	"dependencies": {
 		"@agentpond/core": "workspace:*",
 		"@agentpond/ingest": "workspace:*",
+		"@agentpond/otel": "workspace:*",
 		"@vercel/blob": "^2.5.0"
 	}
 }

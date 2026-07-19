@@ -1,6 +1,6 @@
 # Manual deployment setup
 
-Use this guide when the application is deployed on AWS, Google Cloud, Vercel, or custom infrastructure. Firebase projects should use [`npx agentpond init`](./firebase.md).
+Use this guide when the application is deployed on AWS, Google Cloud, or custom infrastructure. Firebase and Vercel projects should use `npx agentpond init` with the [Firebase](./firebase.md) or [Vercel](./vercel.md) automatic setup guide.
 
 ## Choose the write path
 
@@ -26,7 +26,6 @@ In non-interactive scripts, select it explicitly:
 ```bash
 npx agentpond env init production --store s3
 npx agentpond env init production --store gcs
-npx agentpond env init production --store vercel
 ```
 
 Edit `.agentpond/envs/production.env` with the deployed bucket, prefix, endpoint, and credential-chain settings. Do not commit secrets.
@@ -45,10 +44,6 @@ Use `@agentpond/aws` for direct export or Lambda ingestion, or run the published
 ## Google Cloud
 
 Use `@agentpond/google` for direct GCS export or HTTP Cloud Functions, or run the AgentPond container on Cloud Run or GKE. Authenticate with Application Default Credentials or a narrowly scoped service account.
-
-## Vercel
-
-Use `@agentpond/vercel` with a private Vercel Blob store. Prefer Vercel OIDC on Vercel deployments; use a Blob read-write token only where OIDC is unavailable.
 
 ## Containers and custom infrastructure
 

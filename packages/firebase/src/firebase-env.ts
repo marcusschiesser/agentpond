@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -8,6 +9,21 @@ export type FirebaseCliProjectConfig = {
 	root: string;
 	bucket?: string;
 };
+
+export type FirebaseProcessRequest = {
+	args: readonly string[];
+	cwd: string;
+};
+
+export type FirebaseProcessResult = {
+	exitCode: number;
+	stderr: string;
+	stdout: string;
+};
+
+export type FirebaseProcessRunner = (
+	request: FirebaseProcessRequest,
+) => Promise<FirebaseProcessResult>;
 
 export function isFirebaseProjectDirectory(cwd = process.cwd()): boolean {
 	return firebaseProjectDirectory(cwd) !== undefined;
@@ -22,6 +38,7 @@ export function firebaseProjectDirectory(
 export function firebaseCliProjectConfigFromCwd(
 	cwd = process.cwd(),
 	env: NodeJS.ProcessEnv = process.env,
+	projectName?: string,
 ): FirebaseCliProjectConfig {
 	const root = firebaseProjectDirectory(cwd);
 	if (!root) {
@@ -31,20 +48,21 @@ export function firebaseCliProjectConfigFromCwd(
 	}
 
 	const runtimeConfig = firebaseRuntimeConfig(env.FIREBASE_CONFIG);
-	const projectId =
-		firebaseProjectIdFromCli(root, env) ??
-		runtimeConfig?.projectId ??
-		firebaseProjectIdFromEnv(env);
+	const projectId = projectName
+		? (firebaseProjectIdFromRc(root, projectName) ?? projectName)
+		: (firebaseProjectIdFromCli(root, env) ??
+			runtimeConfig?.projectId ??
+			firebaseProjectIdFromEnv(env));
 	if (!projectId) {
 		throw new Error(
-			"Could not determine Firebase project id. Run firebase use <project> to select a project, or set FIREBASE_CONFIG, GCLOUD_PROJECT, GCP_PROJECT, or GOOGLE_CLOUD_PROJECT.",
+			"Could not determine Firebase project id. Run npx agentpond env use <project> to select a project, or set FIREBASE_CONFIG, GCLOUD_PROJECT, GCP_PROJECT, or GOOGLE_CLOUD_PROJECT.",
 		);
 	}
 
 	return {
 		projectId,
 		root,
-		...(runtimeConfig?.storageBucket
+		...(runtimeConfig?.projectId === projectId && runtimeConfig.storageBucket
 			? { bucket: runtimeConfig.storageBucket }
 			: {}),
 	};
@@ -72,9 +90,66 @@ export function firebaseFunctionsSourceDirectories(root: string): string[] {
 export function firebaseCliProjectConfigFromCwdIfAvailable(
 	cwd = process.cwd(),
 	env: NodeJS.ProcessEnv = process.env,
+	projectName?: string,
 ): FirebaseCliProjectConfig | undefined {
 	if (!firebaseProjectDirectory(cwd)) return undefined;
-	return firebaseCliProjectConfigFromCwd(cwd, env);
+	return firebaseCliProjectConfigFromCwd(cwd, env, projectName);
+}
+
+export async function selectFirebaseEnvironment(
+	name: string,
+	options: { cwd?: string } = {},
+	dependencies: { run?: FirebaseProcessRunner } = {},
+): Promise<string> {
+	const project = firebaseCliProjectConfigFromCwd(
+		options.cwd,
+		process.env,
+		name,
+	);
+	const result = await (dependencies.run ?? runFirebaseProcess)({
+		args: ["use", name, "--non-interactive"],
+		cwd: project.root,
+	});
+	if (result.exitCode !== 0) {
+		const detail = result.stderr.trim();
+		throw new Error(
+			detail
+				? `Could not select Firebase environment "${name}": ${detail}`
+				: `Could not select Firebase environment "${name}". Run firebase login and try again.`,
+		);
+	}
+	return project.projectId;
+}
+
+export async function runFirebaseProcess(
+	request: FirebaseProcessRequest,
+): Promise<FirebaseProcessResult> {
+	return await new Promise((resolve, reject) => {
+		execFile(
+			"firebase",
+			[...request.args],
+			{ cwd: request.cwd, encoding: "utf8" },
+			(error, stdout, stderr) => {
+				if (!error) {
+					resolve({ exitCode: 0, stderr, stdout });
+					return;
+				}
+				if (error.code === "ENOENT") {
+					reject(
+						new Error(
+							"Firebase CLI is required. Install it, run firebase login, and try again.",
+						),
+					);
+					return;
+				}
+				resolve({
+					exitCode: typeof error.code === "number" ? error.code : 1,
+					stderr,
+					stdout,
+				});
+			},
+		);
+	});
 }
 
 function isFirebaseProjectRoot(dir: string): boolean {

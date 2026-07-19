@@ -53,16 +53,11 @@ function storeTypeFromValue(
 	value: string | undefined,
 ): AgentPondStoreType | undefined {
 	if (value === undefined) return undefined;
-	if (
-		value === "local" ||
-		value === "s3" ||
-		value === "gcs" ||
-		value === "vercel"
-	) {
+	if (value === "local" || value === "s3" || value === "gcs") {
 		return value;
 	}
 	throw new Error(
-		`AGENTPOND_STORE must be "local", "s3", "gcs", or "vercel", got "${value}"`,
+		`AGENTPOND_STORE must be "local", "s3", or "gcs", got "${value}"`,
 	);
 }
 
@@ -93,10 +88,10 @@ function runtimeStoreTypeFromEnv(
 	env: NodeJS.ProcessEnv,
 ): RuntimeObjectStoreType {
 	const storeType = env.AGENTPOND_STORE ?? "s3";
-	if (storeType === "s3" || storeType === "gcs" || storeType === "vercel") {
+	if (storeType === "s3" || storeType === "gcs") {
 		return storeType;
 	}
 	throw new Error(
-		`AGENTPOND_STORE must be "s3", "gcs", or "vercel" for runtime config, got "${storeType}"`,
+		`AGENTPOND_STORE must be "s3" or "gcs" for runtime config, got "${storeType}"`,
 	);
 }

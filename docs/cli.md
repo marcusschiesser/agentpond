@@ -13,30 +13,64 @@ npx agentpond --version
 npx agentpond init
 ```
 
-`init` currently supports Firebase. It detects the Firebase root and active project, installs the `agentpond-instrumentation` and `agentpond` project skills, and prints a coding-agent prompt. It does not edit application code or create `.agentpond`.
+`init` detects Firebase or Vercel, installs the `agentpond-instrumentation` and `agentpond` project skills, and prints a provider-specific coding-agent prompt. It does not edit application code, provision storage, link Vercel, or create `.agentpond`.
 
-If the current project is not Firebase, the command exits with a link to [Manual deployment setup](./getting-started/manual-setup.md). `init` is interactive and does not support `--json`.
+When both platform markers exist, select one explicitly with `--platform firebase` or `--platform vercel`. A forced Vercel setup may begin before the app is linked; the coding agent asks for confirmation before running `vercel link` or provisioning Blob. Unsupported projects exit with a link to [Manual deployment setup](./getting-started/manual-setup.md). `init` is interactive and does not support `--json`.
 
 ## Global options
 
 ```text
---env <name>  use an existing non-Firebase AgentPond environment
+--env <name>  use an environment for this command
 --json        print machine-readable output where supported
 --version     print the installed CLI version
 ```
 
 ## Select data
 
-Firebase uses Firebase project selection:
+Use `env use` to select an environment for every deployment: an AgentPond
+environment name for manual storage, a Firebase alias or project ID, or an exact
+Vercel deployment target. `--env` overrides that selection for one command.
 
 ```bash
-firebase use <alias-or-project-id>
-npx agentpond sync
+npx agentpond env use <environment>
+npx agentpond env current
 ```
 
-Do not use `npx agentpond env init` or `npx agentpond env use` for Firebase.
+For Firebase, `env use` delegates to the Firebase CLI's active-project state:
 
-Non-Firebase deployments use AgentPond environments:
+```bash
+npx agentpond env use <alias-or-project-id>
+npx agentpond sync
+npx agentpond --env staging sync
+```
+
+AgentPond manual environment commands (`get`, `list`, and `init`) and
+`npx agentpond dev` are unavailable in Firebase projects. Use `env use`,
+one-command `--env` overrides, and the Firebase runtime instead.
+
+Vercel uses the linked project and an exact deployment target. Production is
+the default; `env use` persists another target in `.vercel/agentpond.json`, and
+`--env` selects another target for one command:
+
+```bash
+npx agentpond sync
+vercel target list --format json
+npx agentpond env use staging
+npx agentpond traces list --limit 10
+npx agentpond --env preview sync
+```
+
+AgentPond pulls target credentials temporarily. The Vercel selection file is
+bound to the linked project ID and is ignored with `.vercel`; no provider choice
+is stored in `.agentpond`. Data is isolated below
+`agentpond/otel/<vercel-project-id>-<target>/` even when projects and application
+data share one private Blob store.
+
+AgentPond manual environment commands (`get`, `list`, and `init`) and
+`npx agentpond dev` are unavailable in Vercel projects. Use the Vercel runtime
+and `env use` before sync or query commands.
+
+Manual deployments use AgentPond environments:
 
 ```bash
 npx agentpond env init production --store s3
@@ -45,7 +79,7 @@ npx agentpond env current
 npx agentpond env list
 ```
 
-Supported deployment stores are `s3`, `gcs`, and `vercel`. The `local` store is available only for explicit tests and filesystem fixtures.
+Supported deployment stores are `s3` and `gcs`. The `local` store is available only for explicit tests and filesystem fixtures.
 
 ## Local testing server
 

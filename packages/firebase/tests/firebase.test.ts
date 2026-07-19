@@ -17,13 +17,16 @@ import {
 import {
 	createFirebaseIngestFunction,
 	createFirebaseSpanExporter,
+	type FirebaseProcessRunner,
 	FirebaseStorageObjectStore,
 	firebaseAuthFromRuntimeEnv,
 	firebaseCliProjectConfigFromCwd,
 	firebaseCliProjectConfigFromCwdIfAvailable,
 	firebaseEnvironmentContextFromCwdIfAvailable,
 	firebaseFunctionsSourceDirectories,
+	firebaseProvider,
 	isFirebaseProjectDirectory,
+	selectFirebaseEnvironment,
 } from "../src/index.js";
 
 const auth: AuthConfig = {
@@ -85,7 +88,9 @@ test("Firebase CLI project config reads .firebaserc from cwd", () => {
 	assert.equal(firebaseCliProjectConfigFromCwdIfAvailable(cwd), undefined);
 	writeFileSync(
 		join(cwd, ".firebaserc"),
-		JSON.stringify({ projects: { default: "demo-project" } }),
+		JSON.stringify({
+			projects: { default: "demo-project", staging: "staging-project" },
+		}),
 		"utf8",
 	);
 
@@ -98,6 +103,75 @@ test("Firebase CLI project config reads .firebaserc from cwd", () => {
 		projectId: "demo-project",
 		root: cwd,
 	});
+	assert.deepEqual(
+		firebaseCliProjectConfigFromCwd(cwd, process.env, "staging"),
+		{ projectId: "staging-project", root: cwd },
+	);
+	const project = firebaseProvider.openProject({ cwd });
+	assert.ok(project);
+	assert.equal(firebaseProvider.kind, "firebase");
+	assert.equal(firebaseProvider.displayName, "Firebase");
+	assert.match(
+		firebaseProvider.instrumentationPrompt,
+		/createFirebaseSpanExporter/,
+	);
+	assert.equal(project.projectLabel, "demo-project");
+	assert.equal(project.rootDir, cwd);
+	assert.equal(
+		project.resolveEnvironment("staging").config.environment?.name,
+		"staging-project",
+	);
+});
+
+test("Firebase environment selection delegates to the Firebase CLI", async () => {
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-firebase-select-"));
+	writeFileSync(
+		join(cwd, ".firebaserc"),
+		JSON.stringify({
+			projects: { default: "prod-project", staging: "staging-project" },
+		}),
+		"utf8",
+	);
+	const requests: Parameters<FirebaseProcessRunner>[0][] = [];
+	const run: FirebaseProcessRunner = async (request) => {
+		requests.push(request);
+		return { exitCode: 0, stderr: "", stdout: "" };
+	};
+
+	assert.equal(
+		await selectFirebaseEnvironment("staging", { cwd }, { run }),
+		"staging-project",
+	);
+	assert.deepEqual(requests, [
+		{
+			args: ["use", "staging", "--non-interactive"],
+			cwd,
+		},
+	]);
+});
+
+test("Firebase environment selection reports Firebase CLI failures", async () => {
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-firebase-select-error-"));
+	writeFileSync(
+		join(cwd, ".firebaserc"),
+		JSON.stringify({ projects: { staging: "staging-project" } }),
+		"utf8",
+	);
+
+	await assert.rejects(
+		selectFirebaseEnvironment(
+			"staging",
+			{ cwd },
+			{
+				run: async () => ({
+					exitCode: 1,
+					stderr: "Project access denied",
+					stdout: "",
+				}),
+			},
+		),
+		/Could not select Firebase environment "staging": Project access denied/,
+	);
 });
 
 test("Firebase CLI project config reads global active project selections", () => {
@@ -195,20 +269,22 @@ test("Firebase CLI project config finds Functions source directories", () => {
 test("Firebase CLI project config reads Firebase config storage buckets", () => {
 	const cwd = mkdtempSync(join(tmpdir(), "agentpond-firebase-env-project-"));
 	writeFileSync(join(cwd, "firebase.json"), JSON.stringify({ functions: [] }));
-
-	assert.deepEqual(
-		firebaseCliProjectConfigFromCwd(cwd, {
-			FIREBASE_CONFIG: JSON.stringify({
-				projectId: "firebase-config-project",
-				storageBucket: "firebase-config-project.firebasestorage.app",
-			}),
-			GCLOUD_PROJECT: "gcloud-project",
-		} as NodeJS.ProcessEnv),
-		{
+	const env = {
+		FIREBASE_CONFIG: JSON.stringify({
 			projectId: "firebase-config-project",
-			root: cwd,
-			bucket: "firebase-config-project.firebasestorage.app",
-		},
+			storageBucket: "firebase-config-project.firebasestorage.app",
+		}),
+		GCLOUD_PROJECT: "gcloud-project",
+	} as NodeJS.ProcessEnv;
+
+	assert.deepEqual(firebaseCliProjectConfigFromCwd(cwd, env), {
+		projectId: "firebase-config-project",
+		root: cwd,
+		bucket: "firebase-config-project.firebasestorage.app",
+	});
+	assert.deepEqual(
+		firebaseCliProjectConfigFromCwd(cwd, env, "another-project"),
+		{ projectId: "another-project", root: cwd },
 	);
 });
 
@@ -263,12 +339,11 @@ test("Firebase environment context owns storage and dev behavior", async () => {
 		await withFakeFirebaseProject(new Map(), async ({ root }) => {
 			const context = firebaseEnvironmentContextFromCwdIfAvailable({
 				cwd: root,
-				envName: "dev",
 			});
 			assert.ok(context);
 			assert.equal(context.kind, "firebase");
 			assert.equal(context.rootDir, root);
-			assert.equal(context.config.environment?.name, "dev");
+			assert.equal(context.config.environment?.name, "demo-project");
 			assert.equal(context.usesAgentPondDevServer, false);
 
 			const storage = await context.resolveStorage();
@@ -278,6 +353,25 @@ test("Firebase environment context owns storage and dev behavior", async () => {
 	} finally {
 		restoreEnv(originalEnv);
 	}
+});
+
+test("Firebase environment context selects aliases statelessly", async () => {
+	await withFakeFirebaseProject(new Map(), async ({ root }) => {
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({
+				projects: { default: "demo-project", staging: "staging-project" },
+			}),
+			"utf8",
+		);
+		const context = firebaseEnvironmentContextFromCwdIfAvailable({
+			cwd: root,
+			envName: "staging",
+		});
+		assert.ok(context);
+		assert.equal(context.config.environment?.name, "staging-project");
+		assert.equal((await context.resolveStorage()).projectId, "staging-project");
+	});
 });
 
 test("Firebase CLI store reads the default bucket from the initialized project", async () => {

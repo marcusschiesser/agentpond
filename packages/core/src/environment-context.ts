@@ -8,3 +8,20 @@ export type AgentPondEnvironmentContext = {
 	usesAgentPondDevServer: boolean;
 	resolveStorage(): Promise<AgentPondStorageContext>;
 };
+
+export type AgentPondProviderProject = {
+	readonly rootDir: string;
+	readonly projectLabel: string;
+	selectEnvironment(name: string): Promise<string>;
+	resolveEnvironment(envName?: string): AgentPondEnvironmentContext;
+};
+
+export type AgentPondProvider = {
+	readonly kind: string;
+	readonly displayName: string;
+	readonly instrumentationPrompt: string;
+	openProject(options?: {
+		cwd?: string;
+		allowUnlinked?: boolean;
+	}): AgentPondProviderProject | undefined;
+};

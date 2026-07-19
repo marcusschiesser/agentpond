@@ -18,7 +18,11 @@ import {
 	type EnvVar,
 	filterEnvEntries,
 } from "../dev-env.js";
-import { environmentContextForCommand } from "../environment-context.js";
+import {
+	environmentContextForCommand,
+	manualEnvironmentContextForCommand,
+} from "../environment-context.js";
+import { providerForCommand } from "../providers.js";
 
 export type SelectPrompt<T extends string> = (config: {
 	message: string;
@@ -45,7 +49,7 @@ export function registerEnvCommand(
 	const promptSelect = options.selectEnvironment ?? select<string>;
 	const promptStore = options.selectStore ?? select<AgentPondInitStore>;
 	const env = addGlobalOptions(
-		program.command("env").description("manage local AgentPond environments"),
+		program.command("env").description("select and manage environments"),
 	);
 
 	addGlobalOptions(env.command("current"))
@@ -63,19 +67,21 @@ export function registerEnvCommand(
 		});
 
 	addGlobalOptions(env.command("get <name>"))
-		.description("print shell exports for an environment")
+		.description("print shell exports for a manual environment")
 		.option("--langfuse", "print only Langfuse-compatible SDK exports")
 		.option("--otel", "print only OpenTelemetry SDK exports")
 		.action((name: string, commandOptions: EnvOptions) => {
-			const context = environmentContextForCommand({ envName: name });
+			const context = manualEnvironmentContextForCommand("get", {
+				envName: name,
+			});
 			printEnvironmentExports(name, commandOptions, context.rootDir);
 		});
 
 	addGlobalOptions(env.command("list"))
-		.description("list local environments")
+		.description("list manual environments")
 		.action((_commandOptions: EnvOptions, command: Command) => {
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
-			const context = environmentContextForCommand({
+			const context = manualEnvironmentContextForCommand("list", {
 				envName: globalOptions.env,
 			});
 			const cwd = context.rootDir;
@@ -89,16 +95,13 @@ export function registerEnvCommand(
 		});
 
 	addGlobalOptions(env.command("init <name>"))
-		.description("initialize an environment")
-		.option("--store <store>", "object store: s3, gcs, vercel, or local")
+		.description("initialize a manual environment")
+		.option("--store <store>", "object store: s3, gcs, or local")
 		.action(
 			async (name: string, commandOptions: EnvOptions, command: Command) => {
-				const context = environmentContextForCommand({ envName: name });
-				if (context.kind !== "agentpond") {
-					throw new CliError(
-						`npx agentpond env init is not available for ${context.kind} projects; the project environment is detected automatically`,
-					);
-				}
+				const context = manualEnvironmentContextForCommand("init", {
+					envName: name,
+				});
 				const store =
 					storeFromValue(commandOptions.store) ??
 					(await promptForStore(promptStore));
@@ -126,36 +129,47 @@ export function registerEnvCommand(
 				_commandOptions: EnvOptions,
 				command: Command,
 			) => {
-				const context = environmentContextForCommand({ envName: name });
-				const selectedName =
-					name ??
-					(await promptForEnvironmentName(promptSelect, context.rootDir));
-				const environment = selectAgentPondEnvironment(selectedName, {
-					cwd: context.rootDir,
-				});
+				const selected = await selectEnvironmentForCommand(name, promptSelect);
 				return print(
-					{ selected: environment.name },
+					{ selected },
 					Boolean(command.optsWithGlobals<GlobalOptions>().json),
 				);
 			},
 		);
 }
 
+async function selectEnvironmentForCommand(
+	name: string | undefined,
+	promptSelect: SelectEnvironmentPrompt,
+): Promise<string> {
+	const providerContext = providerForCommand();
+	if (providerContext) {
+		if (!name) throw new CliError("Missing environment name");
+		try {
+			return await providerContext.project.selectEnvironment(name);
+		} catch (error) {
+			throw new CliError(
+				error instanceof Error ? error.message : String(error),
+			);
+		}
+	}
+
+	const context = environmentContextForCommand({ envName: name });
+	const selectedName =
+		name ?? (await promptForEnvironmentName(promptSelect, context.rootDir));
+	return selectAgentPondEnvironment(selectedName, {
+		cwd: context.rootDir,
+	}).name;
+}
+
 function storeFromValue(
 	value: string | undefined,
 ): AgentPondInitStore | undefined {
 	if (value === undefined) return undefined;
-	if (
-		value === "s3" ||
-		value === "gcs" ||
-		value === "vercel" ||
-		value === "local"
-	) {
+	if (value === "s3" || value === "gcs" || value === "local") {
 		return value;
 	}
-	throw new CliError(
-		`--store must be s3, gcs, vercel, or local, got "${value}"`,
-	);
+	throw new CliError(`--store must be s3, gcs, or local, got "${value}"`);
 }
 
 async function promptForStore(
@@ -169,7 +183,6 @@ async function promptForStore(
 		choices: [
 			{ name: "AWS S3 (or compatible)", value: "s3" },
 			{ name: "Google Cloud Storage (GCS)", value: "gcs" },
-			{ name: "Vercel Blob", value: "vercel" },
 			{ name: "Local filesystem", value: "local" },
 		],
 	});

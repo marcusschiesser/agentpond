@@ -15,6 +15,14 @@ This repository uses Changesets to generate package changelogs.
 - Keep `skills/agentpond/SKILL.md` and `skills/agentpond/references/cli.md` in sync with CLI behavior changes.
 - When a PR changes commands, flags, prompts, environment variables, or storage setup, update the skill in the same PR.
 
+## Provider, Project, and Environment Context
+
+- A provider is the static platform adapter registered by the CLI. It supplies platform metadata and opens a detected provider project from the current directory. Opening a project may succeed before the project is fully linked or configured.
+- A provider project is the project-bound handle returned by `provider.openProject()`. It owns the detected root and setup label, persistent environment selection, and environment resolution, so commands do not repeatedly pass `cwd` through unrelated provider methods.
+- An environment context is the resolved, per-command data-access state for one selected environment. It contains the project root, AgentPond configuration, local cache path, and lazy object-storage resolution. Resolving one may require provider-specific linking or configuration.
+- Keep the CLI provider registry, supported-platform parsing, and provider setup selection in `apps/cli/src/providers.ts`. Do not add provider-specific branches to `apps/cli/src/environment-context.ts`.
+- Use the provider registry to open a provider project for setup and for rejecting provider-managed projects before full resolution. Use the project handle for environment selection and use an environment context for commands that need resolved cache or storage state.
+
 ## Duplicate Code
 
 - Use the `$dry-refactoring` skill when analyzing or fixing duplicate-code findings.
@@ -30,7 +38,7 @@ This repository uses Changesets to generate package changelogs.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **agentpond** (1244 symbols, 2914 relationships, 98 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **agentpond** (1333 symbols, 3159 relationships, 106 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

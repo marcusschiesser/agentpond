@@ -21,7 +21,12 @@ import {
 	type ObjectStore,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
-import { FirebaseStorageObjectStore } from "@agentpond/firebase";
+import {
+	FIREBASE_INSTRUMENTATION_PROMPT,
+	FirebaseStorageObjectStore,
+	firebaseProvider,
+} from "@agentpond/firebase";
+import { VERCEL_INSTRUMENTATION_PROMPT } from "@agentpond/vercel";
 import { configForCommand } from "../src/command-support.js";
 import {
 	createDevLoggerOptions,
@@ -29,7 +34,6 @@ import {
 } from "../src/commands/dev.js";
 import {
 	agentPondInitHeader,
-	FIREBASE_INSTRUMENTATION_PROMPT,
 	installSkillsWithBundledCli,
 	MANUAL_SETUP_URL,
 	type SkillsInstallRequest,
@@ -156,7 +160,10 @@ test("CLI init installs AgentPond skills for a nested Firebase project", async (
 		assert.equal(
 			output,
 			[
-				agentPondInitHeader("firebase-demo"),
+				agentPondInitHeader({
+					displayName: "Firebase",
+					projectLabel: "firebase-demo",
+				}),
 				"AgentPond skills ready for Firebase project: firebase-demo",
 				"",
 				"Paste this prompt into your coding agent:",
@@ -250,7 +257,7 @@ test("CLI init follows Firebase CLI global active project selections", async () 
 	}
 });
 
-test("CLI init rejects non-Firebase projects without creating files", async () => {
+test("CLI init rejects unsupported projects without creating files", async () => {
 	const cwd = process.cwd();
 	const root = realpathSync(
 		mkdtempSync(join(tmpdir(), "agentpond-cli-init-non-firebase-")),
@@ -273,9 +280,9 @@ test("CLI init rejects non-Firebase projects without creating files", async () =
 		assert.equal(
 			stderr,
 			[
-				"Automatic AgentPond setup currently supports Firebase projects.",
+				"Automatic AgentPond setup supports Firebase and Vercel projects.",
 				"",
-				"For AWS, Google Cloud, Vercel, and other deployment setups, see:",
+				"For AWS, Google Cloud, and other deployment setups, see:",
 				MANUAL_SETUP_URL,
 				"",
 			].join("\n"),
@@ -284,6 +291,114 @@ test("CLI init rejects non-Firebase projects without creating files", async () =
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 	} finally {
 		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init installs AgentPond skills for a linked Vercel project", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-vercel-")),
+	);
+	const nested = join(root, "apps", "web");
+	const originalExitCode = process.exitCode;
+	let request: SkillsInstallRequest | undefined;
+	process.exitCode = undefined;
+	try {
+		mkdirSync(join(root, ".vercel"), { recursive: true });
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(
+			join(root, ".vercel", "project.json"),
+			JSON.stringify({ projectId: "prj_demo", projectName: "demo-web" }),
+			"utf8",
+		);
+		process.chdir(nested);
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init"], {
+				installSkills: async (installRequest) => {
+					request = installRequest;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(request, {
+			cwd: root,
+			source: "marcusschiesser/agentpond",
+			skills: ["agentpond-instrumentation", "agentpond"],
+		});
+		assert.match(output, /AgentPond skills ready for Vercel project: demo-web/);
+		assert.match(output, /createVercelSpanExporter/);
+		assert.equal(output.includes(VERCEL_INSTRUMENTATION_PROMPT), true);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init can force Vercel setup before the project is linked", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-vercel-unlinked-")),
+	);
+	const originalExitCode = process.exitCode;
+	let installCwd: string | undefined;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init", "--platform", "vercel"], {
+				installSkills: async (request) => {
+					installCwd = request.cwd;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(installCwd, root);
+		assert.match(output, /Vercel project: unlinked/);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init reports a missing explicitly selected provider project", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-firebase-missing-")),
+	);
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "init", "--platform", "firebase"]),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /No Firebase project was detected/);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init validates platform names against the provider registry", async () => {
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "init", "--platform", "unknown"]),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /--platform must be firebase or vercel/);
+	} finally {
 		process.exitCode = originalExitCode;
 	}
 });
@@ -320,7 +435,7 @@ test("CLI init requires an active Firebase project", async () => {
 
 		assert.equal(process.exitCode, 2);
 		assert.equal(installerCalled, false);
-		assert.match(stderr, /firebase use <alias-or-project-id>/);
+		assert.match(stderr, /agentpond env use <alias-or-project-id>/);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 	} finally {
 		for (const [key, value] of Object.entries(originalProjectEnv)) {
@@ -393,7 +508,16 @@ test("CLI init does not print a prompt when skill installation fails", async () 
 		});
 
 		assert.equal(process.exitCode, 1);
-		assert.equal(output, [agentPondInitHeader("firebase-demo"), ""].join("\n"));
+		assert.equal(
+			output,
+			[
+				agentPondInitHeader({
+					displayName: "Firebase",
+					projectLabel: "firebase-demo",
+				}),
+				"",
+			].join("\n"),
+		);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 	} finally {
 		process.chdir(cwd);
@@ -872,7 +996,7 @@ test("CLI reports the selected environment when --env is omitted for non-JSON co
 		);
 
 		assert.equal(process.exitCode, undefined);
-		assert.match(stderr, /Using AgentPond environment: dev/);
+		assert.match(stderr, /Using environment: dev/);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -1674,14 +1798,14 @@ test("CLI env init writes GCS store files from --store", async () => {
 	}
 });
 
-test("CLI env init writes Vercel store files from --store", async () => {
+test("CLI env init rejects the removed Vercel store option", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-vercel-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
 		process.chdir(root);
-		const output = await captureStdout(() =>
+		const stderr = await captureStderr(() =>
 			main([
 				"node",
 				"agentpond",
@@ -1690,22 +1814,12 @@ test("CLI env init writes Vercel store files from --store", async () => {
 				"staging",
 				"--store",
 				"vercel",
-				"--json",
 			]),
 		);
-		const result = JSON.parse(output) as {
-			store: string;
-			envFile: string;
-		};
-		const envFile = readFileSync(result.envFile, "utf8");
 
-		assert.equal(process.exitCode, undefined);
-		assert.equal(result.store, "vercel");
-		assert.match(envFile, /AGENTPOND_STORE=vercel/);
-		assert.match(envFile, /AGENTPOND_BLOB_ACCESS=private/);
-		assert.match(envFile, /BLOB_READ_WRITE_TOKEN=/);
-		assert.match(envFile, /BLOB_STORE_ID=/);
-		assert.match(envFile, /VERCEL_OIDC_TOKEN=/);
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /--store must be s3, gcs, or local/);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -1813,7 +1927,12 @@ test("CLI uses Firebase project ids as local cache environment names", () => {
 		process.chdir(root);
 		writeFileSync(
 			join(root, ".firebaserc"),
-			JSON.stringify({ projects: { default: "lunaraspect-dev" } }),
+			JSON.stringify({
+				projects: {
+					custom: "lunaraspect-custom",
+					default: "lunaraspect-dev",
+				},
+			}),
 			"utf8",
 		);
 
@@ -1825,10 +1944,10 @@ test("CLI uses Firebase project ids as local cache environment names", () => {
 			config.dbPath,
 			join(root, ".agentpond", "envs", "lunaraspect-dev", "cache.duckdb"),
 		);
-		assert.equal(explicitConfig.environment?.name, "custom");
+		assert.equal(explicitConfig.environment?.name, "lunaraspect-custom");
 		assert.equal(
 			explicitConfig.dbPath,
-			join(root, ".agentpond", "envs", "custom", "cache.duckdb"),
+			join(root, ".agentpond", "envs", "lunaraspect-custom", "cache.duckdb"),
 		);
 
 		writeFileSync(
@@ -1849,15 +1968,25 @@ test("CLI uses Firebase project ids as local cache environment names", () => {
 
 test("CLI Firebase commands use the Firebase project directory for AgentPond files", async () => {
 	const cwd = process.cwd();
+	const originalExitCode = process.exitCode;
 	const root = realpathSync(
 		mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-project-root-")),
 	);
 	const functionsDir = join(root, "packages", "functions");
+	const mutableProvider = firebaseProvider as unknown as {
+		openProject: typeof firebaseProvider.openProject;
+	};
+	const originalOpenProject = mutableProvider.openProject;
 	try {
 		mkdirSync(functionsDir, { recursive: true });
 		writeFileSync(
 			join(root, ".firebaserc"),
-			JSON.stringify({ projects: { default: "firebase-demo" } }),
+			JSON.stringify({
+				projects: {
+					default: "firebase-demo",
+					staging: "firebase-staging",
+				},
+			}),
 			"utf8",
 		);
 		writeFileSync(
@@ -1873,14 +2002,110 @@ test("CLI Firebase commands use the Firebase project directory for AgentPond fil
 			join(root, ".agentpond", "envs", "firebase-demo", "cache.duckdb"),
 		);
 
-		await captureStdout(() =>
-			main(["node", "agentpond", "env", "use", "staging"]),
+		process.exitCode = undefined;
+		mutableProvider.openProject = (options) => {
+			const project = originalOpenProject(options);
+			return project
+				? {
+						...project,
+						async selectEnvironment(name) {
+							assert.equal(name, "staging");
+							assert.equal(project.rootDir, root);
+							return "firebase-staging";
+						},
+					}
+				: undefined;
+		};
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "use", "staging", "--json"]),
 		);
-
-		assert.equal(existsSync(join(root, ".agentpond", "current-env")), true);
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(JSON.parse(output), { selected: "firebase-staging" });
+		assert.equal(existsSync(join(root, ".agentpond", "current-env")), false);
 		assert.equal(existsSync(join(functionsDir, ".agentpond")), false);
 	} finally {
+		mutableProvider.openProject = originalOpenProject;
 		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI managed providers reject manual environments and the dev server", async () => {
+	const cwd = process.cwd();
+	const originalExitCode = process.exitCode;
+	const projects = [
+		{
+			kind: "firebase",
+			setup(root: string) {
+				writeFileSync(
+					join(root, ".firebaserc"),
+					JSON.stringify({ projects: { default: "firebase-demo" } }),
+					"utf8",
+				);
+			},
+		},
+		{
+			kind: "vercel",
+			setup(root: string) {
+				mkdirSync(join(root, ".vercel"), { recursive: true });
+				writeFileSync(
+					join(root, ".vercel", "project.json"),
+					JSON.stringify({ projectId: "prj_demo" }),
+					"utf8",
+				);
+			},
+		},
+		{
+			kind: "vercel",
+			setup(root: string) {
+				writeFileSync(join(root, "vercel.json"), "{}", "utf8");
+			},
+		},
+	] as const;
+	const commands = [
+		{ action: "get", args: ["env", "get", "dev"] },
+		{ action: "list", args: ["env", "list"] },
+		{ action: "init", args: ["env", "init", "staging", "--store", "local"] },
+	] as const;
+
+	try {
+		for (const project of projects) {
+			const root = realpathSync(
+				mkdtempSync(join(tmpdir(), `agentpond-cli-${project.kind}-managed-`)),
+			);
+			project.setup(root);
+			process.chdir(root);
+
+			for (const command of commands) {
+				process.exitCode = undefined;
+				const stderr = await captureStderr(() =>
+					main(["node", "agentpond", ...command.args]),
+				);
+				assert.equal(process.exitCode, 2);
+				assert.match(
+					stderr,
+					new RegExp(
+						`npx agentpond env ${command.action} is not available for ${project.kind} projects`,
+					),
+				);
+			}
+
+			process.exitCode = undefined;
+			const stderr = await captureStderr(() =>
+				main(["node", "agentpond", "dev"]),
+			);
+			assert.equal(process.exitCode, 2);
+			assert.match(
+				stderr,
+				new RegExp(
+					`npx agentpond dev is not available for ${project.kind} projects`,
+				),
+			);
+			assert.equal(existsSync(join(root, ".agentpond")), false);
+		}
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
 	}
 });
 
@@ -1990,6 +2215,63 @@ test("CLI Firebase context ignores invalid AgentPond store values", async () => 
 	}
 });
 
+test("CLI env use persists the selected Vercel target", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-vercel-env-use-")),
+	);
+	const originalExitCode = process.exitCode;
+	try {
+		mkdirSync(join(root, ".vercel"), { recursive: true });
+		writeFileSync(
+			join(root, ".vercel", "project.json"),
+			JSON.stringify({ projectId: "prj_demo" }),
+			"utf8",
+		);
+		process.chdir(root);
+		process.exitCode = undefined;
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "use", "staging", "--json"]),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(JSON.parse(output), { selected: "staging" });
+		assert.deepEqual(
+			JSON.parse(readFileSync(join(root, ".vercel", "agentpond.json"), "utf8")),
+			{ projectId: "prj_demo", target: "staging" },
+		);
+		assert.equal(configForCommand({}).environment?.name, "staging");
+		assert.equal(
+			configForCommand({ env: "preview" }).environment?.name,
+			"preview",
+		);
+		assert.equal(existsSync(join(root, ".agentpond", "current-env")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI Vercel context rejects unlinked projects instead of using a manual context", () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-vercel-unlinked-context-")),
+	);
+	try {
+		writeFileSync(join(root, "vercel.json"), "{}", "utf8");
+		process.chdir(root);
+
+		assert.throws(
+			() => environmentContextForCommand(),
+			/Run vercel link before using AgentPond with this Vercel project/,
+		);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+	}
+});
+
 test("CLI default context validates stores only when storage is resolved", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-default-context-"));
@@ -2003,7 +2285,7 @@ test("CLI default context validates stores only when storage is resolved", async
 		assert.equal(context.usesAgentPondDevServer, true);
 		await assert.rejects(
 			context.resolveStorage(),
-			/AGENTPOND_STORE must be "local", "s3", "gcs", or "vercel"/,
+			/AGENTPOND_STORE must be "local", "s3", or "gcs"/,
 		);
 	} finally {
 		if (originalEnvStore === undefined) {
@@ -2080,7 +2362,7 @@ test("CLI env init rejects invalid stores", async () => {
 		);
 
 		assert.equal(process.exitCode, 2);
-		assert.match(stderr, /--store must be s3, gcs, vercel, or local/);
+		assert.match(stderr, /--store must be s3, gcs, or local/);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -2154,7 +2436,7 @@ test("CLI env init can select a store interactively", async () => {
 				selectStore: async ({ choices }) => {
 					assert.deepEqual(
 						choices.map((choice) => choice.value),
-						["s3", "gcs", "vercel", "local"],
+						["s3", "gcs", "local"],
 					);
 					return "local";
 				},
