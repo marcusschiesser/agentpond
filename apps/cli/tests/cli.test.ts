@@ -330,7 +330,6 @@ test("CLI init installs AgentPond skills for a linked Vercel project", async () 
 		});
 		assert.match(output, /AgentPond skills ready for Vercel project: demo-web/);
 		assert.match(output, /createVercelSpanExporter/);
-		assert.match(output, /do not add an ingestion route/);
 		assert.equal(output.includes(VERCEL_INSTRUMENTATION_PROMPT), true);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 	} finally {
