@@ -19,10 +19,10 @@ export type VercelCliProjectConfig = {
 };
 
 export const VERCEL_INSTRUMENTATION_PROMPT = `Use $agentpond-instrumentation to inspect this Vercel project and add
-OpenInference tracing to its trusted Node.js AI application.
+OpenInference tracing to its Node.js AI application.
 
-Use a connected private Vercel Blob store, export spans directly with
-createVercelSpanExporter() from @agentpond/vercel, and do not add an ingestion route.
+Use a connected private Vercel Blob store and export spans directly with
+createVercelSpanExporter() from @agentpond/vercel.
 
 Build the application, exercise one real AI request, then use $agentpond to:
 
