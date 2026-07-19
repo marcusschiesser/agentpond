@@ -1,5 +1,11 @@
 # @agentpond/core
 
+## 0.5.0
+
+### Minor Changes
+
+- 77afda6: Add automatic Vercel setup with target-aware direct span export to private Blob storage, SDK-managed runtime OIDC refresh, and provider-aware environment selection.
+
 ## 0.4.2
 
 ### Patch Changes
