@@ -1,5 +1,12 @@
 # @agentpond/ingest
 
+## 0.3.6
+
+### Patch Changes
+
+- Updated dependencies [77afda6]
+  - @agentpond/core@0.5.0
+
 ## 0.3.5
 
 ### Patch Changes
