@@ -1,5 +1,12 @@
 # @agentpond/otel
 
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [7874a1b]
+  - @agentpond/core@0.5.1
+
 ## 0.1.2
 
 ### Patch Changes

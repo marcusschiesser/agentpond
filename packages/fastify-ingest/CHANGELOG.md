@@ -1,5 +1,14 @@
 # @agentpond/fastify-ingest
 
+## 0.3.7
+
+### Patch Changes
+
+- 7874a1b: Harden Supabase prefix parsing and update production dependencies to versions containing current security fixes.
+- Updated dependencies [7874a1b]
+  - @agentpond/core@0.5.1
+  - @agentpond/ingest@0.3.7
+
 ## 0.3.6
 
 ### Patch Changes

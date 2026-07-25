@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/otel",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"description": "OpenTelemetry exporter for writing AgentPond traces directly to object storage",
 	"license": "MIT",
 	"type": "module",
