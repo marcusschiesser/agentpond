@@ -1,5 +1,11 @@
 # @agentpond/core
 
+## 0.5.1
+
+### Patch Changes
+
+- 7874a1b: Harden Supabase prefix parsing and update production dependencies to versions containing current security fixes.
+
 ## 0.5.0
 
 ### Minor Changes

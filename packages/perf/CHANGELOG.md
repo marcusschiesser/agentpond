@@ -1,5 +1,16 @@
 # @agentpond/perf
 
+## 0.1.11
+
+### Patch Changes
+
+- Updated dependencies [7874a1b]
+  - @agentpond/core@0.5.1
+  - @agentpond/fastify-ingest@0.3.7
+  - @agentpond/aws@0.3.8
+  - @agentpond/duckdb@0.3.8
+  - @agentpond/ingest@0.3.7
+
 ## 0.1.10
 
 ### Patch Changes

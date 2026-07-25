@@ -1,5 +1,25 @@
 # agentpond
 
+## 0.7.0
+
+### Minor Changes
+
+- 7874a1b: Add automatic Supabase project setup and private Storage-backed trace export.
+
+### Patch Changes
+
+- 7874a1b: Harden Supabase prefix parsing and update production dependencies to versions containing current security fixes.
+- Updated dependencies [7874a1b]
+- Updated dependencies [7874a1b]
+  - @agentpond/supabase@0.6.0
+  - @agentpond/core@0.5.1
+  - @agentpond/fastify-ingest@0.3.7
+  - @agentpond/aws@0.3.8
+  - @agentpond/duckdb@0.3.8
+  - @agentpond/firebase@0.5.1
+  - @agentpond/google@0.3.7
+  - @agentpond/vercel@0.5.1
+
 ## 0.6.0
 
 ### Minor Changes
