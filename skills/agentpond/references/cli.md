@@ -4,7 +4,7 @@ Run AgentPond through `npx` unless it is installed globally.
 
 ## Select data
 
-Use the provider-specific reference for Firebase or Vercel. Environment
+Use the provider-specific reference for Firebase, Supabase, or Vercel. Environment
 selection uses the same commands for every provider:
 
 ```bash
@@ -15,12 +15,22 @@ npx agentpond --env staging sync
 
 `env use` persists through the detected provider. `--env` overrides that
 selection for one command. The provider-specific meaning and persistence are
-documented in the Firebase and Vercel references. Sync before querying when
+documented in the Firebase, Supabase, and Vercel references. Sync before querying when
 recent data matters.
+
+When multiple provider markers are present, use `--platform firebase`,
+`--platform supabase`, or `--platform vercel` on each AgentPond command. This
+override is stateless and does not create provider-choice state:
+
+```bash
+npx agentpond env current --platform supabase
+npx agentpond sync --platform supabase
+```
 
 For manually configured S3 or GCS deployments, `env list`, `env init`, and
 `env get` manage AgentPond environment files. Those manual operations and the
-local testing server are unavailable when AgentPond detects Firebase or Vercel.
+local testing server are unavailable when AgentPond detects Firebase, Supabase,
+or Vercel.
 
 `npx agentpond init` installs both AgentPond skills and prints a provider-specific coding-agent prompt. Cancelling skill installation stops setup without printing a success message or prompt.
 

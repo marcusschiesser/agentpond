@@ -12,6 +12,7 @@ import { providerForCommand } from "./providers.js";
 export type EnvironmentContextOptions = {
 	cwd?: string;
 	envName?: string;
+	platform?: string;
 };
 
 export function environmentContextForCommand(
@@ -30,7 +31,10 @@ export function manualEnvironmentContextForCommand(
 	action: "dev" | "get" | "init" | "list",
 	options: EnvironmentContextOptions = {},
 ): AgentPondEnvironmentContext {
-	const providerContext = providerForCommand({ cwd: options.cwd });
+	const providerContext = providerForCommand({
+		cwd: options.cwd,
+		platform: options.platform,
+	});
 	if (providerContext) {
 		const alternative =
 			action === "dev"

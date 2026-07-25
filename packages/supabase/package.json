@@ -1,0 +1,34 @@
+{
+	"name": "@agentpond/supabase",
+	"version": "0.5.0",
+	"description": "Supabase Storage adapter and direct OpenTelemetry exporter for AgentPond",
+	"license": "MIT",
+	"type": "module",
+	"files": [
+		"dist"
+	],
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts",
+		"test:deno": "deno run tests/deno-smoke.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/marcusschiesser/agentpond.git",
+		"directory": "packages/supabase"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"dependencies": {
+		"@agentpond/core": "workspace:*",
+		"@agentpond/otel": "workspace:*",
+		"@supabase/supabase-js": "^2.110.6"
+	},
+	"devDependencies": {
+		"@opentelemetry/sdk-trace-base": "^2.9.0"
+	}
+}

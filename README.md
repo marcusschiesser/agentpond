@@ -14,7 +14,7 @@
   <a href="https://www.npmjs.com/package/agentpond"><img src="https://img.shields.io/node/v/agentpond.svg" alt="Node.js version"></a>
 </p>
 
-AgentPond is a lightweight trace backend and CLI for AI applications. It keeps raw traces in object storage you control and syncs them into a local DuckDB cache for fast analysis by developers and coding agents. Use it with Firebase Storage, Amazon S3, Google Cloud Storage, Vercel Blob, or custom infrastructure. Firebase and Vercel include automated setup; other deployments use the manual setup path.
+AgentPond is a lightweight trace backend and CLI for AI applications. It keeps raw traces in object storage you control and syncs them into a local DuckDB cache for fast analysis by developers and coding agents. Use it with Firebase Storage, Supabase Storage, Amazon S3, Google Cloud Storage, Vercel Blob, or custom infrastructure. Firebase, Supabase, and Vercel include automated setup; other deployments use the manual setup path.
 
 ## How it works
 
@@ -26,12 +26,13 @@ Object storage is the durable source of truth. The local DuckDB database is a re
 
 Start with the [Manual deployment setup](./docs/getting-started/manual-setup.md) to choose a write path, configure object storage, instrument the application, and sync its traces into AgentPond.
 
-For Firebase and Vercel, AgentPond also provides automated quick starts:
+For Firebase, Supabase, and Vercel, AgentPond also provides automated quick starts:
 
 - [Firebase quick start](./docs/getting-started/firebase.md)
+- [Supabase quick start](./docs/getting-started/supabase.md)
 - [Vercel quick start](./docs/getting-started/vercel.md)
 
-Both require Node.js 22 or newer. From the Firebase or Vercel project, run:
+All require Node.js 22 or newer for the CLI. From the provider project, run:
 
 ```sh
 npx agentpond init
@@ -65,7 +66,7 @@ npx agentpond sql "select id, name, session_id, total_cost from traces order by 
 
 ## Features
 
-- Direct OpenTelemetry export to Firebase Storage, S3, GCS, and Vercel Blob
+- Direct OpenTelemetry export to Firebase Storage, Supabase Storage, S3, GCS, and Vercel Blob
 - Langfuse-compatible and OTLP HTTP ingestion adapters
 - Incremental object-store synchronization
 - Local DuckDB projections for traces, observations, sessions, and scores
@@ -80,6 +81,7 @@ AgentPond does not provide a web UI, hosted trace storage, prompt management, da
 ## Documentation
 
 - [Firebase setup](./docs/getting-started/firebase.md)
+- [Supabase setup](./docs/getting-started/supabase.md)
 - [Vercel setup](./docs/getting-started/vercel.md)
 - [Manual deployment setup](./docs/getting-started/manual-setup.md)
 - [CLI reference](./docs/cli.md)

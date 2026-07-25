@@ -67,6 +67,7 @@ Use the matching adapter for the deployment:
 - `GcsObjectStore.fromRuntimeEnv()` from `@agentpond/google`
 - `createVercelSpanExporter()` from `@agentpond/vercel`
 - `createFirebaseSpanExporter()` from `@agentpond/firebase`
+- `createSupabaseSpanExporter()` from `@agentpond/supabase`
 - `new FileSystemObjectStore(path)` from `@agentpond/core`
 
 The application needs write credentials for the selected object store. Provider-specific prefix defaults and `AGENTPOND_PREFIX` continue to apply; an explicit `prefix` can be passed to the exporter where the store supports overrides.
@@ -92,6 +93,24 @@ The helper derives the linked project and exact deployment target from Vercel sy
 ```sh
 npx agentpond env use staging
 npx agentpond sync
+npx agentpond traces list --limit 25
+```
+
+### Supabase
+
+Supabase users should start with `npx agentpond init --platform supabase`. The
+installed instrumentation skill creates or reuses a dedicated private
+`agentpond` bucket after confirmation, reviews Storage RLS, and uses
+`createSupabaseSpanExporter()` in a Supabase Edge Function or trusted Node.js
+backend. It never adds an ingestion route.
+
+The helper derives the hosted project ref from `SUPABASE_URL` and writes below
+`otel/<project-ref>/`. Persist a linked project or query another branch ref
+without changing the link:
+
+```sh
+npx agentpond env use <project-ref>
+npx agentpond --env <branch-project-ref> sync
 npx agentpond traces list --limit 25
 ```
 

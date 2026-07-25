@@ -1,6 +1,6 @@
 # Manual deployment setup
 
-Use this guide when the application is deployed on AWS, Google Cloud, or custom infrastructure. Firebase and Vercel projects should use `npx agentpond init` with the [Firebase](./firebase.md) or [Vercel](./vercel.md) automatic setup guide.
+Use this guide when the application is deployed on AWS, Google Cloud, or custom infrastructure. Firebase, Supabase, and Vercel projects should use `npx agentpond init` with the [Firebase](./firebase.md), [Supabase](./supabase.md), or [Vercel](./vercel.md) automatic setup guide.
 
 ## Choose the write path
 

@@ -3,14 +3,16 @@ import type {
 	AgentPondProviderProject,
 } from "@agentpond/core";
 import { firebaseProvider } from "@agentpond/firebase";
+import { supabaseProvider } from "@agentpond/supabase";
 import { vercelProvider } from "@agentpond/vercel";
 import { CliError } from "./cli-support.js";
 
-export const AVAILABLE_PLATFORMS = ["firebase", "vercel"] as const;
+export const AVAILABLE_PLATFORMS = ["firebase", "supabase", "vercel"] as const;
 export type InitPlatform = (typeof AVAILABLE_PLATFORMS)[number];
 
 const PROVIDERS_BY_PLATFORM = {
 	firebase: firebaseProvider,
+	supabase: supabaseProvider,
 	vercel: vercelProvider,
 } satisfies Record<InitPlatform, AgentPondProvider>;
 
@@ -35,13 +37,14 @@ export function initPlatformFromValue(
 }
 
 export function providerForCommand(
-	options: { cwd?: string; platform?: InitPlatform } = {},
+	options: { allowUnlinked?: boolean; cwd?: string; platform?: string } = {},
 ): ProviderProjectContext | undefined {
-	if (options.platform) {
-		const provider = PROVIDERS_BY_PLATFORM[options.platform];
+	const platform = initPlatformFromValue(options.platform);
+	if (platform) {
+		const provider = PROVIDERS_BY_PLATFORM[platform];
 		const project = provider.openProject({
 			cwd: options.cwd,
-			allowUnlinked: true,
+			allowUnlinked: options.allowUnlinked,
 		});
 		if (!project) {
 			throw new CliError(
@@ -57,7 +60,7 @@ export function providerForCommand(
 	});
 	if (projects.length > 1) {
 		throw new CliError(
-			`Multiple AgentPond platforms were detected: ${projects.map(({ provider }) => provider.displayName).join(", ")}. Remove the unrelated project marker or select one with npx agentpond init --platform <platform>.`,
+			`Multiple AgentPond platforms were detected: ${projects.map(({ provider }) => provider.displayName).join(", ")}. Pass --platform <platform> to select one for this command.`,
 		);
 	}
 	return projects[0];

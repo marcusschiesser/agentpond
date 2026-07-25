@@ -9,11 +9,11 @@ import { buildServer } from "@agentpond/fastify-ingest";
 import type { Command } from "commander";
 import type { FastifyInstance, FastifyLoggerOptions } from "fastify";
 import { CliError, parsePort } from "../cli-support.js";
-import { addGlobalOptions } from "../command-support.js";
+import { addGlobalOptions, type GlobalOptions } from "../command-support.js";
 import { devSdkEnvironment } from "../dev-env.js";
 import { manualEnvironmentContextForCommand } from "../environment-context.js";
 
-type DevOptions = {
+type DevOptions = GlobalOptions & {
 	host?: string;
 	port?: string;
 };
@@ -23,15 +23,22 @@ export function registerDevCommand(program: Command): void {
 		.description("start a local Langfuse SDK-compatible ingestion server")
 		.option("--host <host>", "host to bind", "127.0.0.1")
 		.option("--port <port>", "port to bind", "4318")
-		.action(async (options: DevOptions) => {
-			await startDevServer(options);
+		.action(async (options: DevOptions, command: Command) => {
+			const globalOptions = command.optsWithGlobals<GlobalOptions>();
+			await startDevServer({
+				...options,
+				platform: globalOptions.platform,
+			});
 		});
 }
 
 export async function startDevServer(options: DevOptions): Promise<void> {
 	const host = options.host ?? "127.0.0.1";
 	const startPort = parsePort(options.port ?? "4318");
-	const context = manualEnvironmentContextForCommand("dev", { envName: "dev" });
+	const context = manualEnvironmentContextForCommand("dev", {
+		envName: "dev",
+		platform: options.platform,
+	});
 	const cwd = context.rootDir;
 	const environment = initAgentPondEnvironment("dev", { cwd });
 	selectAgentPondEnvironment(environment.name, { cwd });

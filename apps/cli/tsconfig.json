@@ -10,6 +10,7 @@
 		{ "path": "../../packages/aws" },
 		{ "path": "../../packages/firebase" },
 		{ "path": "../../packages/google" },
+		{ "path": "../../packages/supabase" },
 		{ "path": "../../packages/vercel" },
 		{ "path": "../../packages/duckdb" },
 		{ "path": "../../packages/fastify-ingest" },

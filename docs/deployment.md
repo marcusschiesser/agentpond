@@ -1,12 +1,12 @@
 # Deployment reference
 
-For deployment onboarding, use automatic [Firebase](./getting-started/firebase.md) or [Vercel](./getting-started/vercel.md) setup, or start with [Manual deployment setup](./getting-started/manual-setup.md) for other providers.
+For deployment onboarding, use automatic [Firebase](./getting-started/firebase.md), [Supabase](./getting-started/supabase.md), or [Vercel](./getting-started/vercel.md) setup, or start with [Manual deployment setup](./getting-started/manual-setup.md) for other providers.
 
 ## Write paths
 
 ### Direct object-store export
 
-A trusted Node.js application writes spans directly to object storage with `AgentPondSpanExporter` and an adapter from `@agentpond/aws`, `@agentpond/google`, or `@agentpond/vercel`.
+A trusted server application writes spans directly to object storage with `AgentPondSpanExporter` and a provider adapter.
 
 ```text
 Node.js application -> object storage -> npx agentpond sync -> local DuckDB
@@ -66,6 +66,23 @@ npx agentpond sync
 ```
 
 Vercel uses direct span export and does not require or create an AgentPond ingestion route. Production is the default target.
+
+## Supabase
+
+- Object store: dedicated private Supabase Storage bucket named `agentpond`
+- Direct exporter: `createSupabaseSpanExporter()` from `@agentpond/supabase`
+- Runtime: Supabase Edge Functions or trusted Node.js backends
+- Credentials: modern Supabase secret key, with temporary legacy `service_role` compatibility
+- Isolation: `otel/<project-ref>/`; branches use their distinct hosted project refs
+
+```bash
+npx agentpond init --platform supabase
+npx agentpond env use <project-ref>
+npx agentpond sync
+```
+
+Supabase uses direct span export and does not require an AgentPond ingestion
+route. Review `storage.objects` RLS policies even when the bucket is private.
 
 ## Custom container infrastructure
 

@@ -58,6 +58,7 @@ export function registerEnvCommand(
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
 			const environment = environmentContextForCommand({
 				envName: globalOptions.env,
+				platform: globalOptions.platform,
 			}).config.environment;
 			if (!environment) throw new CliError("Missing environment configuration");
 			if (globalOptions.json) {
@@ -70,9 +71,11 @@ export function registerEnvCommand(
 		.description("print shell exports for a manual environment")
 		.option("--langfuse", "print only Langfuse-compatible SDK exports")
 		.option("--otel", "print only OpenTelemetry SDK exports")
-		.action((name: string, commandOptions: EnvOptions) => {
+		.action((name: string, commandOptions: EnvOptions, command: Command) => {
+			const globalOptions = command.optsWithGlobals<GlobalOptions>();
 			const context = manualEnvironmentContextForCommand("get", {
 				envName: name,
+				platform: globalOptions.platform,
 			});
 			printEnvironmentExports(name, commandOptions, context.rootDir);
 		});
@@ -83,6 +86,7 @@ export function registerEnvCommand(
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
 			const context = manualEnvironmentContextForCommand("list", {
 				envName: globalOptions.env,
+				platform: globalOptions.platform,
 			});
 			const cwd = context.rootDir;
 			const selected = context.config.environment?.name ?? "dev";
@@ -99,8 +103,10 @@ export function registerEnvCommand(
 		.option("--store <store>", "object store: s3, gcs, or local")
 		.action(
 			async (name: string, commandOptions: EnvOptions, command: Command) => {
+				const globalOptions = command.optsWithGlobals<GlobalOptions>();
 				const context = manualEnvironmentContextForCommand("init", {
 					envName: name,
+					platform: globalOptions.platform,
 				});
 				const store =
 					storeFromValue(commandOptions.store) ??
@@ -116,7 +122,7 @@ export function registerEnvCommand(
 						dbPath: environment.dbPath,
 						store,
 					},
-					Boolean(command.optsWithGlobals<GlobalOptions>().json),
+					Boolean(globalOptions.json),
 				);
 			},
 		);
@@ -129,11 +135,13 @@ export function registerEnvCommand(
 				_commandOptions: EnvOptions,
 				command: Command,
 			) => {
-				const selected = await selectEnvironmentForCommand(name, promptSelect);
-				return print(
-					{ selected },
-					Boolean(command.optsWithGlobals<GlobalOptions>().json),
+				const globalOptions = command.optsWithGlobals<GlobalOptions>();
+				const selected = await selectEnvironmentForCommand(
+					name,
+					promptSelect,
+					globalOptions,
 				);
+				return print({ selected }, Boolean(globalOptions.json));
 			},
 		);
 }
@@ -141,8 +149,9 @@ export function registerEnvCommand(
 async function selectEnvironmentForCommand(
 	name: string | undefined,
 	promptSelect: SelectEnvironmentPrompt,
+	options: GlobalOptions,
 ): Promise<string> {
-	const providerContext = providerForCommand();
+	const providerContext = providerForCommand({ platform: options.platform });
 	if (providerContext) {
 		if (!name) throw new CliError("Missing environment name");
 		try {
@@ -154,7 +163,10 @@ async function selectEnvironmentForCommand(
 		}
 	}
 
-	const context = environmentContextForCommand({ envName: name });
+	const context = environmentContextForCommand({
+		envName: name,
+		platform: options.platform,
+	});
 	const selectedName =
 		name ?? (await promptForEnvironmentName(promptSelect, context.rootDir));
 	return selectAgentPondEnvironment(selectedName, {
