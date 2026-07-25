@@ -397,7 +397,11 @@ function invalidSupabaseCredentialError(): Error {
 }
 
 function listingDirectoryForPrefix(prefix: string): string {
-	const trimmed = prefix.replace(/^\/+|\/+$/g, "");
+	let start = 0;
+	while (prefix[start] === "/") start += 1;
+	let end = prefix.length;
+	while (end > start && prefix[end - 1] === "/") end -= 1;
+	const trimmed = prefix.slice(start, end);
 	if (!trimmed) return "";
 	if (prefix.endsWith("/")) return trimmed;
 	const separator = trimmed.lastIndexOf("/");

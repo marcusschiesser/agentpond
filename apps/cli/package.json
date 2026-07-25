@@ -37,7 +37,7 @@
 		"@inquirer/prompts": "8.5.2",
 		"commander": "15.0.0",
 		"fastify": "^5.6.2",
-		"protobufjs": "^7.6.4",
+		"protobufjs": "^7.6.5",
 		"skills": "1.5.9",
 		"zod": "^4.3.6"
 	}

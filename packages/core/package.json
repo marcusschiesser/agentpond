@@ -23,7 +23,7 @@
 		}
 	},
 	"dependencies": {
-		"protobufjs": "^7.6.4",
+		"protobufjs": "^7.6.5",
 		"zod": "^4.3.6"
 	}
 }
