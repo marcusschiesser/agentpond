@@ -26,6 +26,11 @@ import {
 	FirebaseStorageObjectStore,
 	firebaseProvider,
 } from "@agentpond/firebase";
+import {
+	SUPABASE_INSTRUMENTATION_PROMPT,
+	SupabaseStorageObjectStore,
+	supabaseProvider,
+} from "@agentpond/supabase";
 import { VERCEL_INSTRUMENTATION_PROMPT } from "@agentpond/vercel";
 import { configForCommand } from "../src/command-support.js";
 import {
@@ -280,7 +285,7 @@ test("CLI init rejects unsupported projects without creating files", async () =>
 		assert.equal(
 			stderr,
 			[
-				"Automatic AgentPond setup supports Firebase and Vercel projects.",
+				"Automatic AgentPond setup supports Firebase, Supabase, and Vercel projects.",
 				"",
 				"For AWS, Google Cloud, and other deployment setups, see:",
 				MANUAL_SETUP_URL,
@@ -289,6 +294,242 @@ test("CLI init rejects unsupported projects without creating files", async () =>
 		);
 		assert.doesNotMatch(stderr, /local.*deployment/i);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init installs AgentPond skills for a nested linked Supabase project", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-supabase-")),
+	);
+	const nested = join(root, "supabase", "functions", "chat");
+	const projectRef = "abcdefghijklmnopqrst";
+	const originalExitCode = process.exitCode;
+	let request: SkillsInstallRequest | undefined;
+	process.exitCode = undefined;
+	try {
+		mkdirSync(join(root, "supabase", ".temp"), { recursive: true });
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(
+			join(root, "supabase", "config.toml"),
+			'project_id = "demo"\n',
+		);
+		writeFileSync(
+			join(root, "supabase", ".temp", "project-ref"),
+			`${projectRef}\n`,
+		);
+		process.chdir(nested);
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init"], {
+				installSkills: async (installRequest) => {
+					request = installRequest;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(request, {
+			cwd: root,
+			source: "marcusschiesser/agentpond",
+			skills: ["agentpond-instrumentation", "agentpond"],
+		});
+		assert.match(
+			output,
+			new RegExp(`AgentPond skills ready for Supabase project: ${projectRef}`),
+		);
+		assert.match(output, /createSupabaseSpanExporter/);
+		assert.equal(output.includes(SUPABASE_INSTRUMENTATION_PROMPT), true);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init detects an unlinked Supabase marker", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-supabase-unlinked-")),
+	);
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		mkdirSync(join(root, "supabase"), { recursive: true });
+		writeFileSync(
+			join(root, "supabase", "config.toml"),
+			'project_id = "demo"\n',
+		);
+		process.chdir(root);
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init"], {
+				installSkills: async () => {},
+			}),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.match(output, /Supabase project: unlinked/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init can explicitly select Supabase before project initialization", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-supabase-explicit-")),
+	);
+	const originalExitCode = process.exitCode;
+	let installCwd: string | undefined;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init", "--platform", "supabase"], {
+				installSkills: async (request) => {
+					installCwd = request.cwd;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(installCwd, root);
+		assert.match(output, /Supabase project: unlinked/);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init reports multiple-provider ambiguity including Supabase", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-ambiguous-supabase-")),
+	);
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		writeFileSync(
+			join(root, ".firebaserc"),
+			JSON.stringify({ projects: { default: "firebase-demo" } }),
+		);
+		mkdirSync(join(root, "supabase", ".temp"), { recursive: true });
+		writeFileSync(
+			join(root, "supabase", "config.toml"),
+			'project_id = "demo"\n',
+		);
+		writeFileSync(
+			join(root, "supabase", ".temp", "project-ref"),
+			"abcdefghijklmnopqrst\n",
+		);
+		process.chdir(root);
+
+		const stderr = await captureStderr(() =>
+			main(["node", "agentpond", "init"], {
+				installSkills: async () => {},
+			}),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /Multiple AgentPond platforms were detected/);
+		assert.match(stderr, /Firebase, Supabase/);
+		assert.match(stderr, /--platform <platform>/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI --platform disambiguates data and environment commands", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-platform-override-")),
+	);
+	const projectRef = "abcdefghijklmnopqrst";
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		mkdirSync(join(root, "supabase", ".temp"), { recursive: true });
+		mkdirSync(join(root, ".vercel"), { recursive: true });
+		writeFileSync(
+			join(root, "supabase", "config.toml"),
+			'project_id = "demo"\n',
+		);
+		writeFileSync(
+			join(root, "supabase", ".temp", "project-ref"),
+			`${projectRef}\n`,
+		);
+		writeFileSync(
+			join(root, ".vercel", "project.json"),
+			JSON.stringify({ projectId: "prj_demo", projectName: "demo-web" }),
+		);
+		process.chdir(root);
+
+		assert.throws(
+			() => environmentContextForCommand(),
+			/Multiple AgentPond platforms were detected/,
+		);
+		assert.equal(
+			environmentContextForCommand({ platform: "supabase" }).kind,
+			"supabase",
+		);
+		assert.equal(
+			environmentContextForCommand({ platform: "vercel" }).kind,
+			"vercel",
+		);
+
+		const db = new AgentPondCache(
+			join(root, ".agentpond", "envs", projectRef, "cache.duckdb"),
+		);
+		await db.ensureSchema();
+		await db.close();
+
+		const tracesOutput = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"traces",
+				"list",
+				"--platform",
+				"supabase",
+				"--json",
+			]),
+		);
+		assert.deepEqual(JSON.parse(tracesOutput), []);
+		assert.equal(process.exitCode, undefined);
+
+		const currentOutput = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"--platform",
+				"vercel",
+				"env",
+				"current",
+				"--json",
+			]),
+		);
+		const current = JSON.parse(currentOutput) as { name: string };
+		assert.equal(current.name, "production");
+		assert.equal(process.exitCode, undefined);
+
+		for (const args of [
+			["env", "list", "--platform", "supabase"],
+			["dev", "--platform", "vercel"],
+		]) {
+			process.exitCode = undefined;
+			const stderr = await captureStderr(() =>
+				main(["node", "agentpond", ...args]),
+			);
+			assert.equal(process.exitCode, 2);
+			assert.match(stderr, /is not available for (supabase|vercel) projects/);
+		}
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -397,7 +638,7 @@ test("CLI init validates platform names against the provider registry", async ()
 		);
 
 		assert.equal(process.exitCode, 2);
-		assert.match(stderr, /--platform must be firebase or vercel/);
+		assert.match(stderr, /--platform must be firebase or supabase or vercel/);
 	} finally {
 		process.exitCode = originalExitCode;
 	}
@@ -1918,6 +2159,181 @@ test("CLI object storage auto-detects Firebase monorepos from firebase.json", as
 	}
 });
 
+test("CLI object storage resolves linked Supabase projects from nested directories", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-supabase-storage-")),
+	);
+	const nested = join(root, "apps", "api");
+	const projectRef = "abcdefghijklmnopqrst";
+	const originalFromCliProject = SupabaseStorageObjectStore.fromCliProject;
+	const store = new MemoryObjectStore();
+	let resolvedProjectRef: string | undefined;
+	try {
+		mkdirSync(join(root, "supabase", ".temp"), { recursive: true });
+		mkdirSync(nested, { recursive: true });
+		writeFileSync(
+			join(root, "supabase", "config.toml"),
+			'project_id = "demo"\n',
+		);
+		writeFileSync(
+			join(root, "supabase", ".temp", "project-ref"),
+			`${projectRef}\n`,
+		);
+		process.chdir(nested);
+		SupabaseStorageObjectStore.fromCliProject = (async (project) => {
+			resolvedProjectRef = project.projectRef;
+			return store;
+		}) as typeof SupabaseStorageObjectStore.fromCliProject;
+
+		const context = environmentContextForCommand();
+		const storage = await context.resolveStorage();
+
+		assert.equal(context.kind, "supabase");
+		assert.equal(context.rootDir, root);
+		assert.equal(context.usesAgentPondDevServer, false);
+		assert.equal(context.config.projectId, projectRef);
+		assert.equal(context.config.environment?.name, projectRef);
+		assert.equal(
+			context.config.dbPath,
+			join(root, ".agentpond", "envs", projectRef, "cache.duckdb"),
+		);
+		assert.equal(storage.store, store);
+		assert.equal(storage.projectId, projectRef);
+		assert.equal(storage.prefix, "");
+		assert.equal(resolvedProjectRef, projectRef);
+	} finally {
+		SupabaseStorageObjectStore.fromCliProject = originalFromCliProject;
+		process.chdir(cwd);
+	}
+});
+
+test("CLI Supabase --env overrides are stateless and env current uses the linked ref", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-supabase-env-")),
+	);
+	const projectRef = "abcdefghijklmnopqrst";
+	const overrideRef = "bcdefghijklmnopqrstu";
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		mkdirSync(join(root, "supabase", ".temp"), { recursive: true });
+		writeFileSync(
+			join(root, "supabase", "config.toml"),
+			'project_id = "demo"\n',
+		);
+		const linkPath = join(root, "supabase", ".temp", "project-ref");
+		writeFileSync(linkPath, `${projectRef}\n`);
+		process.chdir(root);
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "current", "--json"]),
+		);
+		const current = JSON.parse(output) as { name: string; dbPath: string };
+		assert.equal(current.name, projectRef);
+		assert.equal(
+			current.dbPath,
+			join(root, ".agentpond", "envs", projectRef, "cache.duckdb"),
+		);
+
+		const override = configForCommand({ env: overrideRef });
+		assert.equal(override.projectId, overrideRef);
+		assert.equal(override.environment?.name, overrideRef);
+		assert.equal(readFileSync(linkPath, "utf8"), `${projectRef}\n`);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI Supabase env use delegates to the provider without AgentPond state", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-supabase-env-use-")),
+	);
+	const projectRef = "abcdefghijklmnopqrst";
+	const selectedRef = "bcdefghijklmnopqrstu";
+	const originalExitCode = process.exitCode;
+	const mutableProvider = supabaseProvider as unknown as {
+		openProject: typeof supabaseProvider.openProject;
+	};
+	const originalOpenProject = mutableProvider.openProject;
+	process.exitCode = undefined;
+	try {
+		mkdirSync(join(root, "supabase", ".temp"), { recursive: true });
+		mkdirSync(join(root, ".vercel"), { recursive: true });
+		writeFileSync(
+			join(root, "supabase", "config.toml"),
+			'project_id = "demo"\n',
+		);
+		writeFileSync(
+			join(root, "supabase", ".temp", "project-ref"),
+			`${projectRef}\n`,
+		);
+		writeFileSync(
+			join(root, ".vercel", "project.json"),
+			JSON.stringify({ projectId: "prj_demo" }),
+		);
+		process.chdir(root);
+		mutableProvider.openProject = (options) => {
+			const project = originalOpenProject(options);
+			return project
+				? {
+						...project,
+						async selectEnvironment(name) {
+							assert.equal(name, selectedRef);
+							return selectedRef;
+						},
+					}
+				: undefined;
+		};
+
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"use",
+				selectedRef,
+				"--platform",
+				"supabase",
+				"--json",
+			]),
+		);
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(JSON.parse(output), { selected: selectedRef });
+		assert.equal(existsSync(join(root, ".agentpond", "current-env")), false);
+	} finally {
+		mutableProvider.openProject = originalOpenProject;
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI Supabase contexts reject unlinked projects for data commands", () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-supabase-unlinked-context-")),
+	);
+	try {
+		mkdirSync(join(root, "supabase"), { recursive: true });
+		writeFileSync(
+			join(root, "supabase", "config.toml"),
+			'project_id = "demo"\n',
+		);
+		process.chdir(root);
+
+		assert.throws(
+			() => environmentContextForCommand(),
+			/Run supabase link --project-ref <project-ref>/,
+		);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+	} finally {
+		process.chdir(cwd);
+	}
+});
+
 test("CLI uses Firebase project ids as local cache environment names", () => {
 	const cwd = process.cwd();
 	const root = realpathSync(
@@ -2041,6 +2457,20 @@ test("CLI managed providers reject manual environments and the dev server", asyn
 					join(root, ".firebaserc"),
 					JSON.stringify({ projects: { default: "firebase-demo" } }),
 					"utf8",
+				);
+			},
+		},
+		{
+			kind: "supabase",
+			setup(root: string) {
+				mkdirSync(join(root, "supabase", ".temp"), { recursive: true });
+				writeFileSync(
+					join(root, "supabase", "config.toml"),
+					'project_id = "demo"\n',
+				);
+				writeFileSync(
+					join(root, "supabase", ".temp", "project-ref"),
+					"abcdefghijklmnopqrst\n",
 				);
 			},
 		},

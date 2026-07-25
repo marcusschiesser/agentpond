@@ -32,6 +32,7 @@ const publishablePackages = [
 	"packages/aws",
 	"packages/firebase",
 	"packages/google",
+	"packages/supabase",
 	"packages/vercel",
 	"packages/duckdb",
 ] as const;

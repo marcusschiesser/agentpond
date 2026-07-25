@@ -18,12 +18,15 @@ test("analytics skill is limited to selecting and inspecting existing data", () 
 		"SKILL.md",
 		"references/cli.md",
 		"references/firebase.md",
+		"references/supabase.md",
 		"references/vercel.md",
 	]);
 
 	assert.match(content, /agentpond env use <alias-or-project-id>/);
 	assert.match(content, /agentpond env use <environment>/);
+	assert.match(content, /agentpond env use <project-ref>/);
 	assert.match(content, /agentpond --env staging/);
+	assert.match(content, /--platform supabase/);
 	assert.match(content, /vercel-project-id>-<target>/);
 	for (const forbidden of [
 		/instrument/i,
@@ -39,21 +42,30 @@ test("analytics skill is limited to selecting and inspecting existing data", () 
 	}
 });
 
-test("analytics skill keeps Firebase and Vercel access in provider references", () => {
+test("analytics skill keeps provider access in separate references", () => {
 	const entry = readSkillFiles("agentpond", ["SKILL.md"]);
 	const firebase = readSkillFiles("agentpond", ["references/firebase.md"]);
+	const supabase = readSkillFiles("agentpond", ["references/supabase.md"]);
 	const vercel = readSkillFiles("agentpond", ["references/vercel.md"]);
 
 	assert.match(entry, /references\/firebase\.md/);
+	assert.match(entry, /references\/supabase\.md/);
 	assert.match(entry, /references\/vercel\.md/);
 	assert.match(firebase, /agentpond env use <alias-or-project-id>/);
 	assert.match(firebase, /agentpond --env staging sync/);
 	assert.match(firebase, /manual environment operations/);
+	assert.doesNotMatch(firebase, /Supabase/);
 	assert.doesNotMatch(firebase, /Vercel/);
+	assert.match(supabase, /supabase link --project-ref <project-ref>/);
+	assert.match(supabase, /agentpond --env <project-ref> sync/);
+	assert.match(supabase, /manual environment operations/);
+	assert.doesNotMatch(supabase, /Firebase/);
+	assert.doesNotMatch(supabase, /Vercel/);
 	assert.match(vercel, /vercel target list --format json/);
 	assert.match(vercel, /agentpond env use staging/);
 	assert.match(vercel, /manual environment operations/);
 	assert.doesNotMatch(vercel, /Firebase/);
+	assert.doesNotMatch(vercel, /Supabase/);
 });
 
 test("Firebase instrumentation skill preserves the setup and verification workflow", () => {
@@ -113,19 +125,60 @@ test("Vercel instrumentation skill uses direct target-aware Blob export", () => 
 	assert.doesNotMatch(content, /handleIngestRequest/);
 });
 
+test("Supabase instrumentation skill covers hosted Edge and Node setup", () => {
+	const content = readSkillFiles("agentpond-instrumentation", [
+		"SKILL.md",
+		"references/supabase.md",
+		"references/openinference.md",
+	]);
+
+	for (const required of [
+		/explicit confirmation/i,
+		/createSupabaseSpanExporter/,
+		/private bucket named `agentpond`/i,
+		/storage\.buckets/,
+		/RLS policies on `storage\.objects`/,
+		/private buckets are not an unconditional deny/i,
+		/SUPABASE_SECRET_KEYS/,
+		/server-only environment configuration/,
+		/BasicTracerProvider/,
+		/BatchSpanProcessor/,
+		/trace\.setGlobalTracerProvider\(provider\)/,
+		/EdgeRuntime\.waitUntil/,
+		/captures the CLI output only in\s+memory/i,
+		/agentpond env use <project-ref>/,
+		/agentpond --env <branch-project-ref> sync/,
+		/one real AI request/i,
+	]) {
+		assert.match(content, required);
+	}
+	assert.doesNotMatch(content, /provider\.register\(\)/);
+	assert.doesNotMatch(content, /handleIngestRequest/);
+	assert.doesNotMatch(content, /supabase projects api-keys .*--reveal/);
+});
+
 test("instrumentation skill keeps provider setup details in separate references", () => {
 	const entry = readSkillFiles("agentpond-instrumentation", ["SKILL.md"]);
 	const firebase = readSkillFiles("agentpond-instrumentation", [
 		"references/firebase.md",
+	]);
+	const supabase = readSkillFiles("agentpond-instrumentation", [
+		"references/supabase.md",
 	]);
 	const vercel = readSkillFiles("agentpond-instrumentation", [
 		"references/vercel.md",
 	]);
 
 	assert.match(entry, /references\/firebase\.md/);
+	assert.match(entry, /references\/supabase\.md/);
 	assert.match(entry, /references\/vercel\.md/);
 	assert.match(firebase, /createFirebaseSpanExporter/);
+	assert.doesNotMatch(firebase, /Supabase/);
 	assert.doesNotMatch(firebase, /Vercel/);
+	assert.match(supabase, /createSupabaseSpanExporter/);
+	assert.doesNotMatch(supabase, /Firebase/);
+	assert.doesNotMatch(supabase, /Vercel/);
 	assert.match(vercel, /createVercelSpanExporter/);
 	assert.doesNotMatch(vercel, /Firebase/);
+	assert.doesNotMatch(vercel, /Supabase/);
 });

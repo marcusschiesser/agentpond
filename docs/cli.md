@@ -13,14 +13,15 @@ npx agentpond --version
 npx agentpond init
 ```
 
-`init` detects Firebase or Vercel, installs the `agentpond-instrumentation` and `agentpond` project skills, and prints a provider-specific coding-agent prompt. It does not edit application code, provision storage, link Vercel, or create `.agentpond`.
+`init` detects Firebase, Supabase, or Vercel, installs the `agentpond-instrumentation` and `agentpond` project skills, and prints a provider-specific coding-agent prompt. It does not edit application code, provision storage, link a provider project, or create `.agentpond`.
 
-When both platform markers exist, select one explicitly with `--platform firebase` or `--platform vercel`. A forced Vercel setup may begin before the app is linked; the coding agent asks for confirmation before running `vercel link` or provisioning Blob. Unsupported projects exit with a link to [Manual deployment setup](./getting-started/manual-setup.md). `init` is interactive and does not support `--json`.
+When multiple platform markers exist, select one explicitly with `--platform firebase`, `--platform supabase`, or `--platform vercel`. The override is stateless and works with setup, environment, sync, and query commands. Forced Supabase or Vercel setup may begin before the project is linked; the coding agent asks for confirmation before linking or provisioning storage. Unsupported projects exit with a link to [Manual deployment setup](./getting-started/manual-setup.md). `init` is interactive and does not support `--json`.
 
 ## Global options
 
 ```text
 --env <name>  use an environment for this command
+--platform <platform>  select firebase, supabase, or vercel for this command
 --json        print machine-readable output where supported
 --version     print the installed CLI version
 ```
@@ -28,8 +29,10 @@ When both platform markers exist, select one explicitly with `--platform firebas
 ## Select data
 
 Use `env use` to select an environment for every deployment: an AgentPond
-environment name for manual storage, a Firebase alias or project ID, or an exact
-Vercel deployment target. `--env` overrides that selection for one command.
+environment name for manual storage, a Firebase alias or project ID, a Supabase
+project ref, or an exact Vercel deployment target. `--env` overrides that
+selection for one command. If the project contains multiple provider markers,
+pass the stateless `--platform <platform>` override to each AgentPond command.
 
 ```bash
 npx agentpond env use <environment>
@@ -47,6 +50,20 @@ npx agentpond --env staging sync
 AgentPond manual environment commands (`get`, `list`, and `init`) and
 `npx agentpond dev` are unavailable in Firebase projects. Use `env use`,
 one-command `--env` overrides, and the Firebase runtime instead.
+
+Supabase uses the hosted project ref in `supabase/.temp/project-ref`. `env use`
+delegates to `supabase link`; `--env` selects another hosted project or branch
+for one command without changing that file:
+
+```bash
+npx agentpond env use <project-ref>
+npx agentpond sync
+npx agentpond --env <branch-project-ref> traces list --limit 10
+```
+
+Supabase data is isolated below `otel/<project-ref>/` in the dedicated private
+`agentpond` bucket. Manual environment commands and `npx agentpond dev` are
+unavailable in Supabase projects.
 
 Vercel uses the linked project and an exact deployment target. Production is
 the default; `env use` persists another target in `.vercel/agentpond.json`, and

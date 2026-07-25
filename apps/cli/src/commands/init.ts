@@ -6,8 +6,6 @@ import type { Command } from "commander";
 import { CliError } from "../cli-support.js";
 import type { GlobalOptions } from "../command-support.js";
 import {
-	AVAILABLE_PLATFORMS,
-	initPlatformFromValue,
 	type ProviderProjectContext,
 	providerForCommand,
 } from "../providers.js";
@@ -42,10 +40,6 @@ export function agentPondInitHeader(context: {
 	].join("\n");
 }
 
-type InitCommandOptions = {
-	platform?: string;
-};
-
 export type SkillsInstallRequest = {
 	cwd: string;
 	source: string;
@@ -71,22 +65,20 @@ export function registerInitCommand(
 	program
 		.command("init")
 		.description("set up AgentPond for the current project")
-		.option(
-			"--platform <platform>",
-			`setup platform: ${AVAILABLE_PLATFORMS.join(" or ")}`,
-		)
-		.action(async (commandOptions: InitCommandOptions, command: Command) => {
+		.action(async (_commandOptions: GlobalOptions, command: Command) => {
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
 			if (globalOptions.json) {
 				throw new CliError("--json is not supported by npx agentpond init");
 			}
 
-			const platform = initPlatformFromValue(commandOptions.platform);
 			let setup:
 				| { context: ProviderProjectContext; projectLabel: string }
 				| undefined;
 			try {
-				const context = providerForCommand({ platform });
+				const context = providerForCommand({
+					allowUnlinked: true,
+					platform: globalOptions.platform,
+				});
 				setup = context
 					? { context, projectLabel: context.project.projectLabel }
 					: undefined;
@@ -98,7 +90,7 @@ export function registerInitCommand(
 			if (!setup) {
 				throw new CliError(
 					[
-						"Automatic AgentPond setup supports Firebase and Vercel projects.",
+						"Automatic AgentPond setup supports Firebase, Supabase, and Vercel projects.",
 						"",
 						"For AWS, Google Cloud, and other deployment setups, see:",
 						MANUAL_SETUP_URL,

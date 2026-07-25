@@ -29,6 +29,6 @@
 	},
 	"devDependencies": {
 		"@agentpond/duckdb": "workspace:*",
-		"protobufjs": "^7.6.4"
+		"protobufjs": "^7.6.5"
 	}
 }

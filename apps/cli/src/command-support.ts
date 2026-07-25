@@ -14,6 +14,7 @@ import { environmentContextForCommand } from "./environment-context.js";
 export type GlobalOptions = {
 	env?: string;
 	json?: boolean;
+	platform?: string;
 };
 
 export type CommandContext = {
@@ -24,18 +25,28 @@ export type CommandContext = {
 export function addGlobalOptions(command: Command): Command {
 	return command
 		.option("--env <name>", "use an environment for this command")
+		.option(
+			"--platform <platform>",
+			"select a provider for this command: firebase, supabase, or vercel",
+		)
 		.option("--json", "print machine-readable JSON output");
 }
 
 export function commandContext(options: GlobalOptions): CommandContext {
-	const context = environmentContextForCommand({ envName: options.env });
+	const context = environmentContextForCommand({
+		envName: options.env,
+		platform: options.platform,
+	});
 	const json = Boolean(options.json);
 	logImplicitEnvironment(options, context.config, json);
 	return { context, json };
 }
 
 export function configForCommand(options: GlobalOptions): AgentPondConfig {
-	return environmentContextForCommand({ envName: options.env }).config;
+	return environmentContextForCommand({
+		envName: options.env,
+		platform: options.platform,
+	}).config;
 }
 
 export function cacheForRead(config: AgentPondConfig): AgentPondCache {

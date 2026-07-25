@@ -35,6 +35,6 @@ Set `session.id` on the outer CHAIN or AGENT span. Generate it once at the conve
 
 - Long-running servers: keep the provider alive and flush at supported lifecycle boundaries.
 - Short-lived scripts and test commands: force-flush and shut down before process exit.
-- Reusable Firebase or Vercel request handlers: do not shut down a module-level provider after every request.
+- Reusable Firebase, Supabase, or Vercel request handlers: do not shut down a module-level provider after every request.
 
 Run a real application request and verify the resulting trace rather than treating compilation alone as success. Confirm span kinds, inputs/outputs, parent-child relationships, tool results, and session grouping.
