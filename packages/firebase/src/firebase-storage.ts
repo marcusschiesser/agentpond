@@ -4,11 +4,14 @@ import {
 	type ObjectStore,
 	type ObjectStoreIngestionSinkOptions,
 } from "@agentpond/core";
-import { type GcsBucket, GcsObjectStore } from "@agentpond/google";
 import {
 	firebaseStorageForAppOptions,
 	firebaseStorageForInitializedApp,
 } from "./firebase-admin.js";
+import {
+	type FirebaseBucket,
+	FirebaseBucketObjectStore,
+} from "./firebase-bucket-store.js";
 import {
 	type FirebaseCliProjectConfig,
 	firebaseFunctionsSourceDirectories,
@@ -27,7 +30,7 @@ export type FirebaseStorageObjectStoreConfig = {
 };
 
 export class FirebaseStorageObjectStore implements ObjectStore {
-	private readonly store: GcsObjectStore;
+	private readonly store: FirebaseBucketObjectStore;
 
 	static fromConfig(
 		options: FirebaseStorageObjectStoreConfig = {},
@@ -38,8 +41,10 @@ export class FirebaseStorageObjectStore implements ObjectStore {
 		};
 		return new FirebaseStorageObjectStore(
 			config,
-			GcsObjectStore.fromBucket(
-				firebaseStorageForInitializedApp().bucket(config.bucket) as GcsBucket,
+			new FirebaseBucketObjectStore(
+				firebaseStorageForInitializedApp().bucket(
+					config.bucket,
+				) as FirebaseBucket,
 			),
 		);
 	}
@@ -56,8 +61,11 @@ export class FirebaseStorageObjectStore implements ObjectStore {
 			"Firebase Admin is required for FirebaseStorageObjectStore.fromCliProject(); install firebase-admin in the Firebase project and authenticate with credentials supported by Firebase Admin",
 			{ moduleDirectories },
 		);
-		const stores = firebaseCliBucketCandidates(project).map((bucketName) =>
-			GcsObjectStore.fromBucket(storage.bucket(bucketName) as GcsBucket),
+		const stores = firebaseCliBucketCandidates(project).map(
+			(bucketName) =>
+				new FirebaseBucketObjectStore(
+					storage.bucket(bucketName) as FirebaseBucket,
+				),
 		);
 		const store = await selectFirebaseCliStore(
 			stores,
@@ -71,7 +79,7 @@ export class FirebaseStorageObjectStore implements ObjectStore {
 
 	private constructor(
 		readonly config: FirebaseStorageConfig,
-		store: GcsObjectStore,
+		store: FirebaseBucketObjectStore,
 	) {
 		this.store = store;
 	}
@@ -107,10 +115,10 @@ function firebaseCliBucketCandidates(
 }
 
 async function selectFirebaseCliStore(
-	stores: GcsObjectStore[],
+	stores: FirebaseBucketObjectStore[],
 	prefix: string,
-): Promise<GcsObjectStore> {
-	let firstExistingStore: GcsObjectStore | undefined;
+): Promise<FirebaseBucketObjectStore> {
+	let firstExistingStore: FirebaseBucketObjectStore | undefined;
 	let lastMissingBucketError: unknown;
 	for (const store of stores) {
 		try {

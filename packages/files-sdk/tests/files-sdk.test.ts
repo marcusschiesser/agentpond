@@ -14,7 +14,10 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import { Files } from "files-sdk";
 import { memory } from "files-sdk/memory";
-import { FilesObjectStore } from "../src/index.js";
+import {
+	FilesObjectStore,
+	filesSdkConfigFromRuntimeEnv,
+} from "../src/index.js";
 import { createFilesSpanExporter } from "../src/otel.js";
 
 async function readableSpans(): Promise<ReadableSpan[]> {
@@ -69,13 +72,10 @@ test("FilesObjectStore validates persistent Files SDK environment settings", () 
 	const root = mkdtempSync(join(tmpdir(), "agentpond-files-sdk-env-"));
 	const environment = initAgentPondEnvironment("production", {
 		cwd: root,
-		storeType: "local",
+		filesSdk: { provider: "s3", bucket: "agentpond" },
 	});
 
-	writeFileSync(
-		environment.envFilePath,
-		"AGENTPOND_STORE=files-sdk\nAGENTPOND_FILES_BUCKET=agentpond\n",
-	);
+	writeFileSync(environment.envFilePath, "AGENTPOND_FILES_BUCKET=agentpond\n");
 	assert.throws(
 		() => FilesObjectStore.fromEnvironment(environment),
 		/FILES_SDK_PROVIDER/,
@@ -83,11 +83,45 @@ test("FilesObjectStore validates persistent Files SDK environment settings", () 
 
 	writeFileSync(
 		environment.envFilePath,
-		"AGENTPOND_STORE=files-sdk\nFILES_SDK_PROVIDER=fs\nAGENTPOND_FILES_BUCKET=agentpond\n",
+		"FILES_SDK_PROVIDER=fs\nAGENTPOND_FILES_BUCKET=agentpond\n",
 	);
 	assert.throws(
 		() => FilesObjectStore.fromEnvironment(environment),
 		/not bucket-backed/,
+	);
+
+	writeFileSync(
+		environment.envFilePath,
+		"FILES_SDK_PROVIDER=bun-s3\nAGENTPOND_FILES_BUCKET=agentpond\n",
+	);
+	assert.throws(
+		() => FilesObjectStore.fromEnvironment(environment),
+		/not supported by AgentPond's Node\.js runtime/,
+	);
+});
+
+test("FilesObjectStore parses runtime endpoint and region configuration", () => {
+	assert.deepEqual(
+		filesSdkConfigFromRuntimeEnv({
+			FILES_SDK_PROVIDER: "minio",
+			AGENTPOND_FILES_BUCKET: "agentpond",
+			FILES_SDK_ENDPOINT: "http://localhost:9000",
+			FILES_SDK_REGION: "us-east-1",
+		}),
+		{
+			provider: "minio",
+			bucket: "agentpond",
+			endpoint: "http://localhost:9000",
+			region: "us-east-1",
+		},
+	);
+	assert.throws(
+		() =>
+			filesSdkConfigFromRuntimeEnv({
+				FILES_SDK_PROVIDER: "minio",
+				AGENTPOND_FILES_BUCKET: "agentpond",
+			}),
+		/requires FILES_SDK_ENDPOINT/,
 	);
 });
 

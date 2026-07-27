@@ -5,10 +5,10 @@ import { join } from "node:path";
 import test from "node:test";
 import {
 	configFromEnv,
-	FileSystemObjectStore,
 	initAgentPondEnvironment,
 	MemoryObjectStore,
 } from "@agentpond/core";
+import { AgentPondCache } from "@agentpond/duckdb";
 import { OITracer } from "@arizeai/openinference-core";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { getActiveTraceId, startActiveObservation } from "@langfuse/tracing";
@@ -269,22 +269,18 @@ test("forceFlush and shutdown wait for concurrent object writes", async () => {
 	assert.equal((await store.listKeys("otel/project-a/")).length, 2);
 });
 
-test("Langfuse and OpenInference traces export to object storage and sync through the CLI", async () => {
+test("Langfuse and OpenInference traces export to an in-memory store and sync into the dev cache", async () => {
 	const originalCwd = process.cwd();
 	const originalExitCode = process.exitCode;
 	const root = mkdtempSync(join(tmpdir(), "agentpond-direct-otel-"));
-	const environmentName = "direct-object-store";
+	const environmentName = "dev";
 	let langfuseTraceId: string | undefined;
 	try {
 		process.chdir(root);
 		process.exitCode = undefined;
-		initAgentPondEnvironment(environmentName, {
-			cwd: root,
-			storeType: "local",
-		});
+		initAgentPondEnvironment(environmentName, { cwd: root });
 		const config = configFromEnv({ cwd: root, envName: environmentName });
-		assert.ok(config.environment);
-		const store = FileSystemObjectStore.fromEnvironment(config.environment);
+		const store = new MemoryObjectStore();
 
 		const langfuseExporter = new AgentPondSpanExporter({
 			store,
@@ -362,16 +358,13 @@ test("Langfuse and OpenInference traces export to object storage and sync throug
 			[],
 		);
 
-		const syncOutput = await captureStdout(() =>
-			main(["node", "agentpond", "sync", "--env", environmentName, "--json"], {
-				updateCheck: false,
-			}),
-		);
-		const syncResult = JSON.parse(syncOutput) as {
-			objectsProcessed: number;
-			eventsProcessed: number;
-		};
-		assert.equal(process.exitCode, undefined);
+		const db = new AgentPondCache(config.dbPath);
+		const syncResult = await db.syncFromStore({
+			store,
+			projectId: config.projectId,
+			prefix: config.prefix,
+		});
+		await db.close();
 		assert.equal(syncResult.objectsProcessed, 3);
 		assert.ok(syncResult.eventsProcessed >= 5);
 

@@ -15,9 +15,6 @@ importers:
 
   .:
     devDependencies:
-      '@agentpond/aws':
-        specifier: workspace:*
-        version: link:packages/aws
       '@agentpond/core':
         specifier: workspace:*
         version: link:packages/core
@@ -27,9 +24,6 @@ importers:
       '@agentpond/fastify-ingest':
         specifier: workspace:*
         version: link:packages/fastify-ingest
-      '@agentpond/google':
-        specifier: workspace:*
-        version: link:packages/google
       '@agentpond/ingest':
         specifier: workspace:*
         version: link:packages/ingest
@@ -48,6 +42,9 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.13.2
+      files-sdk:
+        specifier: 2.2.1
+        version: 2.2.1(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@google-cloud/storage@7.21.0)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.1.0)(google-auth-library@10.9.0)(hono@4.12.31)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -66,9 +63,6 @@ importers:
 
   apps/cli:
     dependencies:
-      '@agentpond/aws':
-        specifier: workspace:*
-        version: link:../../packages/aws
       '@agentpond/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -84,30 +78,48 @@ importers:
       '@agentpond/firebase':
         specifier: workspace:*
         version: link:../../packages/firebase
-      '@agentpond/google':
-        specifier: workspace:*
-        version: link:../../packages/google
       '@agentpond/supabase':
         specifier: workspace:*
         version: link:../../packages/supabase
       '@agentpond/vercel':
         specifier: workspace:*
         version: link:../../packages/vercel
+      '@aws-sdk/client-s3':
+        specifier: 3.1068.0
+        version: 3.1068.0
+      '@aws-sdk/s3-presigned-post':
+        specifier: 3.1068.0
+        version: 3.1068.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: 3.1068.0
+        version: 3.1068.0
       '@duckdb/node-api':
         specifier: ^1.5.4-r.1
         version: 1.5.4-r.1
+      '@google-cloud/storage':
+        specifier: ^7.21.0
+        version: 7.21.0
       '@inquirer/prompts':
         specifier: 8.5.2
         version: 8.5.2(@types/node@24.13.2)
+      '@supabase/storage-js':
+        specifier: 2.110.6
+        version: 2.110.6
       commander:
         specifier: 15.0.0
         version: 15.0.0
+      disk:
+        specifier: ^0.8.18
+        version: 0.8.21
       fastify:
         specifier: ^5.6.2
         version: 5.8.5
       files-sdk:
         specifier: 2.2.1
-        version: 2.2.1(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@google-cloud/storage@7.21.0)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(fastify@5.8.5)(firebase-admin@14.1.0)(google-auth-library@10.9.0)(hono@4.12.31)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        version: 2.2.1(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@google-cloud/storage@7.21.0)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.1.0)(google-auth-library@10.9.0)(hono@4.12.31)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+      node-appwrite:
+        specifier: ^26.0.0
+        version: 26.2.0
       protobufjs:
         specifier: 7.6.5
         version: 7.6.5
@@ -120,18 +132,39 @@ importers:
 
   apps/ingest:
     dependencies:
-      '@agentpond/aws':
-        specifier: workspace:*
-        version: link:../../packages/aws
       '@agentpond/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@agentpond/fastify-ingest':
         specifier: workspace:*
         version: link:../../packages/fastify-ingest
-      '@agentpond/google':
+      '@agentpond/files-sdk':
         specifier: workspace:*
-        version: link:../../packages/google
+        version: link:../../packages/files-sdk
+      '@aws-sdk/client-s3':
+        specifier: 3.1068.0
+        version: 3.1068.0
+      '@aws-sdk/s3-presigned-post':
+        specifier: 3.1068.0
+        version: 3.1068.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: 3.1068.0
+        version: 3.1068.0
+      '@google-cloud/storage':
+        specifier: ^7.21.0
+        version: 7.21.0
+      '@supabase/storage-js':
+        specifier: 2.110.6
+        version: 2.110.6
+      disk:
+        specifier: ^0.8.18
+        version: 0.8.21
+      files-sdk:
+        specifier: 2.2.1
+        version: 2.2.1(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@google-cloud/storage@7.21.0)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.1.0)(google-auth-library@10.9.0)(hono@4.12.31)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+      node-appwrite:
+        specifier: ^26.0.0
+        version: 26.2.0
 
   examples/basic-traces/typescript:
     dependencies:
@@ -177,7 +210,7 @@ importers:
         version: 1.41.1
       openai:
         specifier: ^6.45.0
-        version: 6.45.0(@aws-sdk/credential-provider-node@3.972.55)(@smithy/signature-v4@5.6.6)(zod@4.4.3)
+        version: 6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3)
     devDependencies:
       '@types/node':
         specifier: ^24.10.1
@@ -188,18 +221,6 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
-
-  packages/aws:
-    dependencies:
-      '@agentpond/core':
-        specifier: workspace:*
-        version: link:../core
-      '@agentpond/ingest':
-        specifier: workspace:*
-        version: link:../ingest
-      '@aws-sdk/client-s3':
-        specifier: ^3.936.0
-        version: 3.1068.0
 
   packages/core:
     dependencies:
@@ -267,16 +288,13 @@ importers:
         version: 2.9.0(@opentelemetry/api@1.9.1)
       files-sdk:
         specifier: 2.2.1
-        version: 2.2.1(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@google-cloud/storage@7.21.0)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(fastify@5.8.5)(firebase-admin@14.1.0)(google-auth-library@10.9.0)(hono@4.12.31)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        version: 2.2.1(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@google-cloud/storage@7.21.0)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.1.0)(google-auth-library@10.9.0)(hono@4.12.31)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
 
   packages/firebase:
     dependencies:
       '@agentpond/core':
         specifier: workspace:*
         version: link:../core
-      '@agentpond/google':
-        specifier: workspace:*
-        version: link:../google
       '@agentpond/ingest':
         specifier: workspace:*
         version: link:../ingest
@@ -296,18 +314,6 @@ importers:
       firebase-admin:
         specifier: '>=13.6.0'
         version: 14.1.0
-
-  packages/google:
-    dependencies:
-      '@agentpond/core':
-        specifier: workspace:*
-        version: link:../core
-      '@agentpond/ingest':
-        specifier: workspace:*
-        version: link:../ingest
-      '@google-cloud/storage':
-        specifier: ^7.21.0
-        version: 7.21.0
 
   packages/ingest:
     dependencies:
@@ -330,6 +336,9 @@ importers:
         specifier: ^2.9.0
         version: 2.9.0(@opentelemetry/api@1.9.1)
     devDependencies:
+      '@agentpond/duckdb':
+        specifier: workspace:*
+        version: link:../duckdb
       '@arizeai/openinference-core':
         specifier: ^2.4.0
         version: 2.4.0
@@ -354,9 +363,6 @@ importers:
 
   packages/perf:
     dependencies:
-      '@agentpond/aws':
-        specifier: workspace:*
-        version: link:../aws
       '@agentpond/core':
         specifier: workspace:*
         version: link:../core
@@ -366,9 +372,21 @@ importers:
       '@agentpond/fastify-ingest':
         specifier: workspace:*
         version: link:../fastify-ingest
+      '@agentpond/files-sdk':
+        specifier: workspace:*
+        version: link:../files-sdk
       '@agentpond/ingest':
         specifier: workspace:*
         version: link:../ingest
+      '@aws-sdk/client-s3':
+        specifier: 3.1068.0
+        version: 3.1068.0
+      '@aws-sdk/s3-presigned-post':
+        specifier: 3.1068.0
+        version: 3.1068.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: 3.1068.0
+        version: 3.1068.0
       '@langfuse/otel':
         specifier: ^5.4.1
         version: 5.4.1(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.9.0(@opentelemetry/api@1.9.1))
@@ -378,6 +396,9 @@ importers:
       '@opentelemetry/sdk-node':
         specifier: ^0.220.0
         version: 0.220.0(@opentelemetry/api@1.9.1)
+      files-sdk:
+        specifier: 2.2.1
+        version: 2.2.1(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@google-cloud/storage@7.21.0)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.1.0)(google-auth-library@10.9.0)(hono@4.12.31)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
     devDependencies:
       '@types/node':
         specifier: ^24.10.1
@@ -421,6 +442,9 @@ importers:
         version: 2.5.0
 
 packages:
+
+  '@archildata/api-types@0.0.1':
+    resolution: {integrity: sha512-ja6L2TwV2jfEsXCIUXQsHody5OyCo6AbXqWDFodtnDgtAU22jL/R+DzwAbhL/lz0XlS57HOYQ/GYKizkn6FbpA==}
 
   '@arizeai/openinference-core@2.4.0':
     resolution: {integrity: sha512-F4FgdLj9dCp/f2C0GZ6w3qpd4rsNC8/Rr4ikOvQcIBsn0hjn1jyWA2/9x3TF4Xf8H53ckoGoQv4uhexgwbtCNw==}
@@ -473,10 +497,6 @@ packages:
 
   '@aws-sdk/credential-provider-login@3.972.66':
     resolution: {integrity: sha512-g2fsqm87r/nKthLZ0VkkDBElkGg0PvSa8d97HQ6EilMbJTZ6hxa8FxkSZyJfgPfFdZn0TTmkOffQmTSUcAHIng==}
-    engines: {node: '>=20.0.0'}
-
-  '@aws-sdk/credential-provider-node@3.972.55':
-    resolution: {integrity: sha512-zMGLa/dhESVqmCD7mmIFFKSwSFrJGScvCXcjvBZEVOOMauFS5JRQvLTMukFpMEFWiV6dTAlsen2ATDBulLPtbg==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/credential-provider-node@3.972.70':
@@ -1304,7 +1324,6 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
-      zod: ^3.25 || ^4.0
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
@@ -2086,6 +2105,10 @@ packages:
     resolution: {integrity: sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==}
     engines: {node: '>= 0.8'}
 
+  commander@14.0.3:
+    resolution: {integrity: sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw==}
+    engines: {node: '>=20'}
+
   commander@15.0.0:
     resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
     engines: {node: '>=22.12.0'}
@@ -2202,6 +2225,11 @@ packages:
   dir-glob@3.0.1:
     resolution: {integrity: sha512-WkrWp9GR4KXfKGYzOLmTuGVi1UWFfws377n9cc55/tb6DuqyF6pcQ5AbiHEshaDpY9v6oaSr2XCDidGmMwdzIA==}
     engines: {node: '>=8'}
+
+  disk@0.8.21:
+    resolution: {integrity: sha512-M5EuRHxJGsS8azVmQ9v8VIXe0ROFE22Z5FA+e900PnA0DKCuiuTMO6pzKlEoVuJoePAlzRrIjUDbsFcThWG/9A==}
+    engines: {node: '>= 22'}
+    hasBin: true
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -3010,6 +3038,9 @@ packages:
     resolution: {integrity: sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==}
     engines: {node: '>= 0.6'}
 
+  node-appwrite@26.2.0:
+    resolution: {integrity: sha512-rRToHOuG05F5Q3BGRoJNNIcO69zrYul/V9HOTxfcMSqhdw3TwInAl7pnSnMRW7D0MOQcvaLb8iZIwE1P8TP9Cw==}
+
   node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
@@ -3078,6 +3109,12 @@ packages:
         optional: true
       zod:
         optional: true
+
+  openapi-fetch@0.13.8:
+    resolution: {integrity: sha512-yJ4QKRyNxE44baQ9mY5+r/kAzZ8yXMemtNAOFwOzRXJscdjSxxzWSNlyBAr+o5JjkUw9Lc3W7OIoca0cY3PYnQ==}
+
+  openapi-typescript-helpers@0.0.15:
+    resolution: {integrity: sha512-opyTPaunsklCBpTK8JGef6mfPhLSnyy5a0IN9vKtx3+4aExf+KxEqYwIy3hqkedXIB97u357uLMJsOnm3GVjsw==}
 
   os-paths@4.4.0:
     resolution: {integrity: sha512-wrAwOeXp1RRMFfQY8Sy7VaGVmPocaLwSFOYCGKSyo8qmJ+/yaafCl5BCA1IQZWqFSRBrKDYFeR9d/VyQzfH/jg==}
@@ -3155,10 +3192,6 @@ packages:
   picomatch@2.3.2:
     resolution: {integrity: sha512-V7+vQEJ06Z+c5tSye8S+nHUfI51xoXIXjHQ99cQtKUkQqqO1kO/KCJUfZXuB47h/YBlDhah2H3hdUGXn8ie0oA==}
     engines: {node: '>=8.6'}
-
-  picomatch@4.0.4:
-    resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
-    engines: {node: '>=12'}
 
   picomatch@4.0.5:
     resolution: {integrity: sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==}
@@ -3683,6 +3716,8 @@ packages:
 
 snapshots:
 
+  '@archildata/api-types@0.0.1': {}
+
   '@arizeai/openinference-core@2.4.0':
     dependencies:
       '@arizeai/openinference-semantic-conventions': 2.5.0
@@ -3814,21 +3849,6 @@ snapshots:
       '@smithy/core': 3.29.5
       '@smithy/types': 4.16.1
       tslib: 2.8.1
-
-  '@aws-sdk/credential-provider-node@3.972.55':
-    dependencies:
-      '@aws-sdk/credential-provider-env': 3.972.59
-      '@aws-sdk/credential-provider-http': 3.972.61
-      '@aws-sdk/credential-provider-ini': 3.973.4
-      '@aws-sdk/credential-provider-process': 3.972.59
-      '@aws-sdk/credential-provider-sso': 3.973.3
-      '@aws-sdk/credential-provider-web-identity': 3.972.65
-      '@aws-sdk/types': 3.974.2
-      '@smithy/core': 3.29.5
-      '@smithy/credential-provider-imds': 4.4.10
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-    optional: true
 
   '@aws-sdk/credential-provider-node@3.972.70':
     dependencies:
@@ -4643,7 +4663,7 @@ snapshots:
       globby: 11.1.0
       read-yaml-file: 1.1.0
 
-  '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.29.0':
     dependencies:
       '@hono/node-server': 1.19.14(hono@4.12.31)
       ajv: 8.20.0
@@ -5397,6 +5417,8 @@ snapshots:
     dependencies:
       delayed-stream: 1.0.0
 
+  commander@14.0.3: {}
+
   commander@15.0.0: {}
 
   commander@4.1.1: {}
@@ -5472,6 +5494,14 @@ snapshots:
   dir-glob@3.0.1:
     dependencies:
       path-type: 4.0.0
+
+  disk@0.8.21:
+    dependencies:
+      '@archildata/api-types': 0.0.1
+      commander: 14.0.3
+      fast-xml-parser: 5.7.3
+      openapi-fetch: 0.13.8
+      zod: 4.4.3
 
   dunder-proto@1.0.1:
     dependencies:
@@ -5742,16 +5772,16 @@ snapshots:
     dependencies:
       websocket-driver: 0.7.5
 
-  fdir@6.5.0(picomatch@4.0.4):
+  fdir@6.5.0(picomatch@4.0.5):
     optionalDependencies:
-      picomatch: 4.0.4
+      picomatch: 4.0.5
 
   fetch-blob@3.2.0:
     dependencies:
       node-domexception: 1.0.0
       web-streams-polyfill: 3.3.3
 
-  files-sdk@2.2.1(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@google-cloud/storage@7.21.0)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(fastify@5.8.5)(firebase-admin@14.1.0)(google-auth-library@10.9.0)(hono@4.12.31)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3):
+  files-sdk@2.2.1(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@google-cloud/storage@7.21.0)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.1.0)(google-auth-library@10.9.0)(hono@4.12.31)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3):
     dependencies:
       aws4fetch: 1.0.20
       commander: 15.0.0
@@ -5762,14 +5792,16 @@ snapshots:
       '@aws-sdk/s3-presigned-post': 3.1068.0
       '@aws-sdk/s3-request-presigner': 3.1068.0
       '@google-cloud/storage': 7.21.0
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.29.0
       '@opentelemetry/api': 1.9.1
       '@supabase/storage-js': 2.110.6
       '@vercel/blob': 2.5.0
+      disk: 0.8.21
       fastify: 5.8.5
       firebase-admin: 14.1.0
       google-auth-library: 10.9.0
       hono: 4.12.31
+      node-appwrite: 26.2.0
       openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3)
       zod: 4.4.3
     transitivePeerDependencies:
@@ -6379,6 +6411,11 @@ snapshots:
   negotiator@1.0.0:
     optional: true
 
+  node-appwrite@26.2.0:
+    dependencies:
+      json-bigint: 1.0.0
+      undici: 6.27.0
+
   node-domexception@1.0.0: {}
 
   node-fetch@2.7.0:
@@ -6418,18 +6455,17 @@ snapshots:
     dependencies:
       mimic-fn: 2.1.0
 
-  openai@6.45.0(@aws-sdk/credential-provider-node@3.972.55)(@smithy/signature-v4@5.6.6)(zod@4.4.3):
-    optionalDependencies:
-      '@aws-sdk/credential-provider-node': 3.972.55
-      '@smithy/signature-v4': 5.6.6
-      zod: 4.4.3
-
   openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.70
       '@smithy/signature-v4': 5.6.6
       zod: 4.4.3
-    optional: true
+
+  openapi-fetch@0.13.8:
+    dependencies:
+      openapi-typescript-helpers: 0.0.15
+
+  openapi-typescript-helpers@0.0.15: {}
 
   os-paths@4.4.0: {}
 
@@ -6489,8 +6525,6 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@2.3.2: {}
-
-  picomatch@4.0.4: {}
 
   picomatch@4.0.5: {}
 
@@ -6920,8 +6954,8 @@ snapshots:
 
   tinyglobby@0.2.17:
     dependencies:
-      fdir: 6.5.0(picomatch@4.0.4)
-      picomatch: 4.0.4
+      fdir: 6.5.0(picomatch@4.0.5)
+      picomatch: 4.0.5
 
   to-regex-range@5.0.1:
     dependencies:

@@ -11,7 +11,6 @@ import {
 	registerEnvCommand,
 	type SelectEnvironmentPrompt,
 	type SelectFilesProviderPrompt,
-	type SelectStorePrompt,
 } from "./commands/env.js";
 import { registerInitCommand, type SkillsInstaller } from "./commands/init.js";
 import { registerObservationsCommand } from "./commands/observations.js";
@@ -33,10 +32,11 @@ export const CLI_VERSION = packageJson.version;
 
 export type ProgramOptions = {
 	inputBucket?: InputPrompt;
+	inputEndpoint?: InputPrompt;
+	inputRegion?: InputPrompt;
 	installSkills?: SkillsInstaller;
 	selectEnvironment?: SelectEnvironmentPrompt;
 	selectFilesProvider?: SelectFilesProviderPrompt;
-	selectStore?: SelectStorePrompt;
 	updateCheck?: CliUpdateCheckOptions | false;
 };
 
@@ -63,9 +63,10 @@ export function createProgram(options: ProgramOptions = {}): Command {
 	registerDevCommand(program);
 	registerEnvCommand(program, {
 		inputBucket: options.inputBucket,
+		inputEndpoint: options.inputEndpoint,
+		inputRegion: options.inputRegion,
 		selectEnvironment: options.selectEnvironment,
 		selectFilesProvider: options.selectFilesProvider,
-		selectStore: options.selectStore,
 	});
 	registerSyncCommand(program);
 	registerTracesCommand(program);

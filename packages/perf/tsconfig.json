@@ -7,9 +7,9 @@
 	},
 	"references": [
 		{ "path": "../core" },
-		{ "path": "../aws" },
 		{ "path": "../duckdb" },
 		{ "path": "../fastify-ingest" },
+		{ "path": "../files-sdk" },
 		{ "path": "../ingest" }
 	],
 	"include": ["src/**/*.ts"]

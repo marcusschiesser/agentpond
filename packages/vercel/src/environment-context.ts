@@ -12,6 +12,7 @@ import {
 	type AgentPondEnvironmentContext,
 	type AgentPondProvider,
 	type AgentPondProviderProject,
+	type AgentPondStorageEnvironmentContext,
 	agentPondWorkspaceRoot,
 	normalizePrefix,
 	parseEnvFile,
@@ -74,7 +75,7 @@ function vercelEnvironmentContext(
 	project: VercelCliProjectConfig,
 	envName: string | undefined,
 	dependencies: { run?: VercelProcessRunner } = {},
-): AgentPondEnvironmentContext {
+): AgentPondStorageEnvironmentContext {
 	const target = envName ?? vercelSelectedTarget(project) ?? "production";
 	const projectId = vercelAgentPondProjectId(project.projectId, target);
 	const environment = resolveAgentPondEnvironment({
@@ -97,7 +98,6 @@ function vercelEnvironmentContext(
 		kind: "vercel",
 		rootDir: project.root,
 		config,
-		usesAgentPondDevServer: false,
 		async resolveStorage() {
 			return {
 				store: await vercelStoreForTarget(

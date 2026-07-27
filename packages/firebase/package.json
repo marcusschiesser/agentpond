@@ -24,7 +24,6 @@
 	},
 	"dependencies": {
 		"@agentpond/core": "workspace:*",
-		"@agentpond/google": "workspace:*",
 		"@agentpond/ingest": "workspace:*",
 		"@agentpond/otel": "workspace:*"
 	},

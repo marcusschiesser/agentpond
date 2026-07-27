@@ -1,4 +1,4 @@
-import type { S3ObjectStore } from "@agentpond/aws";
+import type { ObjectStore } from "@agentpond/core";
 import type { AgentPondCache, SyncProgress } from "@agentpond/duckdb";
 import type { PerfArgs } from "./args.js";
 
@@ -9,7 +9,7 @@ export type SyncTiming = {
 
 export async function timeSync(
 	db: AgentPondCache,
-	store: S3ObjectStore,
+	store: ObjectStore,
 	args: PerfArgs,
 	onProgress?: (progress: SyncProgress) => void,
 ): Promise<SyncTiming> {

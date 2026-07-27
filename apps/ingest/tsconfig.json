@@ -6,10 +6,9 @@
 		"outDir": "dist"
 	},
 	"references": [
-		{ "path": "../../packages/aws" },
 		{ "path": "../../packages/core" },
 		{ "path": "../../packages/fastify-ingest" },
-		{ "path": "../../packages/google" }
+		{ "path": "../../packages/files-sdk" }
 	],
 	"include": ["src/**/*.ts"]
 }

@@ -2,25 +2,20 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { S3ObjectStore } from "@agentpond/aws";
-import type { AgentPondConfig } from "@agentpond/core";
+import type { AgentPondConfig, ObjectStore } from "@agentpond/core";
+import type { minio } from "files-sdk/minio";
 
 export type PerfArgs = {
 	traces: number;
-	endpoint: string;
-	bucket: string;
-	accessKeyId: string;
-	secretAccessKey: string;
-	region: string;
 	projectId: string;
 	publicKey: string;
 	secretKey: string;
 	prefix: string;
 	dbPath: string;
-	s3: S3ObjectStoreConfig;
+	minio: MinioConfig;
 };
 
-type S3ObjectStoreConfig = ConstructorParameters<typeof S3ObjectStore>[0];
+type MinioConfig = Parameters<typeof minio>[0];
 
 const DEFAULT_TRACES = 100_000;
 
@@ -36,17 +31,12 @@ export function parseArgs(argv: string[]): PerfArgs {
 
 	return {
 		traces,
-		endpoint: values.endpoint ?? "http://localhost:9000",
-		bucket: values.bucket ?? "agentpond",
-		accessKeyId: values["access-key-id"] ?? "minio",
-		secretAccessKey: values["secret-access-key"] ?? "minio123",
-		region: values.region ?? "us-east-1",
 		projectId: values["project-id"] ?? "default-project",
 		publicKey: values["public-key"] ?? "pk-agentpond",
 		secretKey: values["secret-key"] ?? "sk-agentpond",
 		prefix: normalizePrefix(values.prefix ?? `perf/${runId}`),
 		dbPath,
-		s3: {
+		minio: {
 			bucket: values.bucket ?? "agentpond",
 			endpoint: values.endpoint ?? "http://localhost:9000",
 			region: values.region ?? "us-east-1",
@@ -79,14 +69,14 @@ export function configureLangfuseEnv(address: string, args: PerfArgs): void {
 }
 
 export async function assertEmptyPrefix(
-	store: S3ObjectStore,
+	store: ObjectStore,
 	prefix: string,
 ): Promise<void> {
 	try {
 		const keys = await store.listKeys(prefix);
 		if (keys.length > 0) {
 			throw new Error(
-				`S3 prefix ${prefix} is not empty (${keys.length} existing objects)`,
+				`MinIO prefix ${prefix} is not empty (${keys.length} existing objects)`,
 			);
 		}
 	} catch (error) {
@@ -95,7 +85,7 @@ export async function assertEmptyPrefix(
 		}
 		const message = error instanceof Error ? error.message : String(error);
 		throw new Error(
-			`Could not access local S3 storage. Start MinIO and create the bucket first: docker compose up -d minio create-bucket. Cause: ${message}`,
+			`Could not access MinIO storage. Start MinIO and create the bucket first: docker compose up -d minio create-bucket. Cause: ${message}`,
 		);
 	}
 }

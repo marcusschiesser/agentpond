@@ -1,4 +1,4 @@
-import type { S3ObjectStore } from "@agentpond/aws";
+import type { ObjectStore } from "@agentpond/core";
 
 export type StorageStats = {
 	objectCount: number;
@@ -14,7 +14,7 @@ export type StorageStats = {
 };
 
 export async function collectStorageStats(
-	store: S3ObjectStore,
+	store: ObjectStore,
 	prefix: string,
 	projectId: string,
 ): Promise<StorageStats> {

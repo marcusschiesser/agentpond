@@ -6,14 +6,8 @@ This path does not use an AgentPond server or `npx agentpond dev`. The applicati
 
 ## Install
 
-Install the exporter, the adapter for your object store, and your instrumentation packages. For example, with S3 and Langfuse:
-
-```sh
-npm install @agentpond/otel @agentpond/aws @langfuse/otel @langfuse/tracing @opentelemetry/sdk-node
-```
-
-For a Files SDK provider, install the AgentPond integration, Files SDK, the
-provider's optional peer dependencies, and your instrumentation packages:
+Install the AgentPond Files SDK integration, Files SDK, the selected provider's
+peer SDKs, and your instrumentation packages:
 
 ```sh
 npm install @agentpond/files-sdk @agentpond/otel files-sdk @opentelemetry/sdk-node
@@ -21,17 +15,24 @@ npm install @agentpond/files-sdk @agentpond/otel files-sdk @opentelemetry/sdk-no
 
 ## Langfuse
 
-Create the exporter with an AgentPond object store and project id, then pass it to Langfuse's span processor:
+Create Files SDK normally, pass it to the AgentPond exporter, and give the
+exporter to Langfuse's span processor:
 
 ```ts
-import { S3ObjectStore } from "@agentpond/aws";
-import { AgentPondSpanExporter } from "@agentpond/otel";
+import { Files } from "files-sdk";
+import { r2 } from "files-sdk/r2";
+import { createFilesSpanExporter } from "@agentpond/files-sdk/otel";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 
-const exporter = new AgentPondSpanExporter({
-  store: S3ObjectStore.fromRuntimeEnv(),
-  projectId: process.env.AGENTPOND_PROJECT_ID ?? "default-project",
+const exporter = createFilesSpanExporter({
+  files: new Files({
+    adapter: r2({
+      bucket: "agentpond",
+    }),
+    retries: 3,
+    timeout: 10_000,
+  }),
 });
 const langfuseProcessor = new LangfuseSpanProcessor({ exporter });
 const sdk = new NodeSDK({ spanProcessors: [langfuseProcessor] });
@@ -47,14 +48,18 @@ await sdk.shutdown();
 OpenInference and other standard OpenTelemetry instrumentations can use the same exporter directly:
 
 ```ts
-import { S3ObjectStore } from "@agentpond/aws";
-import { AgentPondSpanExporter } from "@agentpond/otel";
+import { Files } from "files-sdk";
+import { gcs } from "files-sdk/gcs";
+import { createFilesSpanExporter } from "@agentpond/files-sdk/otel";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 
 const sdk = new NodeSDK({
-  traceExporter: new AgentPondSpanExporter({
-    store: S3ObjectStore.fromRuntimeEnv(),
-    projectId: process.env.AGENTPOND_PROJECT_ID ?? "default-project",
+  traceExporter: createFilesSpanExporter({
+    files: new Files({
+      adapter: gcs({ bucket: "agentpond" }),
+      retries: 3,
+      timeout: 10_000,
+    }),
   }),
   instrumentations: [/* OpenInference instrumentations */],
 });
@@ -66,19 +71,21 @@ await sdk.shutdown();
 
 NodeSDK wraps `traceExporter` in a `BatchSpanProcessor`. AgentPond preserves each exporter invocation as one immutable object-store object, so a batch of spans is written as one object. If you configure span processors directly, prefer `BatchSpanProcessor` for production and force-flush at the application's real lifecycle boundary.
 
-## Object Stores
+## Storage adapters
 
 Use the matching adapter for the deployment:
 
-- `S3ObjectStore.fromRuntimeEnv()` from `@agentpond/aws`
-- `GcsObjectStore.fromRuntimeEnv()` from `@agentpond/google`
+- `createFilesSpanExporter()` from `@agentpond/files-sdk/otel` for manual
+  bucket providers such as S3, GCS, R2, MinIO, and other Node-compatible Files
+  SDK bucket adapters
 - `createVercelSpanExporter()` from `@agentpond/vercel`
 - `createFirebaseSpanExporter()` from `@agentpond/firebase`
 - `createSupabaseSpanExporter()` from `@agentpond/supabase`
-- `new FileSystemObjectStore(path)` from `@agentpond/core`
-- `createFilesSpanExporter()` from `@agentpond/files-sdk/otel`
 
-The application needs write credentials for the selected object store. Provider-specific prefix defaults and `AGENTPOND_PREFIX` continue to apply; an explicit `prefix` can be passed to the exporter where the store supports overrides.
+The application needs write credentials for the selected object store.
+`AGENTPOND_PROJECT_ID` defaults to `default-project`, and
+`AGENTPOND_PREFIX` defaults to empty. An explicit `projectId` or `prefix` may
+be passed to the exporter.
 
 ### Files SDK
 
@@ -109,18 +116,18 @@ Create and persist the matching CLI environment:
 
 ```sh
 npx agentpond env init production \
-  --store files-sdk \
   --provider r2 \
   --bucket agentpond
 npx agentpond env use production
 npx agentpond sync
 ```
 
-`env init` reports the optional client packages declared by the selected Files
-SDK provider. Install those packages in the project. Provider credentials,
-regions, and endpoints remain standard provider environment variables in both
-the application runtime and the shell invoking AgentPond; AgentPond does not
-write secrets into its environment file.
+For providers that declare an endpoint or region, pass `--endpoint` or
+`--region` during initialization. AgentPond persists those values with the
+provider and bucket. Provider credentials remain ambient in both the
+application runtime and the shell invoking AgentPond; AgentPond does not write
+secrets into its environment file. `npx agentpond sync` always reads the
+selected persistent environment and takes no storage flags.
 
 ### Firebase
 

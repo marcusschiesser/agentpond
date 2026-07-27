@@ -14,7 +14,7 @@
   <a href="https://www.npmjs.com/package/agentpond"><img src="https://img.shields.io/node/v/agentpond.svg" alt="Node.js version"></a>
 </p>
 
-AgentPond is a lightweight trace backend and CLI for AI applications. It keeps raw traces in object storage you control and syncs them into a local DuckDB cache for fast analysis by your coding agent. Use it with Firebase Storage, Supabase Storage, Amazon S3, Google Cloud Storage, Vercel Blob, or custom infrastructure. Firebase, Supabase, and Vercel projects include automated setup; other deployments use a manual setup path.
+AgentPond is a lightweight trace backend and CLI for AI applications. It keeps raw traces in object storage you control and syncs them into a local DuckDB cache for fast analysis by your coding agent. It supports all bucket providers from [Files SDK](https://github.com/haydenbleasel/files-sdk) such as Amazon S3, Google Cloud Storage, R2, and MinIO; For platforms like Firebase, Supabase, and Vercel there are explicit one-command quick starts.
 
 ## How it works
 
@@ -24,21 +24,15 @@ Object storage is the durable source of truth. The local DuckDB database is a re
 
 ## Getting started
 
-Start with the [Manual deployment setup](./docs/getting-started/manual-setup.md) to configure object storage, instrument the application, and sync its traces into AgentPond.
+Start with the [Manual deployment setup](./docs/getting-started/manual-setup.md) to configure object storage, instrument your application, and sync its traces into AgentPond.
 
-For Firebase, Supabase, and Vercel projects, AgentPond provides automated quick starts:
-
-- [Firebase quick start](./docs/getting-started/firebase.md)
-- [Supabase quick start](./docs/getting-started/supabase.md)
-- [Vercel quick start](./docs/getting-started/vercel.md)
-
-All require Node.js 22 or newer for the CLI. From your project folder, run:
+For [Firebase](./docs/getting-started/firebase.md), [Supabase](./docs/getting-started/supabase.md), and [Vercel](./docs/getting-started/vercel.md) projects, to get started, just run:
 
 ```sh
 npx agentpond init
 ```
 
-The command detects the platform, installs AgentPond's instrumentation and analytics skills, and prints a install prompt for your coding agent. Your agent inspects then the application, proposes a setup, implements it after confirmation, and verifies a real trace end to end.
+The command installs AgentPond's instrumentation and analytics skills, and prints a install prompt for your coding agent. Your coding agent inspects then the application, proposes a setup, implements it after confirmation, and verifies a real trace end to end.
 
 Once the application has emitted a trace:
 
@@ -47,26 +41,9 @@ npx agentpond sync
 npx agentpond traces list --limit 10
 ```
 
-## Analyze traces
-
-Use focused commands for individual traces and sessions:
-
-```sh
-npx agentpond traces get <trace-id>
-npx agentpond observations list --traceId <trace-id>
-npx agentpond sessions get <session-id>
-npx agentpond scores list --traceId <trace-id>
-```
-
-Use DuckDB SQL for aggregation, joins, time windows, or cost analysis:
-
-```sh
-npx agentpond sql "select id, name, session_id, total_cost from traces order by start_time desc limit 10"
-```
-
 ## Features
 
-- Direct OpenTelemetry export to Firebase Storage, Supabase Storage, S3, GCS, and Vercel Blob
+- Direct OpenTelemetry export through Files SDK, Firebase Storage, Supabase Storage, and Vercel Blob
 - Langfuse-compatible and OTLP HTTP ingestion adapters
 - Incremental object-store synchronization
 - Local DuckDB projections for traces, observations, sessions, and scores

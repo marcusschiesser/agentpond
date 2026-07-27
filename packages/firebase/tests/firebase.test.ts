@@ -331,10 +331,9 @@ test("Firebase CLI project config rejects Firebase roots without project ids", (
 	);
 });
 
-test("Firebase environment context owns storage and dev behavior", async () => {
+test("Firebase environment context owns platform storage", async () => {
 	const originalEnv = saveEnv(FIREBASE_ENV_KEYS);
 	try {
-		process.env.AGENTPOND_STORE = "invalid-project-store";
 		process.env.AGENTPOND_PREFIX = "ignored-prefix";
 		await withFakeFirebaseProject(new Map(), async ({ root }) => {
 			const context = firebaseEnvironmentContextFromCwdIfAvailable({
@@ -344,7 +343,6 @@ test("Firebase environment context owns storage and dev behavior", async () => {
 			assert.equal(context.kind, "firebase");
 			assert.equal(context.rootDir, root);
 			assert.equal(context.config.environment?.name, "demo-project");
-			assert.equal(context.usesAgentPondDevServer, false);
 
 			const storage = await context.resolveStorage();
 			assert.equal(storage.projectId, "demo-project");
@@ -860,6 +858,43 @@ test("Firebase ingest function rejects both store and sink", () => {
 	);
 });
 
+test("Firebase ingest function leaves health checks unrouted", async () => {
+	const fn = createFirebaseIngestFunction({
+		auth,
+		sink: sinkFromStore(new MemoryObjectStore()),
+	});
+	const res = createResponse();
+
+	await fn({ method: "GET", url: "/health?ready=1" }, res);
+
+	assert.equal(res.statusCode, 404);
+	assert.deepEqual(JSON.parse(res.body), { error: "Not Found" });
+});
+
+test("Firebase ingest function maps authentication errors", async () => {
+	const fn = createFirebaseIngestFunction({
+		auth,
+		sink: sinkFromStore(new MemoryObjectStore()),
+	});
+	const res = createResponse();
+
+	await fn(
+		{
+			method: "POST",
+			url: "/api/public/ingestion",
+			headers: {
+				authorization: `Basic ${Buffer.from("pk:wrong").toString("base64")}`,
+				"content-type": "application/json",
+			},
+			rawBody: JSON.stringify({ batch: [] }),
+		},
+		res,
+	);
+
+	assert.equal(res.statusCode, 401);
+	assert.equal(JSON.parse(res.body).error, "UnauthorizedError");
+});
+
 test("Firebase auth reads Google project fallbacks from runtime env", () => {
 	const runtimeEnv = {
 		LANGFUSE_PUBLIC_KEY: "pk-runtime",
@@ -1075,7 +1110,6 @@ function createResponse() {
 const FIREBASE_ENV_KEYS = [
 	"AGENTPOND_FIREBASE_STORAGE_BUCKET",
 	"AGENTPOND_PREFIX",
-	"AGENTPOND_STORE",
 	"FUNCTIONS_EMULATOR",
 ] as const;
 

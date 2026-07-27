@@ -2,6 +2,7 @@ import {
 	type AgentPondEnvironmentContext,
 	type AgentPondProvider,
 	type AgentPondProviderProject,
+	type AgentPondStorageEnvironmentContext,
 	configFromEnv,
 	normalizePrefix,
 } from "@agentpond/core";
@@ -48,7 +49,7 @@ export function firebaseEnvironmentContextFromCwdIfAvailable(
 
 function firebaseEnvironmentContext(
 	project: FirebaseCliProjectConfig,
-): AgentPondEnvironmentContext {
+): AgentPondStorageEnvironmentContext {
 	const config = configFromEnv({
 		cwd: project.root,
 		envName: project.projectId,
@@ -58,7 +59,6 @@ function firebaseEnvironmentContext(
 		kind: "firebase",
 		rootDir: project.root,
 		config,
-		usesAgentPondDevServer: false,
 		async resolveStorage() {
 			return {
 				store: await FirebaseStorageObjectStore.fromCliProject(project),

@@ -7,14 +7,18 @@
 		"sync": "tsx src/index.ts"
 	},
 	"dependencies": {
-		"@agentpond/aws": "workspace:*",
 		"@agentpond/core": "workspace:*",
 		"@agentpond/duckdb": "workspace:*",
 		"@agentpond/fastify-ingest": "workspace:*",
+		"@agentpond/files-sdk": "workspace:*",
 		"@agentpond/ingest": "workspace:*",
+		"@aws-sdk/client-s3": "3.1068.0",
+		"@aws-sdk/s3-presigned-post": "3.1068.0",
+		"@aws-sdk/s3-request-presigner": "3.1068.0",
 		"@langfuse/otel": "^5.4.1",
 		"@langfuse/tracing": "^5.4.1",
-		"@opentelemetry/sdk-node": "^0.220.0"
+		"@opentelemetry/sdk-node": "^0.220.0",
+		"files-sdk": "2.2.1"
 	},
 	"devDependencies": {
 		"@types/node": "^24.10.1",

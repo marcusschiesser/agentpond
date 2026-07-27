@@ -9,6 +9,7 @@ export default defineConfig({
 	clean: true,
 	sourcemap: true,
 	splitting: false,
+	external: ["files-sdk"],
 	banner: {
 		js: [
 			"import { createRequire as __agentpondCreateRequire } from 'node:module';",

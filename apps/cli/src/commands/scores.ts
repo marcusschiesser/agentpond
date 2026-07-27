@@ -140,7 +140,7 @@ export async function createScore(
 		},
 	};
 
-	if (context.usesAgentPondDevServer) {
+	if (context.kind === "dev") {
 		const result = await new DuckDbIngestionSink(config.dbPath).writeEvents({
 			projectId: config.projectId,
 			events: [event],

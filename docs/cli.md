@@ -90,16 +90,19 @@ and `env use` before sync or query commands.
 Manual deployments use AgentPond environments:
 
 ```bash
-npx agentpond env init production --store s3
-npx agentpond env init production --store files-sdk --provider r2 --bucket agentpond
+npx agentpond env init production --provider s3 --bucket agentpond
+npx agentpond env init production --provider r2 --bucket agentpond
+npx agentpond env init local-minio --provider minio --bucket agentpond --endpoint http://localhost:9000
 npx agentpond env use production
 npx agentpond env current
 npx agentpond env list
 ```
 
-Supported deployment stores are `s3`, `gcs`, and bucket-backed `files-sdk`
-providers. The `local` store is available only for explicit tests and
-filesystem fixtures.
+Every manual remote environment is a Files SDK environment. AgentPond
+dynamically supports Node-compatible, bucket-backed Files SDK providers and
+rejects Bun-only, non-bucket, unknown, and malformed configurations.
+`AGENTPOND_PROJECT_ID` defaults to `default-project`; the optional
+`AGENTPOND_PREFIX` defaults to empty. Provider credentials remain ambient.
 
 ## Local testing server
 
@@ -110,7 +113,9 @@ npx agentpond dev
 eval "$(npx agentpond env get dev)"
 ```
 
-The dev server writes directly to `.agentpond/envs/dev/cache.duckdb`, so `sync` is not needed for dev.
+The dev server writes directly to `.agentpond/envs/dev/cache.duckdb` and does
+not construct an object store, so `sync` is not needed for dev. `dev` is
+reserved and cannot be initialized with `env init`.
 
 ## Sync
 

@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import {
-	type AgentPondStoreType,
 	type FilesSdkEnvironmentConfig,
 	initAgentPondEnvironment,
 	listAgentPondEnvironments,
@@ -23,6 +22,7 @@ import {
 import {
 	environmentContextForCommand,
 	manualEnvironmentContextForCommand,
+	validateManualEnvironment,
 } from "../environment-context.js";
 import { providerForCommand } from "../providers.js";
 
@@ -32,8 +32,6 @@ export type SelectPrompt<T extends string> = (config: {
 }) => Promise<T>;
 
 export type SelectEnvironmentPrompt = SelectPrompt<string>;
-export type AgentPondInitStore = AgentPondStoreType;
-export type SelectStorePrompt = SelectPrompt<AgentPondInitStore>;
 export type SelectFilesProviderPrompt = SelectPrompt<string>;
 export type InputPrompt = (config: {
 	message: string;
@@ -42,10 +40,11 @@ export type InputPrompt = (config: {
 
 type EnvOptions = GlobalOptions & {
 	bucket?: string;
+	endpoint?: string;
 	langfuse?: boolean;
 	otel?: boolean;
 	provider?: string;
-	store?: string;
+	region?: string;
 };
 
 export function registerEnvCommand(
@@ -53,14 +52,16 @@ export function registerEnvCommand(
 	options: {
 		selectEnvironment?: SelectEnvironmentPrompt;
 		selectFilesProvider?: SelectFilesProviderPrompt;
-		selectStore?: SelectStorePrompt;
 		inputBucket?: InputPrompt;
+		inputEndpoint?: InputPrompt;
+		inputRegion?: InputPrompt;
 	} = {},
 ): void {
 	const promptSelect = options.selectEnvironment ?? select<string>;
-	const promptStore = options.selectStore ?? select<AgentPondInitStore>;
 	const promptFilesProvider = options.selectFilesProvider ?? select<string>;
 	const promptBucket = options.inputBucket ?? input;
+	const promptEndpoint = options.inputEndpoint ?? input;
+	const promptRegion = options.inputRegion ?? input;
 	const env = addGlobalOptions(
 		program.command("env").description("select and manage environments"),
 	);
@@ -108,44 +109,51 @@ export function registerEnvCommand(
 				name,
 				selected: name === selected,
 			}));
+			for (const name of new Set([selected, ...rows.map(({ name }) => name)])) {
+				validateManualEnvironment(cwd, name);
+			}
 			return print(rows, Boolean(globalOptions.json));
 		});
 
 	addGlobalOptions(env.command("init <name>"))
 		.description("initialize a manual environment")
-		.option("--store <store>", "object store: files-sdk, s3, gcs, or local")
 		.option("--provider <provider>", "Files SDK bucket provider")
 		.option("--bucket <bucket>", "Files SDK bucket name")
+		.option("--endpoint <endpoint>", "Files SDK provider endpoint")
+		.option("--region <region>", "Files SDK provider region")
 		.action(
 			async (name: string, commandOptions: EnvOptions, command: Command) => {
+				if (name === "dev") {
+					throw new CliError(
+						'The "dev" environment is managed by `npx agentpond dev`',
+					);
+				}
 				const globalOptions = command.optsWithGlobals<GlobalOptions>();
 				const context = manualEnvironmentContextForCommand("init", {
 					envName: name,
 					platform: globalOptions.platform,
 				});
-				const store =
-					storeFromValue(commandOptions.store) ??
-					(await promptForStore(promptStore));
-				const filesSdk = await filesSdkConfigForStore(
-					store,
+				const filesSdk = await filesSdkConfigForOptions(
 					commandOptions,
 					promptFilesProvider,
 					promptBucket,
+					promptEndpoint,
+					promptRegion,
 				);
 				const environment = initAgentPondEnvironment(name, {
 					cwd: context.rootDir,
-					storeType: store,
-					filesSdk: filesSdk?.config,
+					filesSdk,
 				});
+				validateManualEnvironment(context.rootDir, environment.name);
 				return print(
 					{
-						bucket: filesSdk?.config.bucket,
+						bucket: filesSdk.bucket,
 						name: environment.name,
 						envFile: environment.envFilePath,
 						dbPath: environment.dbPath,
-						peerDependencies: filesSdk?.peerDependencies,
-						provider: filesSdk?.config.provider,
-						store,
+						provider: filesSdk.provider,
+						...(filesSdk.endpoint ? { endpoint: filesSdk.endpoint } : {}),
+						...(filesSdk.region ? { region: filesSdk.region } : {}),
 					},
 					Boolean(globalOptions.json),
 				);
@@ -194,64 +202,19 @@ async function selectEnvironmentForCommand(
 	});
 	const selectedName =
 		name ?? (await promptForEnvironmentName(promptSelect, context.rootDir));
+	validateManualEnvironment(context.rootDir, selectedName);
 	return selectAgentPondEnvironment(selectedName, {
 		cwd: context.rootDir,
 	}).name;
 }
 
-function storeFromValue(
-	value: string | undefined,
-): AgentPondInitStore | undefined {
-	if (value === undefined) return undefined;
-	if (
-		value === "files-sdk" ||
-		value === "s3" ||
-		value === "gcs" ||
-		value === "local"
-	) {
-		return value;
-	}
-	throw new CliError(
-		`--store must be files-sdk, s3, gcs, or local, got "${value}"`,
-	);
-}
-
-async function promptForStore(
-	promptSelect: SelectStorePrompt,
-): Promise<AgentPondInitStore> {
-	if (!process.stdin.isTTY || !process.stdout.isTTY) {
-		throw new CliError("Missing --store");
-	}
-	return promptSelect({
-		message: "Select AgentPond object store",
-		choices: [
-			{ name: "Files SDK bucket provider", value: "files-sdk" },
-			{ name: "AWS S3 (or compatible)", value: "s3" },
-			{ name: "Google Cloud Storage (GCS)", value: "gcs" },
-			{ name: "Local filesystem", value: "local" },
-		],
-	});
-}
-
-async function filesSdkConfigForStore(
-	store: AgentPondInitStore,
-	options: Pick<EnvOptions, "bucket" | "provider">,
+async function filesSdkConfigForOptions(
+	options: Pick<EnvOptions, "bucket" | "endpoint" | "provider" | "region">,
 	promptProvider: SelectFilesProviderPrompt,
 	promptBucket: InputPrompt,
-): Promise<
-	| {
-			config: FilesSdkEnvironmentConfig;
-			peerDependencies: readonly string[];
-	  }
-	| undefined
-> {
-	if (store !== "files-sdk") {
-		if (options.provider !== undefined || options.bucket !== undefined) {
-			throw new CliError("--provider and --bucket require --store files-sdk");
-		}
-		return undefined;
-	}
-
+	promptEndpoint: InputPrompt,
+	promptRegion: InputPrompt,
+): Promise<FilesSdkEnvironmentConfig> {
 	const provider =
 		options.provider ?? (await promptForFilesProvider(promptProvider));
 	const definition = bucketProvider(provider);
@@ -260,9 +223,23 @@ async function filesSdkConfigForStore(
 	).trim();
 	if (!bucket) throw new CliError("Missing --bucket");
 
+	const endpoint = await configuredProviderValue(
+		"endpoint",
+		definition.env.config?.includes("endpoint") ?? false,
+		options.endpoint,
+		promptEndpoint,
+	);
+	const region = await configuredProviderValue(
+		"region",
+		definition.env.config?.includes("region") ?? false,
+		options.region,
+		promptRegion,
+	);
 	return {
-		config: { provider, bucket },
-		peerDependencies: definition.peerDeps,
+		provider,
+		bucket,
+		...(endpoint ? { endpoint } : {}),
+		...(region ? { region } : {}),
 	};
 }
 
@@ -305,14 +282,52 @@ function bucketProvider(provider: string) {
 			`Files SDK provider "${provider}" is not bucket-backed and is not supported by AgentPond`,
 		);
 	}
+	if (provider === "bun-s3") {
+		throw new CliError(
+			'Files SDK provider "bun-s3" is not supported by AgentPond\'s Node.js runtime',
+		);
+	}
+	for (const field of definition.env.config) {
+		if (field !== "bucket" && field !== "endpoint" && field !== "region") {
+			throw new CliError(
+				`Files SDK provider "${provider}" requires unsupported configuration field "${field}"`,
+			);
+		}
+	}
 	return definition;
 }
 
 function bucketProviders() {
 	return PROVIDER_NAMES.flatMap((provider) => {
 		const definition = getProvider(provider);
-		return definition?.env.config?.includes("bucket") ? [definition] : [];
+		return provider !== "bun-s3" &&
+			definition?.env.config?.includes("bucket") &&
+			definition.env.config.every(
+				(field) =>
+					field === "bucket" || field === "endpoint" || field === "region",
+			)
+			? [definition]
+			: [];
 	});
+}
+
+async function configuredProviderValue(
+	field: "endpoint" | "region",
+	required: boolean,
+	value: string | undefined,
+	promptInput: InputPrompt,
+): Promise<string | undefined> {
+	const configured = value?.trim();
+	if (configured) return configured;
+	if (!required) return undefined;
+	if (!process.stdin.isTTY || !process.stdout.isTTY) {
+		throw new CliError(`Missing --${field}`);
+	}
+	const prompted = (
+		await promptInput({ message: `Files SDK ${field}` })
+	).trim();
+	if (!prompted) throw new CliError(`Missing --${field}`);
+	return prompted;
 }
 
 async function promptForEnvironmentName(

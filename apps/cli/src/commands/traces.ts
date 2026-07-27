@@ -113,7 +113,7 @@ export async function createTrace(
 	const now = new Date().toISOString();
 	const traceId = stringFlag(options, "id") ?? createOtelTraceId();
 	const resourceSpans = manualTraceResourceSpans(options, traceId, now);
-	if (context.usesAgentPondDevServer) {
+	if (context.kind === "dev") {
 		const result = await new DuckDbIngestionSink(
 			config.dbPath,
 		).writeOtelResourceSpans({

@@ -40,12 +40,7 @@ export function configFromEnv(
 	const env = envValue(fileEnv);
 	const dbPath = join(environment.envDir, "cache.duckdb");
 	const projectId = env("AGENTPOND_PROJECT_ID") ?? "default-project";
-	const prefix = normalizePrefix(
-		env("AGENTPOND_PREFIX") ??
-			env("AGENTPOND_S3_PREFIX") ??
-			env("AGENTPOND_GCS_PREFIX") ??
-			"",
-	);
+	const prefix = normalizePrefix(env("AGENTPOND_PREFIX") ?? "");
 	const publicKey = env("LANGFUSE_PUBLIC_KEY") ?? "pk-agentpond";
 	const secretKey = env("LANGFUSE_SECRET_KEY") ?? "sk-agentpond";
 
@@ -69,12 +64,7 @@ export function configFromRuntimeEnv(
 	env: NodeJS.ProcessEnv = process.env,
 ): AgentPondRuntimeConfig {
 	const projectId = env.AGENTPOND_PROJECT_ID ?? "default-project";
-	const prefix = normalizePrefix(
-		env.AGENTPOND_PREFIX ??
-			env.AGENTPOND_S3_PREFIX ??
-			env.AGENTPOND_GCS_PREFIX ??
-			"",
-	);
+	const prefix = normalizePrefix(env.AGENTPOND_PREFIX ?? "");
 	const publicKey = env.LANGFUSE_PUBLIC_KEY ?? "pk-agentpond";
 	const secretKey = env.LANGFUSE_SECRET_KEY ?? "sk-agentpond";
 

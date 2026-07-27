@@ -6,8 +6,8 @@ Use this guide when the application is deployed on AWS, Google Cloud, or custom 
 
 AgentPond supports two production patterns:
 
-1. **Direct object-store export:** a trusted Node.js application writes spans directly with `@agentpond/otel` and the provider adapter.
-2. **HTTP ingestion:** applications send OTLP or Langfuse-compatible requests to an AgentPond container or serverless function, which writes to object storage.
+1. **Direct object-store export:** a trusted Node.js application writes spans with `@agentpond/files-sdk/otel` and a Files SDK bucket adapter.
+2. **HTTP ingestion:** applications send OTLP or Langfuse-compatible requests to the AgentPond container, which writes through Files SDK.
 
 Direct export is simplest when the application can safely hold narrowly scoped object-store write credentials. HTTP ingestion is appropriate for non-Node applications, centralized credentials, or Langfuse-compatible operations beyond span export.
 
@@ -21,15 +21,19 @@ Create a local configuration for the deployed storage backend:
 npx agentpond env init production
 ```
 
-In non-interactive scripts, select it explicitly:
+In non-interactive scripts, select the Files SDK provider and bucket explicitly:
 
 ```bash
-npx agentpond env init production --store s3
-npx agentpond env init production --store gcs
-npx agentpond env init production --store files-sdk --provider r2 --bucket agentpond
+npx agentpond env init production --provider s3 --bucket agentpond
+npx agentpond env init production --provider gcs --bucket agentpond
+npx agentpond env init production --provider r2 --bucket agentpond
+npx agentpond env init production --provider minio --bucket agentpond --endpoint http://localhost:9000
 ```
 
-Edit `.agentpond/envs/production.env` with the deployed bucket, prefix, endpoint, and credential-chain settings. Do not commit secrets.
+AgentPond persists the provider, bucket, optional endpoint and region,
+`AGENTPOND_PROJECT_ID`, and optional `AGENTPOND_PREFIX` in
+`.agentpond/envs/production.env`. Provider credentials remain ambient process
+environment variables and are never written by `env init`.
 
 Select and sync the environment:
 
@@ -40,11 +44,20 @@ npx agentpond sync
 
 ## AWS and S3-compatible storage
 
-Use `@agentpond/aws` for direct export or Lambda ingestion, or run the published AgentPond container on ECS, EKS, App Runner, or another runtime. Configure an S3 bucket, region, optional compatible endpoint, and credentials with only the required bucket permissions.
+Use the Files SDK `s3` adapter for direct export. For HTTP ingestion, run
+`ghcr.io/marcusschiesser/agentpond` on ECS, EKS, App Runner, or another
+container runtime with `FILES_SDK_PROVIDER=s3` and
+`AGENTPOND_FILES_BUCKET=<bucket>`. Supply AWS credentials, region, and any
+S3-compatible endpoint through the standard ambient AWS environment variables.
+AgentPond no longer ships an AWS Lambda ingestion handler.
 
 ## Google Cloud
 
-Use `@agentpond/google` for direct GCS export or HTTP Cloud Functions, or run the AgentPond container on Cloud Run or GKE. Authenticate with Application Default Credentials or a narrowly scoped service account.
+Use the Files SDK `gcs` adapter for direct export. For HTTP ingestion, run the
+AgentPond container on Cloud Run or GKE with `FILES_SDK_PROVIDER=gcs` and
+`AGENTPOND_FILES_BUCKET=<bucket>`. Authenticate with Application Default
+Credentials or a narrowly scoped service account. AgentPond no longer ships a
+generic Google Cloud Function handler.
 
 ## Files SDK bucket providers
 
@@ -56,7 +69,10 @@ file.
 
 ## Containers and custom infrastructure
 
-Run `ghcr.io/marcusschiesser/agentpond` on any container platform and connect it to S3-compatible or GCS storage. Configure Langfuse-compatible authentication on the deployed service and point application SDKs at its HTTP endpoint.
+Run `ghcr.io/marcusschiesser/agentpond` on any container platform and select a
+Node-compatible, bucket-backed Files SDK provider. Configure its ambient
+credentials plus Langfuse-compatible authentication on the deployed service,
+then point application SDKs at its HTTP endpoint.
 
 ## Instrument the application
 
@@ -66,7 +82,9 @@ The [OpenInference example](../../examples/openinference-openai/README.md) and [
 
 ## Local testing
 
-Local storage and `npx agentpond dev` are for tests, examples, and smoke checks only. They are not durable shared or production deployments.
+`npx agentpond dev` is for tests, examples, and smoke checks only. It writes
+directly to `.agentpond/envs/dev/cache.duckdb`; it does not create an object
+store and is not a durable shared or production deployment.
 
 Start the local HTTP ingestion server:
 
@@ -79,8 +97,6 @@ In another shell, load its test SDK values:
 ```bash
 eval "$(npx agentpond env get dev)"
 ```
-
-Use `npx agentpond env init <name> --store local` only for explicit filesystem-backed test fixtures.
 
 ## Analyze deployed traces
 
