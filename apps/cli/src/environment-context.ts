@@ -5,6 +5,7 @@ import {
 	configFromEnv,
 	objectStoreForConfig as configuredObjectStoreForConfig,
 } from "@agentpond/core";
+import { FilesObjectStore } from "@agentpond/files-sdk";
 import { GcsObjectStore } from "@agentpond/google";
 import { CliError } from "./cli-support.js";
 import { providerForCommand } from "./providers.js";
@@ -63,6 +64,7 @@ function defaultAgentPondEnvironmentContext(
 		async resolveStorage() {
 			return {
 				store: configuredObjectStoreForConfig(config, {
+					"files-sdk": FilesObjectStore.fromEnvironment,
 					gcs: GcsObjectStore.fromEnvironment,
 					s3: S3ObjectStore.fromEnvironment,
 				}),

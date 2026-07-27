@@ -12,6 +12,13 @@ Install the exporter, the adapter for your object store, and your instrumentatio
 npm install @agentpond/otel @agentpond/aws @langfuse/otel @langfuse/tracing @opentelemetry/sdk-node
 ```
 
+For a Files SDK provider, install the AgentPond integration, Files SDK, the
+provider's optional peer dependencies, and your instrumentation packages:
+
+```sh
+npm install @agentpond/files-sdk @agentpond/otel files-sdk @opentelemetry/sdk-node
+```
+
 ## Langfuse
 
 Create the exporter with an AgentPond object store and project id, then pass it to Langfuse's span processor:
@@ -69,8 +76,51 @@ Use the matching adapter for the deployment:
 - `createFirebaseSpanExporter()` from `@agentpond/firebase`
 - `createSupabaseSpanExporter()` from `@agentpond/supabase`
 - `new FileSystemObjectStore(path)` from `@agentpond/core`
+- `createFilesSpanExporter()` from `@agentpond/files-sdk/otel`
 
 The application needs write credentials for the selected object store. Provider-specific prefix defaults and `AGENTPOND_PREFIX` continue to apply; an explicit `prefix` can be passed to the exporter where the store supports overrides.
+
+### Files SDK
+
+Create Files SDK normally and pass the client to AgentPond:
+
+```ts
+import { Files } from "files-sdk";
+import { r2 } from "files-sdk/r2";
+import { createFilesSpanExporter } from "@agentpond/files-sdk/otel";
+
+const exporter = createFilesSpanExporter({
+  files: new Files({
+    adapter: r2({
+      bucket: "agentpond",
+    }),
+    retries: 3,
+    timeout: 10_000,
+  }),
+});
+```
+
+The factory reads `AGENTPOND_PROJECT_ID` and `AGENTPOND_PREFIX`, defaulting the
+project ID to `default-project`. Do not set the Files SDK `prefix` option for
+this client; use `AGENTPOND_PREFIX` so the exporter and CLI resolve the same
+keys.
+
+Create and persist the matching CLI environment:
+
+```sh
+npx agentpond env init production \
+  --store files-sdk \
+  --provider r2 \
+  --bucket agentpond
+npx agentpond env use production
+npx agentpond sync
+```
+
+`env init` reports the optional client packages declared by the selected Files
+SDK provider. Install those packages in the project. Provider credentials,
+regions, and endpoints remain standard provider environment variables in both
+the application runtime and the shell invoking AgentPond; AgentPond does not
+write secrets into its environment file.
 
 ### Firebase
 

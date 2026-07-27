@@ -26,6 +26,7 @@ In non-interactive scripts, select it explicitly:
 ```bash
 npx agentpond env init production --store s3
 npx agentpond env init production --store gcs
+npx agentpond env init production --store files-sdk --provider r2 --bucket agentpond
 ```
 
 Edit `.agentpond/envs/production.env` with the deployed bucket, prefix, endpoint, and credential-chain settings. Do not commit secrets.
@@ -44,6 +45,14 @@ Use `@agentpond/aws` for direct export or Lambda ingestion, or run the published
 ## Google Cloud
 
 Use `@agentpond/google` for direct GCS export or HTTP Cloud Functions, or run the AgentPond container on Cloud Run or GKE. Authenticate with Application Default Credentials or a narrowly scoped service account.
+
+## Files SDK bucket providers
+
+Use `createFilesSpanExporter()` from `@agentpond/files-sdk/otel` with a
+bucket-backed Files SDK adapter. The application and CLI must use the same
+provider, bucket, `AGENTPOND_PROJECT_ID`, and `AGENTPOND_PREFIX`. Keep provider
+credentials in the process environment rather than the AgentPond environment
+file.
 
 ## Containers and custom infrastructure
 

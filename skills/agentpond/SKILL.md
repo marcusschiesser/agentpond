@@ -25,7 +25,8 @@ Determine the provider before syncing:
 - For a Firebase project, read [references/firebase.md](references/firebase.md).
 - For a Supabase project, read [references/supabase.md](references/supabase.md).
 - For a Vercel-linked project, read [references/vercel.md](references/vercel.md).
-- Otherwise, use an existing manual AgentPond environment as described in [references/cli.md](references/cli.md).
+- Otherwise, use an existing manual AgentPond environment, including Files SDK
+  bucket storage, as described in [references/cli.md](references/cli.md).
 
 Do not create provider-choice state. Select the provider's environment with
 `npx agentpond env use <name>`: a Firebase alias or project ID, a Supabase

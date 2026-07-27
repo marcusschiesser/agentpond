@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import {
 	type AgentPondStoreType,
+	type FilesSdkEnvironmentConfig,
 	initAgentPondEnvironment,
 	listAgentPondEnvironments,
 	parseEnvFileEntries,
@@ -8,8 +9,9 @@ import {
 	resolveAgentPondEnvironment,
 	selectAgentPondEnvironment,
 } from "@agentpond/core";
-import { select } from "@inquirer/prompts";
+import { input, select } from "@inquirer/prompts";
 import type { Command } from "commander";
+import { getProvider, PROVIDER_NAMES } from "files-sdk/providers";
 import { CliError, print } from "../cli-support.js";
 import { addGlobalOptions, type GlobalOptions } from "../command-support.js";
 import {
@@ -32,10 +34,17 @@ export type SelectPrompt<T extends string> = (config: {
 export type SelectEnvironmentPrompt = SelectPrompt<string>;
 export type AgentPondInitStore = AgentPondStoreType;
 export type SelectStorePrompt = SelectPrompt<AgentPondInitStore>;
+export type SelectFilesProviderPrompt = SelectPrompt<string>;
+export type InputPrompt = (config: {
+	message: string;
+	default?: string;
+}) => Promise<string>;
 
 type EnvOptions = GlobalOptions & {
+	bucket?: string;
 	langfuse?: boolean;
 	otel?: boolean;
+	provider?: string;
 	store?: string;
 };
 
@@ -43,11 +52,15 @@ export function registerEnvCommand(
 	program: Command,
 	options: {
 		selectEnvironment?: SelectEnvironmentPrompt;
+		selectFilesProvider?: SelectFilesProviderPrompt;
 		selectStore?: SelectStorePrompt;
+		inputBucket?: InputPrompt;
 	} = {},
 ): void {
 	const promptSelect = options.selectEnvironment ?? select<string>;
 	const promptStore = options.selectStore ?? select<AgentPondInitStore>;
+	const promptFilesProvider = options.selectFilesProvider ?? select<string>;
+	const promptBucket = options.inputBucket ?? input;
 	const env = addGlobalOptions(
 		program.command("env").description("select and manage environments"),
 	);
@@ -100,7 +113,9 @@ export function registerEnvCommand(
 
 	addGlobalOptions(env.command("init <name>"))
 		.description("initialize a manual environment")
-		.option("--store <store>", "object store: s3, gcs, or local")
+		.option("--store <store>", "object store: files-sdk, s3, gcs, or local")
+		.option("--provider <provider>", "Files SDK bucket provider")
+		.option("--bucket <bucket>", "Files SDK bucket name")
 		.action(
 			async (name: string, commandOptions: EnvOptions, command: Command) => {
 				const globalOptions = command.optsWithGlobals<GlobalOptions>();
@@ -111,15 +126,25 @@ export function registerEnvCommand(
 				const store =
 					storeFromValue(commandOptions.store) ??
 					(await promptForStore(promptStore));
+				const filesSdk = await filesSdkConfigForStore(
+					store,
+					commandOptions,
+					promptFilesProvider,
+					promptBucket,
+				);
 				const environment = initAgentPondEnvironment(name, {
 					cwd: context.rootDir,
 					storeType: store,
+					filesSdk: filesSdk?.config,
 				});
 				return print(
 					{
+						bucket: filesSdk?.config.bucket,
 						name: environment.name,
 						envFile: environment.envFilePath,
 						dbPath: environment.dbPath,
+						peerDependencies: filesSdk?.peerDependencies,
+						provider: filesSdk?.config.provider,
 						store,
 					},
 					Boolean(globalOptions.json),
@@ -178,10 +203,17 @@ function storeFromValue(
 	value: string | undefined,
 ): AgentPondInitStore | undefined {
 	if (value === undefined) return undefined;
-	if (value === "s3" || value === "gcs" || value === "local") {
+	if (
+		value === "files-sdk" ||
+		value === "s3" ||
+		value === "gcs" ||
+		value === "local"
+	) {
 		return value;
 	}
-	throw new CliError(`--store must be s3, gcs, or local, got "${value}"`);
+	throw new CliError(
+		`--store must be files-sdk, s3, gcs, or local, got "${value}"`,
+	);
 }
 
 async function promptForStore(
@@ -193,10 +225,93 @@ async function promptForStore(
 	return promptSelect({
 		message: "Select AgentPond object store",
 		choices: [
+			{ name: "Files SDK bucket provider", value: "files-sdk" },
 			{ name: "AWS S3 (or compatible)", value: "s3" },
 			{ name: "Google Cloud Storage (GCS)", value: "gcs" },
 			{ name: "Local filesystem", value: "local" },
 		],
+	});
+}
+
+async function filesSdkConfigForStore(
+	store: AgentPondInitStore,
+	options: Pick<EnvOptions, "bucket" | "provider">,
+	promptProvider: SelectFilesProviderPrompt,
+	promptBucket: InputPrompt,
+): Promise<
+	| {
+			config: FilesSdkEnvironmentConfig;
+			peerDependencies: readonly string[];
+	  }
+	| undefined
+> {
+	if (store !== "files-sdk") {
+		if (options.provider !== undefined || options.bucket !== undefined) {
+			throw new CliError("--provider and --bucket require --store files-sdk");
+		}
+		return undefined;
+	}
+
+	const provider =
+		options.provider ?? (await promptForFilesProvider(promptProvider));
+	const definition = bucketProvider(provider);
+	const bucket = (
+		options.bucket ?? (await promptForFilesBucket(promptBucket))
+	).trim();
+	if (!bucket) throw new CliError("Missing --bucket");
+
+	return {
+		config: { provider, bucket },
+		peerDependencies: definition.peerDeps,
+	};
+}
+
+async function promptForFilesProvider(
+	promptSelect: SelectFilesProviderPrompt,
+): Promise<string> {
+	if (!process.stdin.isTTY || !process.stdout.isTTY) {
+		throw new CliError("Missing --provider");
+	}
+	return promptSelect({
+		message: "Select Files SDK bucket provider",
+		choices: bucketProviders().map(({ name, slug }) => ({
+			name: `${name} (${slug})`,
+			value: slug,
+		})),
+	});
+}
+
+async function promptForFilesBucket(promptInput: InputPrompt): Promise<string> {
+	if (!process.stdin.isTTY || !process.stdout.isTTY) {
+		throw new CliError("Missing --bucket");
+	}
+	return promptInput({
+		message: "Files SDK bucket",
+		default: "agentpond",
+	});
+}
+
+function bucketProvider(provider: string) {
+	const definition = getProvider(provider);
+	if (!definition) {
+		throw new CliError(
+			`Unknown Files SDK provider "${provider}". Bucket providers: ${bucketProviders()
+				.map(({ slug }) => slug)
+				.join(", ")}`,
+		);
+	}
+	if (!definition.env.config?.includes("bucket")) {
+		throw new CliError(
+			`Files SDK provider "${provider}" is not bucket-backed and is not supported by AgentPond`,
+		);
+	}
+	return definition;
+}
+
+function bucketProviders() {
+	return PROVIDER_NAMES.flatMap((provider) => {
+		const definition = getProvider(provider);
+		return definition?.env.config?.includes("bucket") ? [definition] : [];
 	});
 }
 

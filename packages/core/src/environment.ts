@@ -8,7 +8,18 @@ import {
 import { basename, join } from "node:path";
 import { agentPondWorkspaceRoot } from "./workspace.js";
 
-export type AgentPondStoreType = "local" | "s3" | "gcs";
+export type AgentPondStoreType = "files-sdk" | "local" | "s3" | "gcs";
+
+export type FilesSdkEnvironmentConfig = {
+	provider: string;
+	bucket: string;
+};
+
+export type InitAgentPondEnvironmentOptions = {
+	cwd?: string;
+	storeType?: AgentPondStoreType;
+	filesSdk?: FilesSdkEnvironmentConfig;
+};
 
 export type AgentPondEnvironment = {
 	name: string;
@@ -104,7 +115,7 @@ export function selectAgentPondEnvironment(
 
 export function initAgentPondEnvironment(
 	name: string,
-	options: { cwd?: string; storeType?: AgentPondStoreType } = {},
+	options: InitAgentPondEnvironmentOptions = {},
 ): AgentPondEnvironment {
 	const environment = resolveAgentPondEnvironment({ name, cwd: options.cwd });
 	mkdirSync(environment.envDir, { recursive: true });
@@ -112,7 +123,11 @@ export function initAgentPondEnvironment(
 	if (environment.name !== "dev" && !existsSync(environment.envFilePath)) {
 		writeFileSync(
 			environment.envFilePath,
-			defaultEnvironmentFile(environment.name, options.storeType ?? "s3"),
+			defaultEnvironmentFile(
+				environment.name,
+				options.storeType ?? "s3",
+				options.filesSdk,
+			),
 			"utf8",
 		);
 	}
@@ -155,6 +170,7 @@ function normalizeEnvironmentName(name: string): string {
 function defaultEnvironmentFile(
 	name: string,
 	storeType: AgentPondStoreType,
+	filesSdk: FilesSdkEnvironmentConfig | undefined,
 ): string {
 	const isDev = name === "dev";
 	if (isDev) return "";
@@ -180,10 +196,13 @@ function defaultEnvironmentFile(
 		"LANGFUSE_SECRET_KEY=sk-agentpond",
 		"",
 	];
-	return [...storeEnvironmentLines(storeType), ...lines].join("\n");
+	return [...storeEnvironmentLines(storeType, filesSdk), ...lines].join("\n");
 }
 
-function storeEnvironmentLines(storeType: AgentPondStoreType): string[] {
+function storeEnvironmentLines(
+	storeType: AgentPondStoreType,
+	filesSdk: FilesSdkEnvironmentConfig | undefined,
+): string[] {
 	if (storeType === "local") {
 		return [
 			"# Storage backend for this environment.",
@@ -199,6 +218,26 @@ function storeEnvironmentLines(storeType: AgentPondStoreType): string[] {
 			"# Google Cloud Storage bucket containing AgentPond ingestion objects.",
 			"AGENTPOND_GCS_BUCKET=agentpond",
 			"# Authenticate with Google Application Default Credentials or GOOGLE_APPLICATION_CREDENTIALS.",
+			"",
+		];
+	}
+	if (storeType === "files-sdk") {
+		if (!filesSdk?.provider || !filesSdk.bucket) {
+			throw new Error(
+				"Files SDK environments require both a provider and bucket",
+			);
+		}
+		const provider = environmentFileValue(filesSdk.provider, "provider");
+		const bucket = environmentFileValue(filesSdk.bucket, "bucket");
+		return [
+			"# Storage backend for this environment. Files SDK environments sync from object storage.",
+			"AGENTPOND_STORE=files-sdk",
+			"",
+			"# Files SDK bucket adapter used by the exporter and AgentPond CLI.",
+			`FILES_SDK_PROVIDER=${provider}`,
+			"# Bucket containing AgentPond ingestion objects.",
+			`AGENTPOND_FILES_BUCKET=${bucket}`,
+			"# Authenticate with the provider-specific environment variables documented by Files SDK.",
 			"",
 		];
 	}
@@ -223,4 +262,11 @@ function storeEnvironmentLines(storeType: AgentPondStoreType): string[] {
 		"# AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION=WHEN_REQUIRED",
 		"",
 	];
+}
+
+function environmentFileValue(value: string, label: string): string {
+	if (value.includes("\n") || value.includes("\r")) {
+		throw new Error(`Files SDK ${label} must be a single-line value`);
+	}
+	return value;
 }

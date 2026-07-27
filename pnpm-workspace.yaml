@@ -33,6 +33,7 @@ minimumReleaseAgeExclude:
   - '@duckdb/node-bindings@1.5.4-r.1'
   - fast-uri@3.1.4
   - find-my-way@9.7.0
+  - files-sdk@2.2.1
   - typescript@7.0.2
   - uuid@11.1.1
 

@@ -130,6 +130,48 @@ test("generated environment files document local and GCS settings", () => {
 	}
 });
 
+test("generated environment files persist Files SDK provider and bucket", () => {
+	const originalCwd = process.cwd();
+	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-files-sdk-"));
+	try {
+		clearEnv(CONFIG_ENV_KEYS);
+		process.chdir(cwd);
+		const environment = initAgentPondEnvironment("files-env", {
+			storeType: "files-sdk",
+			filesSdk: {
+				provider: "r2",
+				bucket: "agentpond",
+			},
+		});
+		const content = readFileSync(environment.envFilePath, "utf8");
+
+		assert.match(content, /AGENTPOND_STORE=files-sdk/);
+		assert.match(content, /FILES_SDK_PROVIDER=r2/);
+		assert.match(content, /AGENTPOND_FILES_BUCKET=agentpond/);
+		assert.match(content, /AGENTPOND_PROJECT_ID=default-project/);
+		assert.match(content, /AGENTPOND_PREFIX=/);
+		assert.throws(
+			() =>
+				initAgentPondEnvironment("invalid-files-env", {
+					storeType: "files-sdk",
+				}),
+			/require both a provider and bucket/,
+		);
+		assert.throws(
+			() =>
+				initAgentPondEnvironment("invalid-files-bucket", {
+					storeType: "files-sdk",
+					filesSdk: { provider: "r2", bucket: "bucket\nINJECTED=value" },
+				}),
+			/bucket must be a single-line value/,
+		);
+	} finally {
+		process.chdir(originalCwd);
+		restoreEnv(originalEnv);
+	}
+});
+
 test("config ignores store selection until storage is resolved", () => {
 	const originalCwd = process.cwd();
 	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
@@ -156,7 +198,7 @@ test("config ignores store selection until storage is resolved", () => {
 		const invalidStoreConfig = configFromEnv({ envName: "production" });
 		assert.throws(
 			() => sinkForConfig(invalidStoreConfig, {}),
-			/AGENTPOND_STORE must be "local", "s3", or "gcs"/,
+			/AGENTPOND_STORE must be "files-sdk", "local", "s3", or "gcs"/,
 		);
 	} finally {
 		process.chdir(originalCwd);
@@ -522,6 +564,35 @@ test("sinkForConfig wraps the configured object store factory", async () => {
 	}
 });
 
+test("sinkForConfig resolves a registered Files SDK object store factory", async () => {
+	const originalCwd = process.cwd();
+	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-files-sdk-config-"));
+	const store = new FileSystemObjectStore(
+		mkdtempSync(join(tmpdir(), "agentpond-files-sdk-factory-")),
+	);
+	try {
+		clearEnv(CONFIG_ENV_KEYS);
+		process.chdir(cwd);
+		initAgentPondEnvironment("files-env", {
+			storeType: "files-sdk",
+			filesSdk: { provider: "r2", bucket: "agentpond" },
+		});
+		const config = configFromEnv({ envName: "files-env" });
+		const sink = sinkForConfig(config, { "files-sdk": () => store });
+
+		await sink.writeOtelResourceSpans({
+			projectId: config.projectId,
+			resourceSpans: [{ resource: {}, scopeSpans: [] }],
+		});
+
+		assert.equal((await store.listKeys("otel/default-project/")).length, 1);
+	} finally {
+		process.chdir(originalCwd);
+		restoreEnv(originalEnv);
+	}
+});
+
 test("sinkForRuntimeEnv wraps runtime object store factories", async () => {
 	const s3Store = new FileSystemObjectStore(
 		mkdtempSync(join(tmpdir(), "agentpond-runtime-s3-")),
@@ -571,6 +642,7 @@ const CONFIG_ENV_KEYS = [
 	"AGENTPOND_PROJECT_ID",
 	"AGENTPOND_PREFIX",
 	"AGENTPOND_STORE",
+	"AGENTPOND_FILES_BUCKET",
 	"AGENTPOND_S3_BUCKET",
 	"AGENTPOND_S3_ENDPOINT",
 	"AGENTPOND_S3_REGION",
@@ -584,6 +656,7 @@ const CONFIG_ENV_KEYS = [
 	"AGENTPOND_GCS_PREFIX",
 	"AGENTPOND_FIREBASE_STORAGE_BUCKET",
 	"AGENTPOND_BLOB_ACCESS",
+	"FILES_SDK_PROVIDER",
 	"LANGFUSE_BASE_URL",
 	"LANGFUSE_PUBLIC_KEY",
 	"LANGFUSE_SECRET_KEY",

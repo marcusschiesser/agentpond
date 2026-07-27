@@ -30,6 +30,7 @@
 		"@agentpond/duckdb": "workspace:*",
 		"@agentpond/fastify-ingest": "workspace:*",
 		"@agentpond/firebase": "workspace:*",
+		"@agentpond/files-sdk": "workspace:*",
 		"@agentpond/google": "workspace:*",
 		"@agentpond/supabase": "workspace:*",
 		"@agentpond/vercel": "workspace:*",
@@ -37,6 +38,7 @@
 		"@inquirer/prompts": "8.5.2",
 		"commander": "15.0.0",
 		"fastify": "^5.6.2",
+		"files-sdk": "2.2.1",
 		"protobufjs": "^7.6.5",
 		"skills": "1.5.9",
 		"zod": "^4.3.6"

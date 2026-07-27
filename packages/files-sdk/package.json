@@ -1,0 +1,52 @@
+{
+	"name": "@agentpond/files-sdk",
+	"version": "0.0.0",
+	"description": "Files SDK object storage and OpenTelemetry export adapters for AgentPond",
+	"license": "MIT",
+	"type": "module",
+	"files": [
+		"dist"
+	],
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts",
+		"test:e2e:minio": "NODE_ENV=test node --test --import tsx tests/minio.e2e.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/marcusschiesser/agentpond.git",
+		"directory": "packages/files-sdk"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./otel": {
+			"types": "./dist/otel.d.ts",
+			"import": "./dist/otel.js"
+		}
+	},
+	"dependencies": {
+		"@agentpond/core": "workspace:*"
+	},
+	"devDependencies": {
+		"@agentpond/otel": "workspace:*",
+		"@aws-sdk/client-s3": "3.1068.0",
+		"@aws-sdk/s3-presigned-post": "3.1068.0",
+		"@aws-sdk/s3-request-presigner": "3.1068.0",
+		"@opentelemetry/core": "^2.9.0",
+		"@opentelemetry/resources": "^2.9.0",
+		"@opentelemetry/sdk-trace-base": "^2.9.0",
+		"files-sdk": "2.2.1"
+	},
+	"peerDependencies": {
+		"@agentpond/otel": "workspace:*",
+		"files-sdk": "^2.2.1"
+	},
+	"peerDependenciesMeta": {
+		"@agentpond/otel": {
+			"optional": true
+		}
+	}
+}

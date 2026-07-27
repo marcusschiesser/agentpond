@@ -21,6 +21,7 @@ import {
 	type ObjectStore,
 } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
+import { FilesObjectStore } from "@agentpond/files-sdk";
 import {
 	FIREBASE_INSTRUMENTATION_PROMPT,
 	FirebaseStorageObjectStore,
@@ -2039,6 +2040,119 @@ test("CLI env init writes GCS store files from --store", async () => {
 	}
 });
 
+test("CLI env init persists a Files SDK bucket provider", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-files-sdk-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"production",
+				"--store",
+				"files-sdk",
+				"--provider",
+				"r2",
+				"--bucket",
+				"agentpond",
+				"--json",
+			]),
+		);
+		const result = JSON.parse(output) as {
+			bucket: string;
+			envFile: string;
+			peerDependencies: string[];
+			provider: string;
+			store: string;
+		};
+		const content = readFileSync(result.envFile, "utf8");
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.store, "files-sdk");
+		assert.equal(result.provider, "r2");
+		assert.equal(result.bucket, "agentpond");
+		assert.ok(result.peerDependencies.includes("@aws-sdk/client-s3"));
+		assert.match(content, /AGENTPOND_STORE=files-sdk/);
+		assert.match(content, /FILES_SDK_PROVIDER=r2/);
+		assert.match(content, /AGENTPOND_FILES_BUCKET=agentpond/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init validates Files SDK bucket providers and required flags", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-files-sdk-errors-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const nonBucket = await captureStderr(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"fs-env",
+				"--store",
+				"files-sdk",
+				"--provider",
+				"fs",
+				"--bucket",
+				"agentpond",
+			]),
+		);
+		assert.equal(process.exitCode, 2);
+		assert.match(nonBucket, /provider "fs" is not bucket-backed/);
+
+		process.exitCode = undefined;
+		const missingProvider = await captureStderr(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"missing-provider",
+				"--store",
+				"files-sdk",
+				"--bucket",
+				"agentpond",
+			]),
+		);
+		assert.equal(process.exitCode, 2);
+		assert.match(missingProvider, /Missing --provider/);
+
+		process.exitCode = undefined;
+		const unrelated = await captureStderr(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"s3-env",
+				"--store",
+				"s3",
+				"--provider",
+				"r2",
+			]),
+		);
+		assert.equal(process.exitCode, 2);
+		assert.match(
+			unrelated,
+			/--provider and --bucket require --store files-sdk/,
+		);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI env init rejects the removed Vercel store option", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-vercel-"));
@@ -2059,7 +2173,7 @@ test("CLI env init rejects the removed Vercel store option", async () => {
 		);
 
 		assert.equal(process.exitCode, 2);
-		assert.match(stderr, /--store must be s3, gcs, or local/);
+		assert.match(stderr, /--store must be files-sdk, s3, gcs, or local/);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 	} finally {
 		process.chdir(cwd);
@@ -2715,7 +2829,7 @@ test("CLI default context validates stores only when storage is resolved", async
 		assert.equal(context.usesAgentPondDevServer, true);
 		await assert.rejects(
 			context.resolveStorage(),
-			/AGENTPOND_STORE must be "local", "s3", or "gcs"/,
+			/AGENTPOND_STORE must be "files-sdk", "local", "s3", or "gcs"/,
 		);
 	} finally {
 		if (originalEnvStore === undefined) {
@@ -2724,6 +2838,92 @@ test("CLI default context validates stores only when storage is resolved", async
 			process.env.AGENTPOND_STORE = originalEnvStore;
 		}
 		process.chdir(cwd);
+	}
+});
+
+test("CLI default context resolves persistent Files SDK storage", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-files-context-"));
+	const originalFromEnvironment = FilesObjectStore.fromEnvironment;
+	const originalStore = process.env.AGENTPOND_STORE;
+	const store = new MemoryObjectStore();
+	try {
+		delete process.env.AGENTPOND_STORE;
+		process.chdir(root);
+		const environment = initAgentPondEnvironment("production", {
+			storeType: "files-sdk",
+			filesSdk: { provider: "r2", bucket: "agentpond" },
+		});
+		FilesObjectStore.fromEnvironment = ((resolvedEnvironment) => {
+			assert.equal(resolvedEnvironment?.envFilePath, environment.envFilePath);
+			return store;
+		}) as unknown as typeof FilesObjectStore.fromEnvironment;
+
+		const context = environmentContextForCommand({ envName: "production" });
+		const storage = await context.resolveStorage();
+
+		assert.equal(storage.store, store);
+		assert.equal(storage.projectId, "default-project");
+		assert.equal(storage.prefix, "");
+	} finally {
+		FilesObjectStore.fromEnvironment = originalFromEnvironment;
+		if (originalStore === undefined) {
+			delete process.env.AGENTPOND_STORE;
+		} else {
+			process.env.AGENTPOND_STORE = originalStore;
+		}
+		process.chdir(cwd);
+	}
+});
+
+test("CLI sync reads Files SDK storage into the selected environment cache", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-files-sync-"));
+	const originalExitCode = process.exitCode;
+	const originalFromEnvironment = FilesObjectStore.fromEnvironment;
+	const originalStore = process.env.AGENTPOND_STORE;
+	const store = new MemoryObjectStore();
+	const traceId = "11111111111111111111111111111111";
+	process.exitCode = undefined;
+	try {
+		delete process.env.AGENTPOND_STORE;
+		process.chdir(root);
+		const environment = initAgentPondEnvironment("production", {
+			storeType: "files-sdk",
+			filesSdk: { provider: "r2", bucket: "agentpond" },
+		});
+		await store.putJson(
+			"otel/default-project/2026/06/14/11/03/files-batch.json",
+			manualTraceResourceSpans(
+				{ name: "Files SDK Trace" },
+				traceId,
+				"2026-06-14T11:03:19.419Z",
+			),
+		);
+		FilesObjectStore.fromEnvironment = (() =>
+			store) as unknown as typeof FilesObjectStore.fromEnvironment;
+
+		await captureStdout(() =>
+			main(["node", "agentpond", "env", "use", "production", "--json"]),
+		);
+		await captureStdout(() => main(["node", "agentpond", "sync", "--json"]));
+
+		assert.equal(process.exitCode, undefined);
+		const db = new AgentPondCache(environment.dbPath);
+		const rows = await db.query<{ id: string; name: string }>(
+			`SELECT id, name FROM traces WHERE id = '${traceId}'`,
+		);
+		await db.close();
+		assert.deepEqual(rows, [{ id: traceId, name: "Files SDK Trace" }]);
+	} finally {
+		FilesObjectStore.fromEnvironment = originalFromEnvironment;
+		if (originalStore === undefined) {
+			delete process.env.AGENTPOND_STORE;
+		} else {
+			process.env.AGENTPOND_STORE = originalStore;
+		}
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
 	}
 });
 
@@ -2792,7 +2992,7 @@ test("CLI env init rejects invalid stores", async () => {
 		);
 
 		assert.equal(process.exitCode, 2);
-		assert.match(stderr, /--store must be s3, gcs, or local/);
+		assert.match(stderr, /--store must be files-sdk, s3, gcs, or local/);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -2866,7 +3066,7 @@ test("CLI env init can select a store interactively", async () => {
 				selectStore: async ({ choices }) => {
 					assert.deepEqual(
 						choices.map((choice) => choice.value),
-						["s3", "gcs", "local"],
+						["files-sdk", "s3", "gcs", "local"],
 					);
 					return "local";
 				},
@@ -2880,6 +3080,68 @@ test("CLI env init can select a store interactively", async () => {
 		assert.equal(process.exitCode, undefined);
 		assert.equal(result.store, "local");
 		assert.match(readFileSync(result.envFile, "utf8"), /AGENTPOND_STORE=local/);
+	} finally {
+		if (stdinDescriptor)
+			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+		if (stdoutDescriptor)
+			Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init can select a Files SDK provider and bucket interactively", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-files-sdk-tty-"));
+	const originalExitCode = process.exitCode;
+	const stdinDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdin,
+		"isTTY",
+	);
+	const stdoutDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdout,
+		"isTTY",
+	);
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		Object.defineProperty(process.stdin, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		Object.defineProperty(process.stdout, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "init", "production", "--json"], {
+				inputBucket: async ({ default: defaultBucket }) => {
+					assert.equal(defaultBucket, "agentpond");
+					return "traces";
+				},
+				selectFilesProvider: async ({ choices }) => {
+					assert.ok(choices.some((choice) => choice.value === "r2"));
+					assert.ok(choices.every((choice) => choice.value !== "fs"));
+					return "r2";
+				},
+				selectStore: async () => "files-sdk",
+			}),
+		);
+		const result = JSON.parse(output) as {
+			bucket: string;
+			provider: string;
+			store: string;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(
+			{
+				bucket: result.bucket,
+				provider: result.provider,
+				store: result.store,
+			},
+			{ bucket: "traces", provider: "r2", store: "files-sdk" },
+		);
 	} finally {
 		if (stdinDescriptor)
 			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);

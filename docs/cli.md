@@ -91,12 +91,15 @@ Manual deployments use AgentPond environments:
 
 ```bash
 npx agentpond env init production --store s3
+npx agentpond env init production --store files-sdk --provider r2 --bucket agentpond
 npx agentpond env use production
 npx agentpond env current
 npx agentpond env list
 ```
 
-Supported deployment stores are `s3` and `gcs`. The `local` store is available only for explicit tests and filesystem fixtures.
+Supported deployment stores are `s3`, `gcs`, and bucket-backed `files-sdk`
+providers. The `local` store is available only for explicit tests and
+filesystem fixtures.
 
 ## Local testing server
 

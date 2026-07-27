@@ -51,6 +51,20 @@ npx agentpond env init production --store s3
 npx agentpond env init production --store gcs
 ```
 
+## Files SDK
+
+- Object store: any Files SDK provider whose adapter uses a bucket
+- Direct exporter: `createFilesSpanExporter()` from `@agentpond/files-sdk/otel`
+- CLI configuration: persistent provider and bucket selection
+- Credentials: provider-specific process environment variables
+
+```bash
+npx agentpond env init production \
+  --store files-sdk \
+  --provider r2 \
+  --bucket agentpond
+```
+
 ## Vercel
 
 - Object store: private Vercel Blob

@@ -20,7 +20,7 @@ export type ConfiguredObjectStoreFactories = Partial<
 	Record<AgentPondStoreType, ObjectStoreFactory>
 >;
 
-export type RuntimeObjectStoreType = Exclude<AgentPondStoreType, "local">;
+export type RuntimeObjectStoreType = Extract<AgentPondStoreType, "gcs" | "s3">;
 
 export type RuntimeObjectStoreFactories = Partial<
 	Record<RuntimeObjectStoreType, () => ObjectStore>
@@ -53,11 +53,16 @@ function storeTypeFromValue(
 	value: string | undefined,
 ): AgentPondStoreType | undefined {
 	if (value === undefined) return undefined;
-	if (value === "local" || value === "s3" || value === "gcs") {
+	if (
+		value === "files-sdk" ||
+		value === "local" ||
+		value === "s3" ||
+		value === "gcs"
+	) {
 		return value;
 	}
 	throw new Error(
-		`AGENTPOND_STORE must be "local", "s3", or "gcs", got "${value}"`,
+		`AGENTPOND_STORE must be "files-sdk", "local", "s3", or "gcs", got "${value}"`,
 	);
 }
 

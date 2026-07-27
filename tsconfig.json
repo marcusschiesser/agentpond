@@ -3,6 +3,7 @@
 	"references": [
 		{ "path": "./packages/core" },
 		{ "path": "./packages/otel" },
+		{ "path": "./packages/files-sdk" },
 		{ "path": "./packages/aws" },
 		{ "path": "./packages/firebase" },
 		{ "path": "./packages/google" },
