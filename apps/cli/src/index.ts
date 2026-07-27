@@ -7,9 +7,10 @@ import { CliError } from "./cli-support.js";
 import { addGlobalOptions } from "./command-support.js";
 import { registerDevCommand } from "./commands/dev.js";
 import {
+	type InputPrompt,
 	registerEnvCommand,
 	type SelectEnvironmentPrompt,
-	type SelectStorePrompt,
+	type SelectFilesProviderPrompt,
 } from "./commands/env.js";
 import { registerInitCommand, type SkillsInstaller } from "./commands/init.js";
 import { registerObservationsCommand } from "./commands/observations.js";
@@ -30,9 +31,12 @@ const packageJson = require("../package.json") as { version: string };
 export const CLI_VERSION = packageJson.version;
 
 export type ProgramOptions = {
+	inputBucket?: InputPrompt;
+	inputEndpoint?: InputPrompt;
+	inputRegion?: InputPrompt;
 	installSkills?: SkillsInstaller;
 	selectEnvironment?: SelectEnvironmentPrompt;
-	selectStore?: SelectStorePrompt;
+	selectFilesProvider?: SelectFilesProviderPrompt;
 	updateCheck?: CliUpdateCheckOptions | false;
 };
 
@@ -58,8 +62,11 @@ export function createProgram(options: ProgramOptions = {}): Command {
 	registerInitCommand(program, { installSkills: options.installSkills });
 	registerDevCommand(program);
 	registerEnvCommand(program, {
+		inputBucket: options.inputBucket,
+		inputEndpoint: options.inputEndpoint,
+		inputRegion: options.inputRegion,
 		selectEnvironment: options.selectEnvironment,
-		selectStore: options.selectStore,
+		selectFilesProvider: options.selectFilesProvider,
 	});
 	registerSyncCommand(program);
 	registerTracesCommand(program);

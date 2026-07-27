@@ -14,7 +14,7 @@ export function registerSyncCommand(program: Command): void {
 			const { context, json } = commandContext(
 				command.optsWithGlobals<GlobalOptions>(),
 			);
-			if (context.usesAgentPondDevServer) {
+			if (context.kind === "dev") {
 				return print(
 					{
 						skipped: true,

@@ -6,7 +6,8 @@ For deployment onboarding, use automatic [Firebase](./getting-started/firebase.m
 
 ### Direct object-store export
 
-A trusted server application writes spans directly to object storage with `AgentPondSpanExporter` and a provider adapter.
+A trusted Node.js application writes spans directly to object storage with
+`createFilesSpanExporter()` and a Files SDK bucket adapter.
 
 ```text
 Node.js application -> object storage -> npx agentpond sync -> local DuckDB
@@ -30,26 +31,52 @@ Supported endpoints:
 ## AWS
 
 - Object store: S3 or an S3-compatible provider
-- Direct adapter: `S3ObjectStore` from `@agentpond/aws`
-- Serverless handler: `lambdaIngestHandler` or `createLambdaIngestHandler`
+- Direct adapter: `s3` from `files-sdk/s3`
+- HTTP ingestion: the AgentPond Docker image
 - Container targets: ECS, EKS, App Runner, or another container runtime
 
 Initialize the CLI configuration with:
 
 ```bash
-npx agentpond env init production --store s3
+npx agentpond env init production --provider s3 --bucket agentpond
 ```
+
+Set `FILES_SDK_PROVIDER=s3` and `AGENTPOND_FILES_BUCKET=agentpond` on the
+container. AWS credentials, region, and optional compatible endpoint remain
+ambient AWS environment variables. There is no AgentPond AWS Lambda handler.
 
 ## Google Cloud
 
 - Object store: Google Cloud Storage
-- Direct adapter: `GcsObjectStore` from `@agentpond/google`
-- Serverless handler: `httpIngestFunction` or `createHttpIngestFunction`
+- Direct adapter: `gcs` from `files-sdk/gcs`
+- HTTP ingestion: the AgentPond Docker image
 - Container targets: Cloud Run, GKE, or another container runtime
 
 ```bash
-npx agentpond env init production --store gcs
+npx agentpond env init production --provider gcs --bucket agentpond
 ```
+
+Set `FILES_SDK_PROVIDER=gcs` and `AGENTPOND_FILES_BUCKET=agentpond` on the
+container and use Application Default Credentials or a service account. There
+is no generic AgentPond Google Cloud Function handler.
+
+## Files SDK
+
+- Object store: any Files SDK provider whose adapter uses a bucket
+- Direct exporter: `createFilesSpanExporter()` from `@agentpond/files-sdk/otel`
+- CLI configuration: persistent provider and bucket selection
+- Credentials: provider-specific process environment variables
+
+```bash
+npx agentpond env init production \
+  --provider r2 \
+  --bucket agentpond
+```
+
+Providers that declare an endpoint or region receive matching `--endpoint` and
+`--region` values. AgentPond discovers supported providers from Files SDK at
+runtime, excludes Bun-only and non-bucket adapters, and ships their peer SDKs in
+the CLI and ingest image.
 
 ## Vercel
 
@@ -86,6 +113,10 @@ route. Review `storage.objects` RLS policies even when the bucket is private.
 
 ## Custom container infrastructure
 
-Run `ghcr.io/marcusschiesser/agentpond` on any container platform and connect it to S3-compatible or GCS storage. Configure provider credentials and Langfuse-compatible ingestion authentication directly on the deployment.
+Run `ghcr.io/marcusschiesser/agentpond` on any container platform and configure
+`FILES_SDK_PROVIDER`, `AGENTPOND_FILES_BUCKET`, optional
+`FILES_SDK_ENDPOINT`/`FILES_SDK_REGION`, provider credentials, and
+Langfuse-compatible ingestion authentication directly on the deployment.
 
-Local filesystem storage and `npx agentpond dev` are testing facilities only; see [Local testing](./getting-started/manual-setup.md#local-testing).
+`npx agentpond dev` writes directly to its local DuckDB cache and has no object
+store; see [Local testing](./getting-started/manual-setup.md#local-testing).

@@ -2,6 +2,7 @@ import {
 	type AgentPondEnvironmentContext,
 	type AgentPondProvider,
 	type AgentPondProviderProject,
+	type AgentPondStorageEnvironmentContext,
 	agentPondWorkspaceRoot,
 	resolveAgentPondEnvironment,
 } from "@agentpond/core";
@@ -42,7 +43,7 @@ export function supabaseEnvironmentContextFromCwdIfAvailable(
 function supabaseEnvironmentContext(
 	project: SupabaseCliProjectConfig,
 	dependencies: { run?: SupabaseProcessRunner } = {},
-): AgentPondEnvironmentContext {
+): AgentPondStorageEnvironmentContext {
 	const environment = resolveAgentPondEnvironment({
 		cwd: project.root,
 		name: project.projectRef,
@@ -63,7 +64,6 @@ function supabaseEnvironmentContext(
 		kind: "supabase",
 		rootDir: project.root,
 		config,
-		usesAgentPondDevServer: false,
 		async resolveStorage() {
 			return {
 				store: await SupabaseStorageObjectStore.fromCliProject(

@@ -1,11 +1,12 @@
-import { S3ObjectStore } from "@agentpond/aws";
 import {
 	type AgentPondEnvironmentContext,
 	agentPondWorkspaceRoot,
 	configFromEnv,
-	objectStoreForConfig as configuredObjectStoreForConfig,
 } from "@agentpond/core";
-import { GcsObjectStore } from "@agentpond/google";
+import {
+	FilesObjectStore,
+	filesSdkConfigFromEnvironment,
+} from "@agentpond/files-sdk";
 import { CliError } from "./cli-support.js";
 import { providerForCommand } from "./providers.js";
 
@@ -19,9 +20,15 @@ export function environmentContextForCommand(
 	options: EnvironmentContextOptions = {},
 ): AgentPondEnvironmentContext {
 	const providerContext = providerForCommand(options);
-	if (!providerContext) return defaultAgentPondEnvironmentContext(options);
+	if (!providerContext) {
+		return validateEnvironmentContext(
+			defaultAgentPondEnvironmentContext(options),
+		);
+	}
 	try {
-		return providerContext.project.resolveEnvironment(options.envName);
+		return validateEnvironmentContext(
+			providerContext.project.resolveEnvironment(options.envName),
+		);
 	} catch (error) {
 		throw new CliError(error instanceof Error ? error.message : String(error));
 	}
@@ -44,7 +51,9 @@ export function manualEnvironmentContextForCommand(
 			`npx agentpond ${action === "dev" ? "dev" : `env ${action}`} is not available for ${providerContext.provider.kind} projects; ${alternative}`,
 		);
 	}
-	return defaultAgentPondEnvironmentContext(options);
+	return action === "init" || action === "list"
+		? defaultAgentPondEnvironmentContext(options)
+		: validateEnvironmentContext(defaultAgentPondEnvironmentContext(options));
 }
 
 function defaultAgentPondEnvironmentContext(
@@ -55,20 +64,64 @@ function defaultAgentPondEnvironmentContext(
 		cwd: rootDir,
 		envName: options.envName,
 	});
+	if (config.environment?.name === "dev") {
+		return {
+			kind: "dev",
+			rootDir,
+			config,
+		};
+	}
 	return {
-		kind: "agentpond",
+		kind: "files-sdk",
 		rootDir,
 		config,
-		usesAgentPondDevServer: config.environment?.name === "dev",
 		async resolveStorage() {
 			return {
-				store: configuredObjectStoreForConfig(config, {
-					gcs: GcsObjectStore.fromEnvironment,
-					s3: S3ObjectStore.fromEnvironment,
-				}),
+				store: FilesObjectStore.fromEnvironment(config.environment),
 				projectId: config.projectId,
 				prefix: config.prefix,
 			};
 		},
 	};
+}
+
+export function validateManualEnvironment(cwd: string, name: string): void {
+	validateEnvironmentContext(
+		defaultAgentPondEnvironmentContext({ cwd, envName: name }),
+	);
+}
+
+export function validateEnvironmentContext(
+	context: AgentPondEnvironmentContext,
+): AgentPondEnvironmentContext {
+	switch (context.kind) {
+		case "dev":
+			if (context.config.environment?.name !== "dev") {
+				throw new CliError(
+					'Only the "dev" environment may use direct DuckDB storage',
+				);
+			}
+			return context;
+		case "files-sdk":
+			try {
+				filesSdkConfigFromEnvironment(context.config.environment);
+			} catch (error) {
+				const name = context.config.environment?.name ?? "unknown";
+				const message = error instanceof Error ? error.message : String(error);
+				throw new CliError(
+					`AgentPond environment "${name}" is not a valid Files SDK environment: ${message}`,
+				);
+			}
+			return context;
+		case "firebase":
+		case "supabase":
+		case "vercel":
+			return context;
+		default:
+			throw new CliError(
+				`Unsupported AgentPond environment kind: ${String(
+					(context as { kind?: unknown }).kind,
+				)}`,
+			);
+	}
 }

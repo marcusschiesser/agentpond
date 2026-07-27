@@ -18,9 +18,16 @@
 		"directory": "apps/ingest"
 	},
 	"dependencies": {
-		"@agentpond/aws": "workspace:*",
 		"@agentpond/core": "workspace:*",
 		"@agentpond/fastify-ingest": "workspace:*",
-		"@agentpond/google": "workspace:*"
+		"@agentpond/files-sdk": "workspace:*",
+		"@aws-sdk/client-s3": "3.1068.0",
+		"@aws-sdk/s3-presigned-post": "3.1068.0",
+		"@aws-sdk/s3-request-presigner": "3.1068.0",
+		"@google-cloud/storage": "^7.21.0",
+		"@supabase/storage-js": "2.110.6",
+		"disk": "^0.8.18",
+		"files-sdk": "2.2.1",
+		"node-appwrite": "^26.0.0"
 	}
 }

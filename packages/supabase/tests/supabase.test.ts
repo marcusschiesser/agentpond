@@ -300,7 +300,6 @@ test("Supabase environment contexts use project refs for overrides and cache pat
 	);
 	assert.equal(context.config.prefix, "");
 	assert.equal(context.rootDir, root);
-	assert.equal(context.usesAgentPondDevServer, false);
 	assert.match(
 		supabaseProvider.instrumentationPrompt,
 		/agentpond Storage bucket/,

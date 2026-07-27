@@ -1,10 +1,12 @@
 import { performance } from "node:perf_hooks";
-import { S3ObjectStore } from "@agentpond/aws";
 import { sinkFromStore } from "@agentpond/core";
 import { AgentPondCache } from "@agentpond/duckdb";
 import { buildServer } from "@agentpond/fastify-ingest";
+import { FilesObjectStore } from "@agentpond/files-sdk";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { NodeSDK } from "@opentelemetry/sdk-node";
+import { Files } from "files-sdk";
+import { minio } from "files-sdk/minio";
 import {
 	assertEmptyPrefix,
 	buildConfig,
@@ -25,13 +27,19 @@ import { countTraces, formatDuration, timeSync } from "./sync.js";
 async function main(argv = process.argv.slice(2)): Promise<void> {
 	const args = parseArgs(argv);
 	const config = buildConfig(args);
-	const store = new S3ObjectStore(args.s3);
+	const store = new FilesObjectStore(
+		new Files({
+			adapter: minio(args.minio),
+			retries: 3,
+			timeout: 10_000,
+		}),
+	);
 
 	logStep(
 		`starting Langfuse sync benchmark with ${args.traces} traces and prefix ${args.prefix}`,
 	);
 	await assertEmptyPrefix(store, args.prefix);
-	logStep("confirmed S3 prefix is empty");
+	logStep("confirmed MinIO prefix is empty");
 
 	process.env.NODE_ENV = "test";
 	const server = buildServer({
@@ -67,7 +75,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 			`tracing finished in ${formatDuration(performance.now() - ingestionStarted)}`,
 		);
 
-		logStep("collecting S3 object size stats");
+		logStep("collecting MinIO object size stats");
 		const storage = await collectStorageStats(
 			store,
 			args.prefix,

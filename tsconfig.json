@@ -3,9 +3,8 @@
 	"references": [
 		{ "path": "./packages/core" },
 		{ "path": "./packages/otel" },
-		{ "path": "./packages/aws" },
+		{ "path": "./packages/files-sdk" },
 		{ "path": "./packages/firebase" },
-		{ "path": "./packages/google" },
 		{ "path": "./packages/supabase" },
 		{ "path": "./packages/vercel" },
 		{ "path": "./packages/ingest" },

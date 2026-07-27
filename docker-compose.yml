@@ -32,12 +32,11 @@ services:
       AGENTPOND_PROJECT_ID: default-project
       LANGFUSE_PUBLIC_KEY: pk-agentpond
       LANGFUSE_SECRET_KEY: sk-agentpond
-      AGENTPOND_S3_BUCKET: agentpond
-      AGENTPOND_S3_ENDPOINT: http://minio:9000
-      AGENTPOND_S3_FORCE_PATH_STYLE: "true"
-      AWS_ACCESS_KEY_ID: minio
-      AWS_SECRET_ACCESS_KEY: minio123
-      AWS_REGION: us-east-1
+      FILES_SDK_PROVIDER: minio
+      AGENTPOND_FILES_BUCKET: agentpond
+      FILES_SDK_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY_ID: minio
+      MINIO_SECRET_ACCESS_KEY: minio123
     ports:
       - "4318:3000"
 

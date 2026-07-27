@@ -27,10 +27,25 @@ npx agentpond env current --platform supabase
 npx agentpond sync --platform supabase
 ```
 
-For manually configured S3 or GCS deployments, `env list`, `env init`, and
-`env get` manage AgentPond environment files. Those manual operations and the
-local testing server are unavailable when AgentPond detects Firebase, Supabase,
-or Vercel.
+For manually configured remote bucket deployments, `env list`, `env init`, and
+`env get` manage Files SDK-backed AgentPond environment files. Those manual
+operations and the local testing server are unavailable when AgentPond detects
+Firebase, Supabase, or Vercel.
+
+Select and sync an existing Files SDK environment:
+
+```bash
+npx agentpond env use production
+npx agentpond sync
+```
+
+The environment file stores `FILES_SDK_PROVIDER` and
+`AGENTPOND_FILES_BUCKET`, optional `FILES_SDK_ENDPOINT` and
+`FILES_SDK_REGION`, but not credentials. Run AgentPond with the selected
+provider's credential variables available in the process environment. Keep
+`AGENTPOND_PROJECT_ID` and `AGENTPOND_PREFIX` identical to the application
+runtime; `default-project` and an empty prefix are the defaults. Bun-only,
+non-bucket, unknown, and malformed manual environments are rejected.
 
 `npx agentpond init` installs both AgentPond skills and prints a provider-specific coding-agent prompt. Cancelling skill installation stops setup without printing a success message or prompt.
 

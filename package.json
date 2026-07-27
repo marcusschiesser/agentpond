@@ -23,14 +23,13 @@
 		"release": "changeset publish",
 		"ingest": "tsx apps/ingest/src/index.ts",
 		"cli": "tsx apps/cli/src/index.ts",
-		"perf:sync": "pnpm --filter @agentpond/perf sync"
+		"perf:sync": "pnpm --filter @agentpond/perf sync",
+		"test:e2e:files-sdk": "docker compose up -d minio && docker compose run --rm create-bucket && pnpm --filter @agentpond/files-sdk test:e2e:minio"
 	},
 	"devDependencies": {
-		"@agentpond/aws": "workspace:*",
 		"@agentpond/core": "workspace:*",
 		"@agentpond/duckdb": "workspace:*",
 		"@agentpond/fastify-ingest": "workspace:*",
-		"@agentpond/google": "workspace:*",
 		"@agentpond/supabase": "workspace:*",
 		"@agentpond/vercel": "workspace:*",
 		"@agentpond/ingest": "workspace:*",
@@ -39,6 +38,7 @@
 		"@types/node": "^24.10.1",
 		"husky": "^9.1.7",
 		"jscpd": "^5.0.11",
+		"files-sdk": "2.2.1",
 		"tsup": "^8.5.1",
 		"tsx": "^4.21.0",
 		"typescript": "^7.0.2"

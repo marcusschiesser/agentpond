@@ -8,7 +8,17 @@ import {
 import { basename, join } from "node:path";
 import { agentPondWorkspaceRoot } from "./workspace.js";
 
-export type AgentPondStoreType = "local" | "s3" | "gcs";
+export type FilesSdkEnvironmentConfig = {
+	provider: string;
+	bucket: string;
+	endpoint?: string;
+	region?: string;
+};
+
+export type InitAgentPondEnvironmentOptions = {
+	cwd?: string;
+	filesSdk?: FilesSdkEnvironmentConfig;
+};
 
 export type AgentPondEnvironment = {
 	name: string;
@@ -104,7 +114,7 @@ export function selectAgentPondEnvironment(
 
 export function initAgentPondEnvironment(
 	name: string,
-	options: { cwd?: string; storeType?: AgentPondStoreType } = {},
+	options: InitAgentPondEnvironmentOptions = {},
 ): AgentPondEnvironment {
 	const environment = resolveAgentPondEnvironment({ name, cwd: options.cwd });
 	mkdirSync(environment.envDir, { recursive: true });
@@ -112,7 +122,7 @@ export function initAgentPondEnvironment(
 	if (environment.name !== "dev" && !existsSync(environment.envFilePath)) {
 		writeFileSync(
 			environment.envFilePath,
-			defaultEnvironmentFile(environment.name, options.storeType ?? "s3"),
+			defaultEnvironmentFile(environment.name, options.filesSdk),
 			"utf8",
 		);
 	}
@@ -154,7 +164,7 @@ function normalizeEnvironmentName(name: string): string {
 
 function defaultEnvironmentFile(
 	name: string,
-	storeType: AgentPondStoreType,
+	filesSdk: FilesSdkEnvironmentConfig | undefined,
 ): string {
 	const isDev = name === "dev";
 	if (isDev) return "";
@@ -164,63 +174,51 @@ function defaultEnvironmentFile(
 		"# Optional key prefix inside the selected object store.",
 		"AGENTPOND_PREFIX=",
 		"",
-		"# OpenTelemetry exporter endpoint used by standard OTLP HTTP exporters.",
-		"OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/api/public/otel",
-		"# Signal-specific OTLP trace endpoint used by exporters that expect the full traces URL.",
-		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/api/public/otel/v1/traces",
-		"# OpenTelemetry exporter protocol for OTLP HTTP JSON.",
-		"OTEL_EXPORTER_OTLP_PROTOCOL=http/json",
-		"",
-		"# Langfuse-compatible base URL used by SDKs.",
-		"LANGFUSE_BASE_URL=http://localhost:4318",
-		"",
-		"# Langfuse-compatible public key accepted by the ingestion server.",
-		"LANGFUSE_PUBLIC_KEY=pk-agentpond",
-		"# Langfuse-compatible secret key accepted by the ingestion server.",
-		"LANGFUSE_SECRET_KEY=sk-agentpond",
-		"",
 	];
-	return [...storeEnvironmentLines(storeType), ...lines].join("\n");
+	return [...filesSdkEnvironmentLines(filesSdk), ...lines].join("\n");
 }
 
-function storeEnvironmentLines(storeType: AgentPondStoreType): string[] {
-	if (storeType === "local") {
-		return [
-			"# Storage backend for this environment.",
-			"AGENTPOND_STORE=local",
-			"",
-		];
+function filesSdkEnvironmentLines(
+	filesSdk: FilesSdkEnvironmentConfig | undefined,
+): string[] {
+	if (!filesSdk?.provider || !filesSdk.bucket) {
+		throw new Error(
+			"Remote environments require a Files SDK provider and bucket",
+		);
 	}
-	if (storeType === "gcs") {
-		return [
-			"# Storage backend for this environment. GCS-backed environments sync from object storage.",
-			"AGENTPOND_STORE=gcs",
-			"",
-			"# Google Cloud Storage bucket containing AgentPond ingestion objects.",
-			"AGENTPOND_GCS_BUCKET=agentpond",
-			"# Authenticate with Google Application Default Credentials or GOOGLE_APPLICATION_CREDENTIALS.",
-			"",
-		];
-	}
+	const provider = environmentFileValue(filesSdk.provider, "provider");
+	const bucket = environmentFileValue(filesSdk.bucket, "bucket");
+	const endpoint = filesSdk.endpoint
+		? environmentFileValue(filesSdk.endpoint, "endpoint")
+		: undefined;
+	const region = filesSdk.region
+		? environmentFileValue(filesSdk.region, "region")
+		: undefined;
 	return [
-		"# Storage backend for this environment. S3-backed environments sync from object storage.",
-		"AGENTPOND_STORE=s3",
-		"",
-		"# S3 bucket containing AgentPond ingestion objects.",
-		"AGENTPOND_S3_BUCKET=agentpond",
-		"# Local MinIO endpoint from docker-compose.yml. Leave empty for Amazon S3.",
-		"AGENTPOND_S3_ENDPOINT=http://localhost:9000",
-		"# AWS/S3 region used by the object-store client.",
-		"AGENTPOND_S3_REGION=us-east-1",
-		"# Local MinIO access key from docker-compose.yml. Leave empty to use the AWS SDK credential chain.",
-		"AGENTPOND_S3_ACCESS_KEY_ID=minio",
-		"# Local MinIO secret key from docker-compose.yml. Leave empty to use the AWS SDK credential chain.",
-		"AGENTPOND_S3_SECRET_ACCESS_KEY=minio123",
-		"# Use true for MinIO. Use false for Amazon S3 virtual-hosted buckets.",
-		"AGENTPOND_S3_FORCE_PATH_STYLE=true",
-		"# Optional for S3-compatible providers such as Hugging Face Storage Buckets.",
-		"# AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION=WHEN_REQUIRED",
-		"# AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION=WHEN_REQUIRED",
+		"# Files SDK bucket adapter used by the exporter and AgentPond CLI.",
+		`FILES_SDK_PROVIDER=${provider}`,
+		"# Bucket containing AgentPond ingestion objects.",
+		`AGENTPOND_FILES_BUCKET=${bucket}`,
+		...(endpoint
+			? [
+					"# Optional endpoint required by this Files SDK provider.",
+					`FILES_SDK_ENDPOINT=${endpoint}`,
+				]
+			: []),
+		...(region
+			? [
+					"# Optional region required by this Files SDK provider.",
+					`FILES_SDK_REGION=${region}`,
+				]
+			: []),
+		"# Authenticate with the provider-specific environment variables documented by Files SDK.",
 		"",
 	];
+}
+
+function environmentFileValue(value: string, label: string): string {
+	if (value.includes("\n") || value.includes("\r")) {
+		throw new Error(`Files SDK ${label} must be a single-line value`);
+	}
+	return value;
 }

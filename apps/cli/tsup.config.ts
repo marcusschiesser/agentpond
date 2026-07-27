@@ -9,5 +9,5 @@ export default defineConfig({
 	clean: true,
 	sourcemap: true,
 	splitting: false,
-	external: ["@duckdb/node-api", "@duckdb/node-bindings"],
+	external: ["@duckdb/node-api", "@duckdb/node-bindings", "files-sdk"],
 });
