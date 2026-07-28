@@ -8,9 +8,12 @@ import {
 	resolveAgentPondEnvironment,
 	selectAgentPondEnvironment,
 } from "@agentpond/core";
+import {
+	getFilesSdkBucketProvider,
+	listFilesSdkBucketProviders,
+} from "@agentpond/files-sdk";
 import { input, select } from "@inquirer/prompts";
 import type { Command } from "commander";
-import { getProvider, PROVIDER_NAMES } from "files-sdk/providers";
 import { CliError, print } from "../cli-support.js";
 import { addGlobalOptions, type GlobalOptions } from "../command-support.js";
 import {
@@ -133,6 +136,15 @@ export function registerEnvCommand(
 					envName: name,
 					platform: globalOptions.platform,
 				});
+				const resolvedEnvironment = resolveAgentPondEnvironment({
+					cwd: context.rootDir,
+					name,
+				});
+				if (existsSync(resolvedEnvironment.envFilePath)) {
+					throw new CliError(
+						`Environment "${resolvedEnvironment.name}" is already initialized at ${resolvedEnvironment.envFilePath}`,
+					);
+				}
 				const filesSdk = await filesSdkConfigForOptions(
 					commandOptions,
 					promptFilesProvider,
@@ -217,7 +229,12 @@ async function filesSdkConfigForOptions(
 ): Promise<FilesSdkEnvironmentConfig> {
 	const provider =
 		options.provider ?? (await promptForFilesProvider(promptProvider));
-	const definition = bucketProvider(provider);
+	let definition: ReturnType<typeof getFilesSdkBucketProvider>;
+	try {
+		definition = getFilesSdkBucketProvider(provider);
+	} catch (error) {
+		throw new CliError(error instanceof Error ? error.message : String(error));
+	}
 	const bucket = (
 		options.bucket ?? (await promptForFilesBucket(promptBucket))
 	).trim();
@@ -225,13 +242,13 @@ async function filesSdkConfigForOptions(
 
 	const endpoint = await configuredProviderValue(
 		"endpoint",
-		definition.env.config?.includes("endpoint") ?? false,
+		definition.configFields.includes("endpoint"),
 		options.endpoint,
 		promptEndpoint,
 	);
 	const region = await configuredProviderValue(
 		"region",
-		definition.env.config?.includes("region") ?? false,
+		definition.configFields.includes("region"),
 		options.region,
 		promptRegion,
 	);
@@ -251,7 +268,7 @@ async function promptForFilesProvider(
 	}
 	return promptSelect({
 		message: "Select Files SDK bucket provider",
-		choices: bucketProviders().map(({ name, slug }) => ({
+		choices: listFilesSdkBucketProviders().map(({ name, slug }) => ({
 			name: `${name} (${slug})`,
 			value: slug,
 		})),
@@ -265,49 +282,6 @@ async function promptForFilesBucket(promptInput: InputPrompt): Promise<string> {
 	return promptInput({
 		message: "Files SDK bucket",
 		default: "agentpond",
-	});
-}
-
-function bucketProvider(provider: string) {
-	const definition = getProvider(provider);
-	if (!definition) {
-		throw new CliError(
-			`Unknown Files SDK provider "${provider}". Bucket providers: ${bucketProviders()
-				.map(({ slug }) => slug)
-				.join(", ")}`,
-		);
-	}
-	if (!definition.env.config?.includes("bucket")) {
-		throw new CliError(
-			`Files SDK provider "${provider}" is not bucket-backed and is not supported by AgentPond`,
-		);
-	}
-	if (provider === "bun-s3") {
-		throw new CliError(
-			'Files SDK provider "bun-s3" is not supported by AgentPond\'s Node.js runtime',
-		);
-	}
-	for (const field of definition.env.config) {
-		if (field !== "bucket" && field !== "endpoint" && field !== "region") {
-			throw new CliError(
-				`Files SDK provider "${provider}" requires unsupported configuration field "${field}"`,
-			);
-		}
-	}
-	return definition;
-}
-
-function bucketProviders() {
-	return PROVIDER_NAMES.flatMap((provider) => {
-		const definition = getProvider(provider);
-		return provider !== "bun-s3" &&
-			definition?.env.config?.includes("bucket") &&
-			definition.env.config.every(
-				(field) =>
-					field === "bucket" || field === "endpoint" || field === "region",
-			)
-			? [definition]
-			: [];
 	});
 }
 

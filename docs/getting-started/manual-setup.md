@@ -62,10 +62,12 @@ generic Google Cloud Function handler.
 ## Files SDK bucket providers
 
 Use `createFilesSpanExporter()` from `@agentpond/files-sdk/otel` with a
-bucket-backed Files SDK adapter. The application and CLI must use the same
-provider, bucket, `AGENTPOND_PROJECT_ID`, and `AGENTPOND_PREFIX`. Keep provider
-credentials in the process environment rather than the AgentPond environment
-file.
+supported Node-compatible, bucket-backed Files SDK adapter. Manual environments
+persist bucket, endpoint, and region configuration; adapters that require other
+constructor-only fields are rejected. The application and CLI must use the
+same provider, bucket, `AGENTPOND_PROJECT_ID`, and `AGENTPOND_PREFIX`. Keep
+provider credentials in the process environment rather than the AgentPond
+environment file.
 
 ## Containers and custom infrastructure
 

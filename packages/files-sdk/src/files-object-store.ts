@@ -1,6 +1,5 @@
 import {
 	type AgentPondEnvironment,
-	envValue,
 	type IngestionSink,
 	nonEmpty,
 	type ObjectStore,
@@ -10,11 +9,26 @@ import {
 } from "@agentpond/core";
 import type { Files } from "files-sdk";
 import { loadFiles } from "files-sdk/loader";
-import { getProvider } from "files-sdk/providers";
+import {
+	getProvider,
+	PROVIDER_NAMES,
+	type Provider,
+} from "files-sdk/providers";
 
 const DEFAULT_RETRIES = 3;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const UNSUPPORTED_NODE_PROVIDERS = new Set(["bun-s3"]);
+const SUPPORTED_PROVIDER_CONFIG_FIELDS = new Set([
+	"bucket",
+	"endpoint",
+	"region",
+]);
+const PROVIDER_CONFIG_FIELD_OVERRIDES: Record<string, readonly string[]> = {
+	akamai: ["bucket", "region"],
+	"backblaze-b2": ["bucket", "region"],
+	"ibm-cos": ["bucket", "region"],
+	"oracle-cloud": ["bucket", "namespace", "region"],
+};
 
 export type FilesClient = Pick<Files, "download" | "listAll" | "upload">;
 
@@ -29,6 +43,36 @@ type ProviderHelp = {
 	provider: string;
 	peerDependencies: readonly string[];
 };
+
+export type FilesSdkBucketProvider = Provider & {
+	configFields: readonly string[];
+};
+
+export function getFilesSdkBucketProvider(
+	provider: string,
+): FilesSdkBucketProvider {
+	const definition = getProvider(provider);
+	if (!definition) {
+		throw new Error(
+			`Unknown Files SDK provider "${provider}". Bucket providers: ${listFilesSdkBucketProviders()
+				.map(({ slug }) => slug)
+				.join(", ")}`,
+		);
+	}
+	return validateBucketProvider(definition);
+}
+
+export function listFilesSdkBucketProviders(): FilesSdkBucketProvider[] {
+	return PROVIDER_NAMES.flatMap((provider) => {
+		const definition = getProvider(provider);
+		if (!definition) return [];
+		try {
+			return [validateBucketProvider(definition)];
+		} catch {
+			return [];
+		}
+	});
+}
 
 export class FilesObjectStore implements ObjectStore {
 	private readonly files: Promise<FilesClient>;
@@ -129,8 +173,8 @@ export function filesSdkConfigFromEnvironment(
 			"Files SDK object storage requires an AgentPond environment",
 		);
 	}
-	const env = envValue(parseEnvFile(environment.envFilePath));
-	return filesSdkConfigFromValues(env);
+	const fileEnv = parseEnvFile(environment.envFilePath);
+	return filesSdkConfigFromValues((name) => fileEnv[name]);
 }
 
 export function filesSdkConfigFromRuntimeEnv(
@@ -161,21 +205,8 @@ function filesSdkConfigFromValues(
 }
 
 function validateFilesSdkConfig(config: FilesSdkObjectStoreConfig) {
-	const definition = getProvider(config.provider);
-	if (!definition) {
-		throw new Error(`Unknown Files SDK provider "${config.provider}"`);
-	}
-	if (!definition.env.config?.includes("bucket")) {
-		throw new Error(
-			`Files SDK provider "${config.provider}" is not bucket-backed and is not supported by AgentPond`,
-		);
-	}
-	if (UNSUPPORTED_NODE_PROVIDERS.has(config.provider)) {
-		throw new Error(
-			`Files SDK provider "${config.provider}" is not supported by AgentPond's Node.js runtime`,
-		);
-	}
-	for (const field of definition.env.config) {
+	const definition = getFilesSdkBucketProvider(config.provider);
+	for (const field of definition.configFields) {
 		if (field === "bucket") continue;
 		if (field === "endpoint" && !config.endpoint) {
 			throw new Error(
@@ -194,6 +225,31 @@ function validateFilesSdkConfig(config: FilesSdkObjectStoreConfig) {
 		}
 	}
 	return definition;
+}
+
+function validateBucketProvider(definition: Provider): FilesSdkBucketProvider {
+	const configFields =
+		PROVIDER_CONFIG_FIELD_OVERRIDES[definition.slug] ??
+		definition.env.config ??
+		[];
+	if (!configFields.includes("bucket")) {
+		throw new Error(
+			`Files SDK provider "${definition.slug}" is not bucket-backed and is not supported by AgentPond`,
+		);
+	}
+	if (UNSUPPORTED_NODE_PROVIDERS.has(definition.slug)) {
+		throw new Error(
+			`Files SDK provider "${definition.slug}" is not supported by AgentPond's Node.js runtime`,
+		);
+	}
+	for (const field of configFields) {
+		if (!SUPPORTED_PROVIDER_CONFIG_FIELDS.has(field)) {
+			throw new Error(
+				`Files SDK provider "${definition.slug}" requires unsupported configuration field "${field}"`,
+			);
+		}
+	}
+	return { ...definition, configFields };
 }
 
 async function loadConfiguredFiles(

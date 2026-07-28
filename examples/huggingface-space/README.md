@@ -58,7 +58,11 @@ hf repos create "$HF_SPACE_ID" \
 Initialize a local AgentPond environment:
 
 ```sh
-npx agentpond env init hf-space --store s3
+npx agentpond env init hf-space \
+  --provider minio \
+  --bucket "$HF_BUCKET" \
+  --endpoint "https://s3.hf.co/$HF_NAMESPACE" \
+  --region us-east-1
 npx agentpond env use hf-space
 ```
 
@@ -73,25 +77,29 @@ Replace `.agentpond/envs/hf-space.env` with the Space and bucket configuration:
 
 ```sh
 cat > .agentpond/envs/hf-space.env <<EOF
+FILES_SDK_PROVIDER=minio
+AGENTPOND_FILES_BUCKET=$HF_BUCKET
+FILES_SDK_ENDPOINT=https://s3.hf.co/$HF_NAMESPACE
+FILES_SDK_REGION=us-east-1
 AGENTPOND_PROJECT_ID=default-project
-AGENTPOND_STORE=s3
-AGENTPOND_S3_BUCKET=$HF_BUCKET
-AGENTPOND_S3_ENDPOINT=https://s3.hf.co/$HF_NAMESPACE
-AGENTPOND_S3_REGION=us-east-1
-AGENTPOND_S3_FORCE_PATH_STYLE=true
-AGENTPOND_S3_REQUEST_CHECKSUM_CALCULATION=WHEN_REQUIRED
-AGENTPOND_S3_RESPONSE_CHECKSUM_VALIDATION=WHEN_REQUIRED
+AGENTPOND_PREFIX=
 
 LANGFUSE_BASE_URL=https://${HF_NAMESPACE}-${HF_SPACE_NAME}.hf.space
 LANGFUSE_PUBLIC_KEY=pk-agentpond-hf
 LANGFUSE_SECRET_KEY=sk-replace-with-a-random-secret
 
-AGENTPOND_S3_ACCESS_KEY_ID=<hf-s3-access-key>
-AGENTPOND_S3_SECRET_ACCESS_KEY=<hf-s3-secret-key>
+MINIO_ACCESS_KEY_ID=<hf-s3-access-key>
+MINIO_SECRET_ACCESS_KEY=<hf-s3-secret-key>
+AWS_REQUEST_CHECKSUM_CALCULATION=WHEN_REQUIRED
+AWS_RESPONSE_CHECKSUM_VALIDATION=WHEN_REQUIRED
 EOF
 ```
 
-Use a real random `LANGFUSE_SECRET_KEY`. If your namespace or Space name contains characters that Hugging Face normalizes differently in subdomains, copy the direct Space URL from the Space page into `LANGFUSE_BASE_URL`.
+The Files SDK MinIO adapter is used here because Hugging Face's S3-compatible
+endpoint requires path-style addressing. Use a real random
+`LANGFUSE_SECRET_KEY`. If your namespace or Space name contains characters that
+Hugging Face normalizes differently in subdomains, copy the direct Space URL
+from the Space page into `LANGFUSE_BASE_URL`.
 
 Upload the whole file as Space secrets. This is simpler than splitting public variables and sensitive secrets, and every entry is available to the container as an environment variable.
 

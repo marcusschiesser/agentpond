@@ -45,7 +45,10 @@ The environment file stores `FILES_SDK_PROVIDER` and
 provider's credential variables available in the process environment. Keep
 `AGENTPOND_PROJECT_ID` and `AGENTPOND_PREFIX` identical to the application
 runtime; `default-project` and an empty prefix are the defaults. Bun-only,
-non-bucket, unknown, and malformed manual environments are rejected.
+non-bucket, unknown, malformed, and providers requiring constructor
+configuration beyond bucket, endpoint, and region are rejected.
+`env init` refuses to replace an existing environment file; edit that file
+deliberately or initialize a different name.
 
 `npx agentpond init` installs both AgentPond skills and prints a provider-specific coding-agent prompt. Cancelling skill installation stops setup without printing a success message or prompt.
 

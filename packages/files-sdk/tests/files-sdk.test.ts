@@ -17,6 +17,7 @@ import { memory } from "files-sdk/memory";
 import {
 	FilesObjectStore,
 	filesSdkConfigFromRuntimeEnv,
+	listFilesSdkBucketProviders,
 } from "../src/index.js";
 import { createFilesSpanExporter } from "../src/otel.js";
 
@@ -100,6 +101,42 @@ test("FilesObjectStore validates persistent Files SDK environment settings", () 
 	);
 });
 
+test("FilesObjectStore does not replace persistent settings with ambient storage config", () => {
+	const root = mkdtempSync(
+		join(tmpdir(), "agentpond-files-sdk-persistent-env-"),
+	);
+	const environment = initAgentPondEnvironment("production", {
+		cwd: root,
+		filesSdk: { provider: "s3", bucket: "agentpond" },
+	});
+	const originalProvider = process.env.FILES_SDK_PROVIDER;
+	const originalBucket = process.env.AGENTPOND_FILES_BUCKET;
+	try {
+		process.env.FILES_SDK_PROVIDER = "r2";
+		process.env.AGENTPOND_FILES_BUCKET = "ambient-bucket";
+		writeFileSync(
+			environment.envFilePath,
+			"AGENTPOND_STORE=s3\nAGENTPOND_S3_BUCKET=legacy-bucket\n",
+		);
+
+		assert.throws(
+			() => FilesObjectStore.fromEnvironment(environment),
+			/FILES_SDK_PROVIDER/,
+		);
+	} finally {
+		if (originalProvider === undefined) {
+			delete process.env.FILES_SDK_PROVIDER;
+		} else {
+			process.env.FILES_SDK_PROVIDER = originalProvider;
+		}
+		if (originalBucket === undefined) {
+			delete process.env.AGENTPOND_FILES_BUCKET;
+		} else {
+			process.env.AGENTPOND_FILES_BUCKET = originalBucket;
+		}
+	}
+});
+
 test("FilesObjectStore parses runtime endpoint and region configuration", () => {
 	assert.deepEqual(
 		filesSdkConfigFromRuntimeEnv({
@@ -123,6 +160,49 @@ test("FilesObjectStore parses runtime endpoint and region configuration", () => 
 			}),
 		/requires FILES_SDK_ENDPOINT/,
 	);
+});
+
+test("Files SDK provider contracts reflect adapter-required configuration", () => {
+	assert.throws(
+		() =>
+			filesSdkConfigFromRuntimeEnv({
+				FILES_SDK_PROVIDER: "akamai",
+				AGENTPOND_FILES_BUCKET: "agentpond",
+			}),
+		/requires FILES_SDK_REGION/,
+	);
+	assert.deepEqual(
+		filesSdkConfigFromRuntimeEnv({
+			FILES_SDK_PROVIDER: "backblaze-b2",
+			AGENTPOND_FILES_BUCKET: "agentpond",
+			FILES_SDK_REGION: "us-west-002",
+		}),
+		{
+			provider: "backblaze-b2",
+			bucket: "agentpond",
+			endpoint: undefined,
+			region: "us-west-002",
+		},
+	);
+	assert.throws(
+		() =>
+			filesSdkConfigFromRuntimeEnv({
+				FILES_SDK_PROVIDER: "oracle-cloud",
+				AGENTPOND_FILES_BUCKET: "agentpond",
+				FILES_SDK_ENDPOINT:
+					"https://namespace.compat.objectstorage.example.com",
+				FILES_SDK_REGION: "eu-madrid-1",
+			}),
+		/requires unsupported configuration field "namespace"/,
+	);
+
+	const supportedProviders = listFilesSdkBucketProviders().map(
+		({ slug }) => slug,
+	);
+	assert.ok(supportedProviders.includes("akamai"));
+	assert.ok(supportedProviders.includes("backblaze-b2"));
+	assert.ok(supportedProviders.includes("ibm-cos"));
+	assert.ok(!supportedProviders.includes("oracle-cloud"));
 });
 
 test("createFilesSpanExporter uses AgentPond runtime project and prefix", async () => {

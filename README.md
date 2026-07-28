@@ -14,7 +14,7 @@
   <a href="https://www.npmjs.com/package/agentpond"><img src="https://img.shields.io/node/v/agentpond.svg" alt="Node.js version"></a>
 </p>
 
-AgentPond is a lightweight trace backend and CLI for AI applications. It keeps raw traces in object storage you control and syncs them into a local DuckDB cache for fast analysis by your coding agent. It supports all bucket providers from [Files SDK](https://github.com/haydenbleasel/files-sdk) such as Amazon S3, Google Cloud Storage, R2, and MinIO; For platforms like Firebase, Supabase, and Vercel there are explicit one-command quick starts.
+AgentPond is a lightweight trace backend and CLI for AI applications. It keeps raw traces in object storage you control and syncs them into a local DuckDB cache for fast analysis by your coding agent. It supports Node-compatible bucket providers from [Files SDK](https://github.com/haydenbleasel/files-sdk) such as Amazon S3, Google Cloud Storage, R2, and MinIO; For platforms like Firebase, Supabase, and Vercel there are explicit one-command quick starts.
 
 ## How it works
 

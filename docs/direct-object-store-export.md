@@ -11,7 +11,17 @@ peer SDKs, and your instrumentation packages:
 
 ```sh
 npm install @agentpond/files-sdk @agentpond/otel files-sdk @opentelemetry/sdk-node
+
+# R2, S3, and MinIO
+npm install @aws-sdk/client-s3 @aws-sdk/s3-presigned-post @aws-sdk/s3-request-presigner
+
+# Google Cloud Storage
+npm install @google-cloud/storage
 ```
+
+Install only the provider peer SDKs for the adapter used by the application.
+The [Files SDK documentation](https://files-sdk.dev) lists the install command
+for every other provider.
 
 ## Langfuse
 
@@ -76,8 +86,8 @@ NodeSDK wraps `traceExporter` in a `BatchSpanProcessor`. AgentPond preserves eac
 Use the matching adapter for the deployment:
 
 - `createFilesSpanExporter()` from `@agentpond/files-sdk/otel` for manual
-  bucket providers such as S3, GCS, R2, MinIO, and other Node-compatible Files
-  SDK bucket adapters
+  bucket providers such as S3, GCS, R2, MinIO, and other supported
+  Node-compatible Files SDK bucket adapters
 - `createVercelSpanExporter()` from `@agentpond/vercel`
 - `createFirebaseSpanExporter()` from `@agentpond/firebase`
 - `createSupabaseSpanExporter()` from `@agentpond/supabase`

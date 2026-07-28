@@ -100,9 +100,12 @@ npx agentpond env list
 
 Every manual remote environment is a Files SDK environment. AgentPond
 dynamically supports Node-compatible, bucket-backed Files SDK providers and
-rejects Bun-only, non-bucket, unknown, and malformed configurations.
+rejects Bun-only, non-bucket, unknown, malformed, and providers requiring
+constructor configuration beyond bucket, endpoint, and region.
 `AGENTPOND_PROJECT_ID` defaults to `default-project`; the optional
 `AGENTPOND_PREFIX` defaults to empty. Provider credentials remain ambient.
+`env init` refuses to replace an existing environment file; edit that file
+deliberately or initialize a different name.
 
 ## Local testing server
 

@@ -2089,14 +2089,14 @@ test("CLI env init persists a Files SDK bucket provider", async () => {
 	}
 });
 
-test("CLI env init persists dynamically required Files SDK endpoint and region fields", async () => {
+test("CLI env init refuses to replace an existing environment", async () => {
 	const cwd = process.cwd();
-	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-files-sdk-fields-"));
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-existing-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
 		process.chdir(root);
-		const output = await captureStdout(() =>
+		await captureStdout(() =>
 			main([
 				"node",
 				"agentpond",
@@ -2104,34 +2104,97 @@ test("CLI env init persists dynamically required Files SDK endpoint and region f
 				"init",
 				"production",
 				"--provider",
-				"oracle-cloud",
+				"s3",
+				"--bucket",
+				"original-bucket",
+			]),
+		);
+		assert.equal(process.exitCode, undefined);
+		const envFile = join(root, ".agentpond", "envs", "production.env");
+		const originalContent = readFileSync(envFile, "utf8");
+
+		process.exitCode = undefined;
+		const stderr = await captureStderr(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"production",
+				"--provider",
+				"gcs",
+				"--bucket",
+				"new-bucket",
+			]),
+		);
+
+		assert.equal(process.exitCode, 2);
+		assert.match(stderr, /Environment "production" is already initialized/);
+		assert.equal(readFileSync(envFile, "utf8"), originalContent);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init persists dynamically required Files SDK endpoint and region fields", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-files-sdk-fields-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const endpointOutput = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"minio",
+				"--provider",
+				"minio",
 				"--bucket",
 				"agentpond",
 				"--endpoint",
-				"https://example.compat.objectstorage.example.com",
-				"--region",
-				"eu-madrid-1",
+				"http://localhost:9000",
 				"--json",
 			]),
 		);
-		const result = JSON.parse(output) as {
+		const endpointResult = JSON.parse(endpointOutput) as {
 			endpoint: string;
+			envFile: string;
+		};
+		const endpointContent = readFileSync(endpointResult.envFile, "utf8");
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(endpointResult.endpoint, "http://localhost:9000");
+		assert.match(endpointContent, /FILES_SDK_ENDPOINT=http:\/\/localhost:9000/);
+
+		const regionOutput = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"backblaze",
+				"--provider",
+				"backblaze-b2",
+				"--bucket",
+				"agentpond",
+				"--region",
+				"us-west-002",
+				"--json",
+			]),
+		);
+		const regionResult = JSON.parse(regionOutput) as {
 			envFile: string;
 			region: string;
 		};
-		const content = readFileSync(result.envFile, "utf8");
+		const regionContent = readFileSync(regionResult.envFile, "utf8");
 
 		assert.equal(process.exitCode, undefined);
-		assert.equal(
-			result.endpoint,
-			"https://example.compat.objectstorage.example.com",
-		);
-		assert.equal(result.region, "eu-madrid-1");
-		assert.match(
-			content,
-			/FILES_SDK_ENDPOINT=https:\/\/example\.compat\.objectstorage\.example\.com/,
-		);
-		assert.match(content, /FILES_SDK_REGION=eu-madrid-1/);
+		assert.equal(regionResult.region, "us-west-002");
+		assert.match(regionContent, /FILES_SDK_REGION=us-west-002/);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -2209,6 +2272,30 @@ test("CLI env init validates Files SDK bucket providers and required flags", asy
 		);
 		assert.equal(process.exitCode, 2);
 		assert.match(bun, /not supported by AgentPond's Node\.js runtime/);
+
+		process.exitCode = undefined;
+		const unsupportedConfig = await captureStderr(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"oracle-env",
+				"--provider",
+				"oracle-cloud",
+				"--bucket",
+				"agentpond",
+				"--endpoint",
+				"https://namespace.compat.objectstorage.example.com",
+				"--region",
+				"eu-madrid-1",
+			]),
+		);
+		assert.equal(process.exitCode, 2);
+		assert.match(
+			unsupportedConfig,
+			/provider "oracle-cloud" requires unsupported configuration field "namespace"/,
+		);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -2851,6 +2938,8 @@ test("CLI rejects every unsupported manual environment format across environment
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-invalid-envs-"));
 	const originalExitCode = process.exitCode;
+	const originalFilesProvider = process.env.FILES_SDK_PROVIDER;
+	const originalFilesBucket = process.env.AGENTPOND_FILES_BUCKET;
 	process.exitCode = undefined;
 	try {
 		process.chdir(root);
@@ -2861,6 +2950,8 @@ test("CLI rejects every unsupported manual environment format across environment
 			main(["node", "agentpond", "env", "use", "legacy", "--json"]),
 		);
 		assert.equal(process.exitCode, undefined);
+		process.env.FILES_SDK_PROVIDER = "r2";
+		process.env.AGENTPOND_FILES_BUCKET = "ambient-bucket";
 
 		const invalidEnvironments = [
 			"AGENTPOND_STORE=local\n",
@@ -2893,6 +2984,16 @@ test("CLI rejects every unsupported manual environment format across environment
 			}
 		}
 	} finally {
+		if (originalFilesProvider === undefined) {
+			delete process.env.FILES_SDK_PROVIDER;
+		} else {
+			process.env.FILES_SDK_PROVIDER = originalFilesProvider;
+		}
+		if (originalFilesBucket === undefined) {
+			delete process.env.AGENTPOND_FILES_BUCKET;
+		} else {
+			process.env.AGENTPOND_FILES_BUCKET = originalFilesBucket;
+		}
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
@@ -3069,6 +3170,7 @@ test("CLI env init can select a Files SDK provider and bucket interactively", as
 					assert.ok(choices.some((choice) => choice.value === "r2"));
 					assert.ok(choices.every((choice) => choice.value !== "fs"));
 					assert.ok(choices.every((choice) => choice.value !== "bun-s3"));
+					assert.ok(choices.every((choice) => choice.value !== "oracle-cloud"));
 					return "r2";
 				},
 			}),

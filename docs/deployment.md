@@ -62,7 +62,7 @@ is no generic AgentPond Google Cloud Function handler.
 
 ## Files SDK
 
-- Object store: any Files SDK provider whose adapter uses a bucket
+- Object store: a supported Node-compatible Files SDK bucket provider
 - Direct exporter: `createFilesSpanExporter()` from `@agentpond/files-sdk/otel`
 - CLI configuration: persistent provider and bucket selection
 - Credentials: provider-specific process environment variables
@@ -75,8 +75,9 @@ npx agentpond env init production \
 
 Providers that declare an endpoint or region receive matching `--endpoint` and
 `--region` values. AgentPond discovers supported providers from Files SDK at
-runtime, excludes Bun-only and non-bucket adapters, and ships their peer SDKs in
-the CLI and ingest image.
+runtime, excludes Bun-only and non-bucket adapters plus providers requiring
+constructor configuration beyond bucket, endpoint, and region, and ships their
+peer SDKs in the CLI and ingest image.
 
 ## Vercel
 
