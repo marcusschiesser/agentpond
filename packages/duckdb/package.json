@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/duckdb",
-	"version": "0.3.8",
+	"version": "0.3.9",
 	"description": "DuckDB-backed cache and ingestion utilities for AgentPond",
 	"license": "MIT",
 	"type": "module",
