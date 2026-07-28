@@ -10,9 +10,10 @@ import { agentPondWorkspaceRoot } from "./workspace.js";
 
 export type FilesSdkEnvironmentConfig = {
 	provider: string;
-	bucket: string;
+	bucket?: string;
 	endpoint?: string;
 	region?: string;
+	root?: string;
 };
 
 export type InitAgentPondEnvironmentOptions = {
@@ -181,24 +182,31 @@ function defaultEnvironmentFile(
 function filesSdkEnvironmentLines(
 	filesSdk: FilesSdkEnvironmentConfig | undefined,
 ): string[] {
-	if (!filesSdk?.provider || !filesSdk.bucket) {
-		throw new Error(
-			"Remote environments require a Files SDK provider and bucket",
-		);
+	if (!filesSdk?.provider) {
+		throw new Error("Remote environments require a Files SDK provider");
 	}
 	const provider = environmentFileValue(filesSdk.provider, "provider");
-	const bucket = environmentFileValue(filesSdk.bucket, "bucket");
+	const bucket = filesSdk.bucket
+		? environmentFileValue(filesSdk.bucket, "bucket")
+		: undefined;
 	const endpoint = filesSdk.endpoint
 		? environmentFileValue(filesSdk.endpoint, "endpoint")
 		: undefined;
 	const region = filesSdk.region
 		? environmentFileValue(filesSdk.region, "region")
 		: undefined;
+	const root = filesSdk.root
+		? environmentFileValue(filesSdk.root, "root")
+		: undefined;
 	return [
-		"# Files SDK bucket adapter used by the exporter and AgentPond CLI.",
+		"# Files SDK adapter used by the exporter and AgentPond CLI.",
 		`FILES_SDK_PROVIDER=${provider}`,
-		"# Bucket containing AgentPond ingestion objects.",
-		`AGENTPOND_FILES_BUCKET=${bucket}`,
+		...(bucket
+			? [
+					"# Bucket containing AgentPond ingestion objects.",
+					`AGENTPOND_FILES_BUCKET=${bucket}`,
+				]
+			: []),
 		...(endpoint
 			? [
 					"# Optional endpoint required by this Files SDK provider.",
@@ -210,6 +218,9 @@ function filesSdkEnvironmentLines(
 					"# Optional region required by this Files SDK provider.",
 					`FILES_SDK_REGION=${region}`,
 				]
+			: []),
+		...(root
+			? ["# Root used by this Files SDK provider.", `FILES_SDK_ROOT=${root}`]
 			: []),
 		"# Authenticate with the provider-specific environment variables documented by Files SDK.",
 		"",

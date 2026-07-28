@@ -13,9 +13,15 @@ npx agentpond --version
 npx agentpond init
 ```
 
-`init` detects Firebase, Supabase, or Vercel, installs the `agentpond-instrumentation` and `agentpond` project skills, and prints a provider-specific coding-agent prompt. It does not edit application code, provision storage, link a provider project, or create `.agentpond`.
+`init` detects Firebase, Supabase, or Vercel, installs the
+`agentpond-instrumentation` and `agentpond` project skills, and prints the
+matching coding-agent prompt. When no managed platform is detected, it prints a
+Files SDK workflow that uses the dependency-free `fs` adapter for real local
+trace verification before choosing production storage. `init` does not edit
+application code, provision storage, link a provider project, initialize an
+environment, or create `.agentpond`.
 
-When multiple platform markers exist, select one explicitly with `--platform firebase`, `--platform supabase`, or `--platform vercel`. The override is stateless and works with setup, environment, sync, and query commands. Forced Supabase or Vercel setup may begin before the project is linked; the coding agent asks for confirmation before linking or provisioning storage. Unsupported projects exit with a link to [Manual deployment setup](./getting-started/manual-setup.md). `init` is interactive and does not support `--json`.
+When multiple platform markers exist, select one explicitly with `--platform firebase`, `--platform supabase`, or `--platform vercel`. The override is stateless and works with setup, environment, sync, and query commands. Forced Supabase or Vercel setup may begin before the project is linked; the coding agent asks for confirmation before linking or provisioning storage. `init` is interactive and does not support `--json`.
 
 ## Global options
 
@@ -93,15 +99,19 @@ Manual deployments use AgentPond environments:
 npx agentpond env init production --provider s3 --bucket agentpond
 npx agentpond env init production --provider r2 --bucket agentpond
 npx agentpond env init local-minio --provider minio --bucket agentpond --endpoint http://localhost:9000
+npx agentpond env init local --provider fs --root /absolute/project/.agentpond/envs/local/objects
 npx agentpond env use production
 npx agentpond env current
 npx agentpond env list
 ```
 
-Every manual remote environment is a Files SDK environment. AgentPond
-dynamically supports Node-compatible, bucket-backed Files SDK providers and
-rejects Bun-only, non-bucket, unknown, malformed, and providers requiring
-constructor configuration beyond bucket, endpoint, and region.
+Every manual environment is a Files SDK environment. AgentPond dynamically
+supports persistent Node-compatible providers whose required configuration uses
+bucket, endpoint, region, or root. It rejects memory, Bun-only, unknown,
+malformed, providers requiring other constructor configuration, and adapters
+whose peer SDKs the executing CLI cannot resolve. To make another compatible
+catalog adapter available, install `agentpond` locally alongside that adapter's
+peer SDK so `npx` uses the project-local CLI.
 `AGENTPOND_PROJECT_ID` defaults to `default-project`; the optional
 `AGENTPOND_PREFIX` defaults to empty. Provider credentials remain ambient.
 `env init` refuses to replace an existing environment file; edit that file

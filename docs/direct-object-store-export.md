@@ -20,8 +20,12 @@ npm install @google-cloud/storage
 ```
 
 Install only the provider peer SDKs for the adapter used by the application.
-The [Files SDK documentation](https://files-sdk.dev) lists the install command
-for every other provider.
+The [Files SDK provider catalog](https://files-sdk.dev/docs/providers) lists
+the install command for every other provider. The dependency-free `fs` adapter
+is available for local development and trace verification. The executing
+AgentPond CLI must also be able to resolve the selected peer SDK. If the
+published CLI does not include it, install `agentpond` locally alongside the
+peer SDK so `npx` uses the project-local CLI.
 
 ## Langfuse
 
@@ -85,9 +89,10 @@ NodeSDK wraps `traceExporter` in a `BatchSpanProcessor`. AgentPond preserves eac
 
 Use the matching adapter for the deployment:
 
-- `createFilesSpanExporter()` from `@agentpond/files-sdk/otel` for manual
-  bucket providers such as S3, GCS, R2, MinIO, and other supported
-  Node-compatible Files SDK bucket adapters
+- `createFilesSpanExporterFromRuntimeEnv()` from
+  `@agentpond/files-sdk/otel` for environment-driven Files SDK setup
+- `createFilesSpanExporter()` from `@agentpond/files-sdk/otel` when the
+  application already constructs a Files SDK client
 - `createVercelSpanExporter()` from `@agentpond/vercel`
 - `createFirebaseSpanExporter()` from `@agentpond/firebase`
 - `createSupabaseSpanExporter()` from `@agentpond/supabase`
@@ -98,6 +103,18 @@ The application needs write credentials for the selected object store.
 be passed to the exporter.
 
 ### Files SDK
+
+For environment-driven setup, keep the adapter choice outside application code:
+
+```ts
+import { createFilesSpanExporterFromRuntimeEnv } from "@agentpond/files-sdk/otel";
+
+const exporter = createFilesSpanExporterFromRuntimeEnv();
+```
+
+The helper reads `FILES_SDK_PROVIDER` and the selected adapter's typed
+configuration from runtime environment variables. This allows the same
+instrumentation code to use `fs` locally and a cloud adapter in production.
 
 Create Files SDK normally and pass the client to AgentPond:
 
@@ -133,8 +150,8 @@ npx agentpond sync
 ```
 
 For providers that declare an endpoint or region, pass `--endpoint` or
-`--region` during initialization. AgentPond persists those values with the
-provider and bucket. Provider credentials remain ambient in both the
+`--region` during initialization. Root-based providers use `--root`. AgentPond
+persists those values with the provider. Provider credentials remain ambient in both the
 application runtime and the shell invoking AgentPond; AgentPond does not write
 secrets into its environment file. `npx agentpond sync` always reads the
 selected persistent environment and takes no storage flags.

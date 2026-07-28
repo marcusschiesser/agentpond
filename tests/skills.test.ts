@@ -157,6 +157,32 @@ test("Supabase instrumentation skill covers hosted Edge and Node setup", () => {
 	assert.doesNotMatch(content, /supabase projects api-keys .*--reveal/);
 });
 
+test("Files SDK instrumentation skill verifies traces with persistent local storage", () => {
+	const content = readSkillFiles("agentpond-instrumentation", [
+		"SKILL.md",
+		"references/files-sdk.md",
+		"references/openinference.md",
+	]);
+
+	for (const required of [
+		/explicit confirmation/i,
+		/createFilesSpanExporterFromRuntimeEnv/,
+		/agentpond env init local[\s\S]*--provider fs[\s\S]*--root/,
+		/\.agentpond\//,
+		/agentpond env get local/,
+		/do not replace an existing environment file/i,
+		/one real AI request/i,
+		/agentpond sync/,
+		/agentpond traces get <trace-id>/,
+		/files-sdk\.dev\/docs\/providers/,
+		/development\s+and verification only/i,
+	]) {
+		assert.match(content, required);
+	}
+	assert.doesNotMatch(content, /--local/);
+	assert.doesNotMatch(content, /FILES_SDK_PROVIDER=memory/);
+});
+
 test("instrumentation skill keeps provider setup details in separate references", () => {
 	const entry = readSkillFiles("agentpond-instrumentation", ["SKILL.md"]);
 	const firebase = readSkillFiles("agentpond-instrumentation", [
@@ -168,10 +194,14 @@ test("instrumentation skill keeps provider setup details in separate references"
 	const vercel = readSkillFiles("agentpond-instrumentation", [
 		"references/vercel.md",
 	]);
+	const filesSdk = readSkillFiles("agentpond-instrumentation", [
+		"references/files-sdk.md",
+	]);
 
 	assert.match(entry, /references\/firebase\.md/);
 	assert.match(entry, /references\/supabase\.md/);
 	assert.match(entry, /references\/vercel\.md/);
+	assert.match(entry, /references\/files-sdk\.md/);
 	assert.match(firebase, /createFirebaseSpanExporter/);
 	assert.doesNotMatch(firebase, /Supabase/);
 	assert.doesNotMatch(firebase, /Vercel/);
@@ -181,4 +211,8 @@ test("instrumentation skill keeps provider setup details in separate references"
 	assert.match(vercel, /createVercelSpanExporter/);
 	assert.doesNotMatch(vercel, /Firebase/);
 	assert.doesNotMatch(vercel, /Supabase/);
+	assert.match(filesSdk, /createFilesSpanExporterFromRuntimeEnv/);
+	assert.doesNotMatch(filesSdk, /createFirebaseSpanExporter/);
+	assert.doesNotMatch(filesSdk, /createSupabaseSpanExporter/);
+	assert.doesNotMatch(filesSdk, /createVercelSpanExporter/);
 });

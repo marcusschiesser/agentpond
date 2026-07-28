@@ -37,6 +37,7 @@ const managedEnvironmentVariables = [
 	"AGENTPOND_PROJECT_ID",
 	"FILES_SDK_ENDPOINT",
 	"FILES_SDK_PROVIDER",
+	"FILES_SDK_ROOT",
 	"MINIO_ACCESS_KEY_ID",
 	"MINIO_SECRET_ACCESS_KEY",
 ] as const;

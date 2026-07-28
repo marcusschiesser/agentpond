@@ -24,6 +24,7 @@
 		"ingest": "tsx apps/ingest/src/index.ts",
 		"cli": "tsx apps/cli/src/index.ts",
 		"perf:sync": "pnpm --filter @agentpond/perf sync",
+		"test:e2e:files-sdk:fs": "pnpm --filter @agentpond/files-sdk test:e2e:fs",
 		"test:e2e:files-sdk": "docker compose up -d minio && docker compose run --rm create-bucket && pnpm --filter @agentpond/files-sdk test:e2e:minio"
 	},
 	"devDependencies": {

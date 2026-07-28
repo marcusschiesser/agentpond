@@ -25,8 +25,8 @@ Determine the provider before syncing:
 - For a Firebase project, read [references/firebase.md](references/firebase.md).
 - For a Supabase project, read [references/supabase.md](references/supabase.md).
 - For a Vercel-linked project, read [references/vercel.md](references/vercel.md).
-- Otherwise, use an existing manual AgentPond environment. Every manual remote
-  environment is backed by a Node-compatible Files SDK bucket provider, as
+- Otherwise, use an existing manual AgentPond environment. Every manual
+  environment is backed by a supported Node-compatible Files SDK provider, as
   described in [references/cli.md](references/cli.md).
 
 Do not create provider-choice state. Select the provider's environment with

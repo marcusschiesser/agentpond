@@ -40,8 +40,8 @@ import {
 } from "../src/commands/dev.js";
 import {
 	agentPondInitHeader,
+	FILES_SDK_INSTRUMENTATION_PROMPT,
 	installSkillsWithBundledCli,
-	MANUAL_SETUP_URL,
 	type SkillsInstallRequest,
 	type SkillsProcessRequest,
 } from "../src/commands/init.js";
@@ -263,37 +263,45 @@ test("CLI init follows Firebase CLI global active project selections", async () 
 	}
 });
 
-test("CLI init rejects unsupported projects without creating files", async () => {
+test("CLI init installs AgentPond skills for a Files SDK project", async () => {
 	const cwd = process.cwd();
 	const root = realpathSync(
 		mkdtempSync(join(tmpdir(), "agentpond-cli-init-non-firebase-")),
 	);
 	const originalExitCode = process.exitCode;
-	let installerCalled = false;
+	let request: SkillsInstallRequest | undefined;
 	process.exitCode = undefined;
 	try {
 		process.chdir(root);
-		const stderr = await captureStderr(() =>
+		const output = await captureStdout(() =>
 			main(["node", "agentpond", "init"], {
-				installSkills: async () => {
-					installerCalled = true;
+				installSkills: async (installRequest) => {
+					request = installRequest;
 				},
 			}),
 		);
 
-		assert.equal(process.exitCode, 2);
-		assert.equal(installerCalled, false);
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(request, {
+			cwd: root,
+			source: "marcusschiesser/agentpond",
+			skills: ["agentpond-instrumentation", "agentpond"],
+		});
 		assert.equal(
-			stderr,
+			output,
 			[
-				"Automatic AgentPond setup supports Firebase, Supabase, and Vercel projects.",
+				agentPondInitHeader({
+					displayName: "Files SDK",
+					projectLabel: root,
+				}),
+				`AgentPond skills ready for Files SDK project: ${root}`,
 				"",
-				"For AWS, Google Cloud, and other deployment setups, see:",
-				MANUAL_SETUP_URL,
+				"Paste this prompt into your coding agent:",
+				"",
+				FILES_SDK_INSTRUMENTATION_PROMPT,
 				"",
 			].join("\n"),
 		);
-		assert.doesNotMatch(stderr, /local.*deployment/i);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 	} finally {
 		process.chdir(cwd);
@@ -2089,6 +2097,47 @@ test("CLI env init persists a Files SDK bucket provider", async () => {
 	}
 });
 
+test("CLI env init persists a Files SDK filesystem provider", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-fs-"));
+	const storageRoot = join(root, ".agentpond", "envs", "local", "objects");
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"local",
+				"--provider",
+				"fs",
+				"--root",
+				storageRoot,
+				"--json",
+			]),
+		);
+		const result = JSON.parse(output) as {
+			envFile: string;
+			provider: string;
+			root: string;
+		};
+		const content = readFileSync(result.envFile, "utf8");
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.provider, "fs");
+		assert.equal(result.root, storageRoot);
+		assert.match(content, /FILES_SDK_PROVIDER=fs/);
+		assert.match(content, new RegExp(`FILES_SDK_ROOT=${storageRoot}`));
+		assert.doesNotMatch(content, /AGENTPOND_FILES_BUCKET=/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI env init refuses to replace an existing environment", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-existing-"));
@@ -2201,28 +2250,37 @@ test("CLI env init persists dynamically required Files SDK endpoint and region f
 	}
 });
 
-test("CLI env init validates Files SDK bucket providers and required flags", async () => {
+test("CLI env init validates Files SDK providers and required flags", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-files-sdk-errors-"));
 	const originalExitCode = process.exitCode;
 	process.exitCode = undefined;
 	try {
 		process.chdir(root);
-		const nonBucket = await captureStderr(() =>
+		const missingRoot = await captureStderr(() =>
+			main(["node", "agentpond", "env", "init", "fs-env", "--provider", "fs"]),
+		);
+		assert.equal(process.exitCode, 2);
+		assert.match(missingRoot, /Missing --root/);
+
+		process.exitCode = undefined;
+		const missingPeer = await captureStderr(() =>
 			main([
 				"node",
 				"agentpond",
 				"env",
 				"init",
-				"fs-env",
+				"box-env",
 				"--provider",
-				"fs",
-				"--bucket",
-				"agentpond",
+				"box",
 			]),
 		);
 		assert.equal(process.exitCode, 2);
-		assert.match(nonBucket, /provider "fs" is not bucket-backed/);
+		assert.match(
+			missingPeer,
+			/provider "box" is not available in this AgentPond CLI installation/,
+		);
+		assert.match(missingPeer, /box-typescript-sdk-gen/);
 
 		process.exitCode = undefined;
 		const missingProvider = await captureStderr(() =>
@@ -3168,8 +3226,10 @@ test("CLI env init can select a Files SDK provider and bucket interactively", as
 				},
 				selectFilesProvider: async ({ choices }) => {
 					assert.ok(choices.some((choice) => choice.value === "r2"));
-					assert.ok(choices.every((choice) => choice.value !== "fs"));
+					assert.ok(choices.some((choice) => choice.value === "fs"));
+					assert.ok(choices.every((choice) => choice.value !== "box"));
 					assert.ok(choices.every((choice) => choice.value !== "bun-s3"));
+					assert.ok(choices.every((choice) => choice.value !== "memory"));
 					assert.ok(choices.every((choice) => choice.value !== "oracle-cloud"));
 					return "r2";
 				},
@@ -3188,6 +3248,67 @@ test("CLI env init can select a Files SDK provider and bucket interactively", as
 			},
 			{ bucket: "traces", provider: "r2" },
 		);
+	} finally {
+		if (stdinDescriptor)
+			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+		if (stdoutDescriptor)
+			Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init prompts for Files SDK filesystem roots", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-fs-tty-")),
+	);
+	const storageRoot = join(root, ".agentpond", "envs", "local", "objects");
+	const originalExitCode = process.exitCode;
+	const stdinDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdin,
+		"isTTY",
+	);
+	const stdoutDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdout,
+		"isTTY",
+	);
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		Object.defineProperty(process.stdin, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		Object.defineProperty(process.stdout, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "init", "local", "--json"], {
+				inputBucket: async () => {
+					throw new Error("Filesystem must not prompt for a bucket");
+				},
+				inputRoot: async ({ message }) => {
+					assert.equal(message, "Files SDK root");
+					return storageRoot;
+				},
+				selectFilesProvider: async () => "fs",
+			}),
+		);
+		const result = JSON.parse(output) as {
+			provider: string;
+			root: string;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.deepEqual(result, {
+			dbPath: join(root, ".agentpond", "envs", "local", "cache.duckdb"),
+			envFile: join(root, ".agentpond", "envs", "local.env"),
+			name: "local",
+			provider: "fs",
+			root: storageRoot,
+		});
 	} finally {
 		if (stdinDescriptor)
 			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
