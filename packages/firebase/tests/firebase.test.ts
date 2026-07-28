@@ -895,8 +895,12 @@ test("Firebase ingest function maps authentication errors", async () => {
 	assert.equal(JSON.parse(res.body).error, "UnauthorizedError");
 });
 
-test("Firebase auth reads Google project fallbacks from runtime env", () => {
+test("Firebase auth prefers the Firebase runtime project id", () => {
 	const runtimeEnv = {
+		AGENTPOND_PROJECT_ID: "agentpond-project",
+		FIREBASE_CONFIG: JSON.stringify({
+			projectId: "firebase-config-project",
+		}),
 		LANGFUSE_PUBLIC_KEY: "pk-runtime",
 		LANGFUSE_SECRET_KEY: "sk-runtime",
 		GCP_PROJECT: "gcp-project",
@@ -904,10 +908,29 @@ test("Firebase auth reads Google project fallbacks from runtime env", () => {
 	};
 
 	assert.deepEqual(firebaseAuthFromRuntimeEnv(runtimeEnv), {
-		projectId: "gcloud-project",
+		projectId: "firebase-config-project",
 		publicKey: "pk-runtime",
 		secretKey: "sk-runtime",
 	});
+	assert.equal(
+		firebaseAuthFromRuntimeEnv({
+			GCP_PROJECT: "gcp-project",
+			GCLOUD_PROJECT: "gcloud-project",
+		}).projectId,
+		"gcloud-project",
+	);
+	assert.equal(
+		firebaseAuthFromRuntimeEnv({
+			GOOGLE_CLOUD_PROJECT: "google-cloud-project",
+		}).projectId,
+		"google-cloud-project",
+	);
+	assert.equal(
+		firebaseAuthFromRuntimeEnv({
+			AGENTPOND_PROJECT_ID: "agentpond-project",
+		}).projectId,
+		"agentpond-project",
+	);
 });
 
 test("Firebase emulator env still writes to the configured Firebase store", async () => {

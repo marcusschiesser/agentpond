@@ -1,7 +1,7 @@
 import {
 	createSupabaseSpanExporter,
 	supabaseStorageConfigFromEnv,
-} from "../dist/index.js";
+} from "../../packages/supabase/dist/index.js";
 
 const projectRef = "abcdefghijklmnopqrst";
 const env = {

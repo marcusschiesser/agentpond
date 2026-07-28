@@ -18,11 +18,16 @@ import {
 const DEFAULT_RETRIES = 3;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const UNSUPPORTED_NODE_PROVIDERS = new Set(["bun-s3"]);
-const SUPPORTED_PROVIDER_CONFIG_FIELDS = new Set([
+const NON_PERSISTENT_PROVIDERS = new Set(["memory"]);
+const SUPPORTED_PROVIDER_CONFIG_FIELDS = [
 	"bucket",
 	"endpoint",
 	"region",
-]);
+	"root",
+] as const;
+const SUPPORTED_PROVIDER_CONFIG_FIELD_SET = new Set<string>(
+	SUPPORTED_PROVIDER_CONFIG_FIELDS,
+);
 const PROVIDER_CONFIG_FIELD_OVERRIDES: Record<string, readonly string[]> = {
 	akamai: ["bucket", "region"],
 	"backblaze-b2": ["bucket", "region"],
@@ -34,9 +39,10 @@ export type FilesClient = Pick<Files, "download" | "listAll" | "upload">;
 
 export type FilesSdkObjectStoreConfig = {
 	provider: string;
-	bucket: string;
+	bucket?: string;
 	endpoint?: string;
 	region?: string;
+	root?: string;
 };
 
 type ProviderHelp = {
@@ -44,28 +50,47 @@ type ProviderHelp = {
 	peerDependencies: readonly string[];
 };
 
-export type FilesSdkBucketProvider = Provider & {
-	configFields: readonly string[];
+export type FilesSdkProviderConfigField =
+	(typeof SUPPORTED_PROVIDER_CONFIG_FIELDS)[number];
+
+export type FilesSdkProvider = Provider & {
+	configFields: readonly FilesSdkProviderConfigField[];
 };
 
-export function getFilesSdkBucketProvider(
-	provider: string,
-): FilesSdkBucketProvider {
+export type FilesSdkBucketProvider = FilesSdkProvider;
+
+export function getFilesSdkProvider(provider: string): FilesSdkProvider {
 	const definition = getProvider(provider);
 	if (!definition) {
 		throw new Error(
-			`Unknown Files SDK provider "${provider}". Bucket providers: ${listFilesSdkBucketProviders()
+			`Unknown Files SDK provider "${provider}". Supported providers: ${listFilesSdkProviders()
 				.map(({ slug }) => slug)
 				.join(", ")}`,
 		);
 	}
-	return validateBucketProvider(definition);
+	return validateFilesSdkProvider(definition);
 }
 
-export function listFilesSdkBucketProviders(): FilesSdkBucketProvider[] {
+export function listFilesSdkProviders(): FilesSdkProvider[] {
 	return PROVIDER_NAMES.flatMap((provider) => {
 		const definition = getProvider(provider);
 		if (!definition) return [];
+		try {
+			return [validateFilesSdkProvider(definition)];
+		} catch {
+			return [];
+		}
+	});
+}
+
+export function getFilesSdkBucketProvider(
+	provider: string,
+): FilesSdkBucketProvider {
+	return validateBucketProvider(getFilesSdkProvider(provider));
+}
+
+export function listFilesSdkBucketProviders(): FilesSdkBucketProvider[] {
+	return listFilesSdkProviders().flatMap((definition) => {
 		try {
 			return [validateBucketProvider(definition)];
 		} catch {
@@ -187,54 +212,44 @@ function filesSdkConfigFromValues(
 	env: (name: string) => string | undefined,
 ): FilesSdkObjectStoreConfig {
 	const provider = nonEmpty(env("FILES_SDK_PROVIDER"));
-	const bucket = nonEmpty(env("AGENTPOND_FILES_BUCKET"));
 	if (!provider) {
 		throw new Error("Files SDK object storage requires FILES_SDK_PROVIDER");
 	}
-	if (!bucket) {
-		throw new Error("Files SDK object storage requires AGENTPOND_FILES_BUCKET");
-	}
+	const bucket = nonEmpty(env("AGENTPOND_FILES_BUCKET"));
+	const endpoint = nonEmpty(env("FILES_SDK_ENDPOINT"));
+	const region = nonEmpty(env("FILES_SDK_REGION"));
+	const root = nonEmpty(env("FILES_SDK_ROOT"));
 	const config = {
 		provider,
-		bucket,
-		endpoint: nonEmpty(env("FILES_SDK_ENDPOINT")),
-		region: nonEmpty(env("FILES_SDK_REGION")),
+		...(bucket ? { bucket } : {}),
+		...(endpoint ? { endpoint } : {}),
+		...(region ? { region } : {}),
+		...(root ? { root } : {}),
 	};
 	validateFilesSdkConfig(config);
 	return config;
 }
 
 function validateFilesSdkConfig(config: FilesSdkObjectStoreConfig) {
-	const definition = getFilesSdkBucketProvider(config.provider);
+	const definition = getFilesSdkProvider(config.provider);
 	for (const field of definition.configFields) {
-		if (field === "bucket") continue;
-		if (field === "endpoint" && !config.endpoint) {
+		if (!config[field]) {
 			throw new Error(
-				`Files SDK provider "${config.provider}" requires FILES_SDK_ENDPOINT`,
-			);
-		}
-		if (field === "region" && !config.region) {
-			throw new Error(
-				`Files SDK provider "${config.provider}" requires FILES_SDK_REGION`,
-			);
-		}
-		if (field !== "endpoint" && field !== "region") {
-			throw new Error(
-				`Files SDK provider "${config.provider}" requires unsupported configuration field "${field}"`,
+				`Files SDK provider "${config.provider}" requires ${providerConfigEnvironmentVariable(field)}`,
 			);
 		}
 	}
 	return definition;
 }
 
-function validateBucketProvider(definition: Provider): FilesSdkBucketProvider {
+function validateFilesSdkProvider(definition: Provider): FilesSdkProvider {
 	const configFields =
 		PROVIDER_CONFIG_FIELD_OVERRIDES[definition.slug] ??
 		definition.env.config ??
 		[];
-	if (!configFields.includes("bucket")) {
+	if (NON_PERSISTENT_PROVIDERS.has(definition.slug)) {
 		throw new Error(
-			`Files SDK provider "${definition.slug}" is not bucket-backed and is not supported by AgentPond`,
+			`Files SDK provider "${definition.slug}" is not persistent and is not supported by AgentPond`,
 		);
 	}
 	if (UNSUPPORTED_NODE_PROVIDERS.has(definition.slug)) {
@@ -243,23 +258,53 @@ function validateBucketProvider(definition: Provider): FilesSdkBucketProvider {
 		);
 	}
 	for (const field of configFields) {
-		if (!SUPPORTED_PROVIDER_CONFIG_FIELDS.has(field)) {
+		if (!SUPPORTED_PROVIDER_CONFIG_FIELD_SET.has(field)) {
 			throw new Error(
 				`Files SDK provider "${definition.slug}" requires unsupported configuration field "${field}"`,
 			);
 		}
 	}
-	return { ...definition, configFields };
+	return {
+		...definition,
+		configFields: configFields as readonly FilesSdkProviderConfigField[],
+	};
+}
+
+function validateBucketProvider(
+	definition: FilesSdkProvider,
+): FilesSdkBucketProvider {
+	if (!definition.configFields.includes("bucket")) {
+		throw new Error(
+			`Files SDK provider "${definition.slug}" is not bucket-backed and is not supported by this API`,
+		);
+	}
+	return definition;
+}
+
+function providerConfigEnvironmentVariable(
+	field: FilesSdkProviderConfigField,
+): string {
+	switch (field) {
+		case "bucket":
+			return "AGENTPOND_FILES_BUCKET";
+		case "endpoint":
+			return "FILES_SDK_ENDPOINT";
+		case "region":
+			return "FILES_SDK_REGION";
+		case "root":
+			return "FILES_SDK_ROOT";
+	}
 }
 
 async function loadConfiguredFiles(
 	config: FilesSdkObjectStoreConfig,
 ): Promise<FilesClient> {
 	const { files } = await loadFiles({
-		bucket: config.bucket,
 		provider: config.provider,
+		...(config.bucket ? { bucket: config.bucket } : {}),
 		...(config.endpoint ? { endpoint: config.endpoint } : {}),
 		...(config.region ? { region: config.region } : {}),
+		...(config.root ? { root: config.root } : {}),
 		retries: DEFAULT_RETRIES,
 		timeout: DEFAULT_TIMEOUT_MS,
 	});

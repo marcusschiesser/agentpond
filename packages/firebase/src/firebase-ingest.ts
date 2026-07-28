@@ -10,6 +10,7 @@ import {
 	type IngestionSink,
 	resolveIngestionSink,
 } from "@agentpond/ingest";
+import { firebaseProjectIdFromEnv } from "./firebase-runtime-project.js";
 import { FirebaseStorageObjectStore } from "./firebase-storage.js";
 
 export type FirebaseIngestFunctionOptions = {
@@ -87,10 +88,10 @@ function inferFirebasePathPrefix(req: FirebaseHttpRequest): string | undefined {
 export function firebaseAuthFromRuntimeEnv(
 	env: NodeJS.ProcessEnv = process.env,
 ): AuthConfig {
+	const projectId = firebaseProjectIdFromEnv(env) ?? env.AGENTPOND_PROJECT_ID;
 	return authFromRuntimeEnv({
 		...env,
-		AGENTPOND_PROJECT_ID:
-			env.AGENTPOND_PROJECT_ID ?? env.GCLOUD_PROJECT ?? env.GCP_PROJECT,
+		AGENTPOND_PROJECT_ID: projectId,
 	});
 }
 

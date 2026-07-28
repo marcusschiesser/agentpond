@@ -1,13 +1,17 @@
 # Deployment reference
 
-For deployment onboarding, use automatic [Firebase](./getting-started/firebase.md), [Supabase](./getting-started/supabase.md), or [Vercel](./getting-started/vercel.md) setup, or start with [Manual deployment setup](./getting-started/manual-setup.md) for other providers.
+For deployment onboarding, start with the [setup guide](./getting-started/setup.md).
+Firebase, Supabase, and Vercel projects also have automatic
+[Firebase](./getting-started/firebase.md),
+[Supabase](./getting-started/supabase.md), and
+[Vercel](./getting-started/vercel.md) setup paths.
 
 ## Write paths
 
 ### Direct object-store export
 
 A trusted Node.js application writes spans directly to object storage with
-`createFilesSpanExporter()` and a Files SDK bucket adapter.
+`createFilesSpanExporterFromRuntimeEnv()` and a persistent Files SDK adapter.
 
 ```text
 Node.js application -> object storage -> npx agentpond sync -> local DuckDB
@@ -62,9 +66,9 @@ is no generic AgentPond Google Cloud Function handler.
 
 ## Files SDK
 
-- Object store: a supported Node-compatible Files SDK bucket provider
-- Direct exporter: `createFilesSpanExporter()` from `@agentpond/files-sdk/otel`
-- CLI configuration: persistent provider and bucket selection
+- Object store: a supported persistent Node-compatible Files SDK provider
+- Direct exporter: `createFilesSpanExporterFromRuntimeEnv()` from `@agentpond/files-sdk/otel`
+- CLI configuration: persistent provider and typed adapter configuration
 - Credentials: provider-specific process environment variables
 
 ```bash
@@ -73,11 +77,11 @@ npx agentpond env init production \
   --bucket agentpond
 ```
 
-Providers that declare an endpoint or region receive matching `--endpoint` and
-`--region` values. AgentPond discovers supported providers from Files SDK at
-runtime, excludes Bun-only and non-bucket adapters plus providers requiring
-constructor configuration beyond bucket, endpoint, and region, and ships their
-peer SDKs in the CLI and ingest image.
+Providers that declare an endpoint, region, or root receive matching typed
+flags. AgentPond discovers supported providers from Files SDK at runtime and
+excludes memory, Bun-only, and adapters requiring constructor configuration
+beyond bucket, endpoint, region, and root. CLI setup also excludes adapters
+whose peer SDKs the executing AgentPond installation cannot resolve.
 
 ## Vercel
 
@@ -120,4 +124,5 @@ Run `ghcr.io/marcusschiesser/agentpond` on any container platform and configure
 Langfuse-compatible ingestion authentication directly on the deployment.
 
 `npx agentpond dev` writes directly to its local DuckDB cache and has no object
-store; see [Local testing](./getting-started/manual-setup.md#local-testing).
+store; see
+[Local HTTP testing without Docker](./getting-started/setup.md#local-http-testing-without-docker).

@@ -9,8 +9,7 @@
 	],
 	"types": "./dist/index.d.ts",
 	"scripts": {
-		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts",
-		"test:deno": "deno run tests/deno-smoke.ts"
+		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts"
 	},
 	"repository": {
 		"type": "git",

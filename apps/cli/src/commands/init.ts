@@ -2,18 +2,34 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { agentPondWorkspaceRoot } from "@agentpond/core";
 import type { Command } from "commander";
 import { CliError } from "../cli-support.js";
 import type { GlobalOptions } from "../command-support.js";
-import {
-	type ProviderProjectContext,
-	providerForCommand,
-} from "../providers.js";
+import { providerForCommand } from "../providers.js";
 
 const require = createRequire(import.meta.url);
 
-export const MANUAL_SETUP_URL =
-	"https://github.com/marcusschiesser/agentpond/blob/main/docs/getting-started/manual-setup.md";
+export const SETUP_GUIDE_URL =
+	"https://github.com/marcusschiesser/agentpond/blob/main/docs/getting-started/setup.md";
+export const FILES_SDK_PROVIDER_DOCS_URL =
+	"https://files-sdk.dev/docs/providers";
+
+export const FILES_SDK_INSTRUMENTATION_PROMPT = `Use $agentpond-instrumentation to inspect this project and add
+OpenInference tracing to its trusted Node.js AI application.
+
+Use createFilesSpanExporterFromRuntimeEnv() from @agentpond/files-sdk/otel so
+the application and AgentPond CLI share one environment-driven storage setup.
+
+For dependency-free local verification, create a persistent Files SDK
+filesystem environment with:
+
+  npx agentpond env init local --provider fs --root <absolute-project-root>/.agentpond/envs/local/objects
+
+Build the application, exercise one real AI request with the local environment
+loaded, then use $agentpond to sync and inspect the trace. After verification,
+help the user choose a production Files SDK provider from
+${FILES_SDK_PROVIDER_DOCS_URL} and follow ${SETUP_GUIDE_URL}.`;
 
 export const AGENTPOND_SKILLS_SOURCE = "marcusschiesser/agentpond";
 export const AGENTPOND_INIT_SKILLS = [
@@ -48,6 +64,13 @@ export type SkillsInstallRequest = {
 
 export type SkillsInstaller = (request: SkillsInstallRequest) => Promise<void>;
 
+type InitSetup = {
+	displayName: string;
+	instrumentationPrompt: string;
+	projectLabel: string;
+	rootDir: string;
+};
+
 export type SkillsProcessRequest = {
 	args: readonly string[];
 	command: string;
@@ -71,57 +94,59 @@ export function registerInitCommand(
 				throw new CliError("--json is not supported by npx agentpond init");
 			}
 
-			let setup:
-				| { context: ProviderProjectContext; projectLabel: string }
-				| undefined;
+			let setup: InitSetup;
 			try {
 				const context = providerForCommand({
 					allowUnlinked: true,
 					platform: globalOptions.platform,
 				});
 				setup = context
-					? { context, projectLabel: context.project.projectLabel }
-					: undefined;
+					? {
+							displayName: context.provider.displayName,
+							instrumentationPrompt: context.provider.instrumentationPrompt,
+							projectLabel: context.project.projectLabel,
+							rootDir: context.project.rootDir,
+						}
+					: filesSdkInitSetup();
 			} catch (error) {
 				throw new CliError(
 					error instanceof Error ? error.message : String(error),
 				);
 			}
-			if (!setup) {
-				throw new CliError(
-					[
-						"Automatic AgentPond setup supports Firebase, Supabase, and Vercel projects.",
-						"",
-						"For AWS, Google Cloud, and other deployment setups, see:",
-						MANUAL_SETUP_URL,
-					].join("\n"),
-				);
-			}
-			const { context, projectLabel } = setup;
 
 			console.log(
 				agentPondInitHeader({
-					displayName: context.provider.displayName,
-					projectLabel,
+					displayName: setup.displayName,
+					projectLabel: setup.projectLabel,
 				}),
 			);
 
 			await (options.installSkills ?? installSkillsWithBundledCli)({
-				cwd: context.project.rootDir,
+				cwd: setup.rootDir,
 				source: AGENTPOND_SKILLS_SOURCE,
 				skills: AGENTPOND_INIT_SKILLS,
 			});
 
 			console.log(
 				[
-					`AgentPond skills ready for ${context.provider.displayName} project: ${projectLabel}`,
+					`AgentPond skills ready for ${setup.displayName} project: ${setup.projectLabel}`,
 					"",
 					"Paste this prompt into your coding agent:",
 					"",
-					context.provider.instrumentationPrompt,
+					setup.instrumentationPrompt,
 				].join("\n"),
 			);
 		});
+}
+
+function filesSdkInitSetup(): InitSetup {
+	const rootDir = agentPondWorkspaceRoot();
+	return {
+		displayName: "Files SDK",
+		instrumentationPrompt: FILES_SDK_INSTRUMENTATION_PROMPT,
+		projectLabel: rootDir,
+		rootDir,
+	};
 }
 
 export async function installSkillsWithBundledCli(

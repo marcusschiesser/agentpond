@@ -17,9 +17,14 @@ import { memory } from "files-sdk/memory";
 import {
 	FilesObjectStore,
 	filesSdkConfigFromRuntimeEnv,
+	getFilesSdkProvider,
 	listFilesSdkBucketProviders,
+	listFilesSdkProviders,
 } from "../src/index.js";
-import { createFilesSpanExporter } from "../src/otel.js";
+import {
+	createFilesSpanExporter,
+	createFilesSpanExporterFromRuntimeEnv,
+} from "../src/otel.js";
 
 async function readableSpans(): Promise<ReadableSpan[]> {
 	const collector = new InMemorySpanExporter();
@@ -69,6 +74,20 @@ test("FilesObjectStore reports invalid JSON with the object key", async () => {
 	);
 });
 
+test("FilesObjectStore persists JSON through the Files SDK filesystem adapter", async () => {
+	const root = mkdtempSync(join(tmpdir(), "agentpond-files-sdk-fs-store-"));
+	const store = FilesObjectStore.fromConfig({ provider: "fs", root });
+
+	await store.putJson("traces/z.json", { id: "z" });
+	await store.putJson("traces/a.json", { id: "a" });
+
+	assert.deepEqual(await store.getJson("traces/a.json"), { id: "a" });
+	assert.deepEqual(await store.listKeys("traces/"), [
+		"traces/a.json",
+		"traces/z.json",
+	]);
+});
+
 test("FilesObjectStore validates persistent Files SDK environment settings", () => {
 	const root = mkdtempSync(join(tmpdir(), "agentpond-files-sdk-env-"));
 	const environment = initAgentPondEnvironment("production", {
@@ -82,14 +101,18 @@ test("FilesObjectStore validates persistent Files SDK environment settings", () 
 		/FILES_SDK_PROVIDER/,
 	);
 
-	writeFileSync(
-		environment.envFilePath,
-		"FILES_SDK_PROVIDER=fs\nAGENTPOND_FILES_BUCKET=agentpond\n",
-	);
+	writeFileSync(environment.envFilePath, "FILES_SDK_PROVIDER=fs\n");
 	assert.throws(
 		() => FilesObjectStore.fromEnvironment(environment),
-		/not bucket-backed/,
+		/requires FILES_SDK_ROOT/,
 	);
+
+	const fsRoot = join(root, ".agentpond", "envs", "local", "objects");
+	writeFileSync(
+		environment.envFilePath,
+		`FILES_SDK_PROVIDER=fs\nFILES_SDK_ROOT=${fsRoot}\n`,
+	);
+	assert.doesNotThrow(() => FilesObjectStore.fromEnvironment(environment));
 
 	writeFileSync(
 		environment.envFilePath,
@@ -152,6 +175,20 @@ test("FilesObjectStore parses runtime endpoint and region configuration", () => 
 			region: "us-east-1",
 		},
 	);
+	assert.deepEqual(
+		filesSdkConfigFromRuntimeEnv({
+			FILES_SDK_PROVIDER: "fs",
+			FILES_SDK_ROOT: "/tmp/agentpond-files",
+		}),
+		{
+			provider: "fs",
+			root: "/tmp/agentpond-files",
+		},
+	);
+	assert.throws(
+		() => filesSdkConfigFromRuntimeEnv({ FILES_SDK_PROVIDER: "fs" }),
+		/requires FILES_SDK_ROOT/,
+	);
 	assert.throws(
 		() =>
 			filesSdkConfigFromRuntimeEnv({
@@ -180,7 +217,6 @@ test("Files SDK provider contracts reflect adapter-required configuration", () =
 		{
 			provider: "backblaze-b2",
 			bucket: "agentpond",
-			endpoint: undefined,
 			region: "us-west-002",
 		},
 	);
@@ -196,13 +232,18 @@ test("Files SDK provider contracts reflect adapter-required configuration", () =
 		/requires unsupported configuration field "namespace"/,
 	);
 
-	const supportedProviders = listFilesSdkBucketProviders().map(
-		({ slug }) => slug,
-	);
+	const supportedProviders = listFilesSdkProviders().map(({ slug }) => slug);
+	const bucketProviders = listFilesSdkBucketProviders().map(({ slug }) => slug);
+	assert.deepEqual(getFilesSdkProvider("fs").configFields, ["root"]);
+	assert.ok(supportedProviders.includes("fs"));
+	assert.ok(supportedProviders.includes("box"));
 	assert.ok(supportedProviders.includes("akamai"));
 	assert.ok(supportedProviders.includes("backblaze-b2"));
 	assert.ok(supportedProviders.includes("ibm-cos"));
+	assert.ok(!supportedProviders.includes("memory"));
+	assert.ok(!supportedProviders.includes("bun-s3"));
 	assert.ok(!supportedProviders.includes("oracle-cloud"));
+	assert.ok(!bucketProviders.includes("fs"));
 });
 
 test("createFilesSpanExporter uses AgentPond runtime project and prefix", async () => {
@@ -243,4 +284,29 @@ test("createFilesSpanExporter uses AgentPond runtime project and prefix", async 
 			process.env.AGENTPOND_PREFIX = originalPrefix;
 		}
 	}
+});
+
+test("createFilesSpanExporterFromRuntimeEnv loads the filesystem adapter", async () => {
+	const root = mkdtempSync(join(tmpdir(), "agentpond-files-sdk-runtime-fs-"));
+	const exporter = createFilesSpanExporterFromRuntimeEnv({
+		env: {
+			FILES_SDK_PROVIDER: "fs",
+			FILES_SDK_ROOT: root,
+			AGENTPOND_PROJECT_ID: "runtime-files-project",
+			AGENTPOND_PREFIX: "runtime-files-prefix",
+		},
+	});
+	const spans = await readableSpans();
+	const result = await new Promise<ExportResult>((resolve) =>
+		exporter.export(spans, resolve),
+	);
+
+	assert.equal(result.code, ExportResultCode.SUCCESS);
+	const store = FilesObjectStore.fromConfig({ provider: "fs", root });
+	const keys = await store.listKeys(
+		"runtime-files-prefix/otel/runtime-files-project/",
+	);
+	assert.equal(keys.length, 1);
+	assert.match(keys[0], /[0-9a-f-]+\.json$/);
+	await exporter.shutdown();
 });

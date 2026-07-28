@@ -105,7 +105,7 @@ test("generated environment files persist Files SDK provider and bucket", () => 
 		assert.match(content, /AGENTPOND_PREFIX=/);
 		assert.throws(
 			() => initAgentPondEnvironment("invalid-files-env"),
-			/require a Files SDK provider and bucket/,
+			/require a Files SDK provider/,
 		);
 		assert.throws(
 			() =>
@@ -117,6 +117,35 @@ test("generated environment files persist Files SDK provider and bucket", () => 
 	} finally {
 		process.chdir(originalCwd);
 		restoreEnv(originalEnv);
+	}
+});
+
+test("generated environment files persist Files SDK filesystem roots", () => {
+	const originalCwd = process.cwd();
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-files-sdk-fs-"));
+	const storageRoot = join(cwd, ".agentpond", "envs", "local", "objects");
+	try {
+		process.chdir(cwd);
+		const environment = initAgentPondEnvironment("local", {
+			filesSdk: {
+				provider: "fs",
+				root: storageRoot,
+			},
+		});
+		const content = readFileSync(environment.envFilePath, "utf8");
+
+		assert.match(content, /FILES_SDK_PROVIDER=fs/);
+		assert.match(content, new RegExp(`FILES_SDK_ROOT=${storageRoot}`));
+		assert.doesNotMatch(content, /AGENTPOND_FILES_BUCKET=/);
+		assert.throws(
+			() =>
+				initAgentPondEnvironment("invalid-files-root", {
+					filesSdk: { provider: "fs", root: "objects\nINJECTED=value" },
+				}),
+			/root must be a single-line value/,
+		);
+	} finally {
+		process.chdir(originalCwd);
 	}
 });
 
@@ -419,6 +448,7 @@ const CONFIG_ENV_KEYS = [
 	"FILES_SDK_PROVIDER",
 	"FILES_SDK_ENDPOINT",
 	"FILES_SDK_REGION",
+	"FILES_SDK_ROOT",
 	"LANGFUSE_BASE_URL",
 	"LANGFUSE_PUBLIC_KEY",
 	"LANGFUSE_SECRET_KEY",

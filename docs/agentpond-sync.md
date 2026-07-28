@@ -3,8 +3,8 @@
 ## Goal
 
 AgentPond stores raw OTEL payloads and Langfuse-compatible score ingestion
-events in remote object storage and uses DuckDB as a local query cache. Manual
-remote environments resolve their bucket through Files SDK; Firebase,
+events in persistent object storage and uses DuckDB as a local query cache.
+Manual environments resolve their storage through Files SDK; Firebase,
 Supabase, and Vercel retain their platform-native storage adapters. Object
 storage is the durable source of truth, and DuckDB is the materialized analysis
 layer.
@@ -37,9 +37,9 @@ The `sessions` relation is a DuckDB view derived from traces with session IDs.
 
 `sync` reads the persistent environment selected by
 `npx agentpond env use <name>`. It has no storage-selection flags. The
-environment contains `FILES_SDK_PROVIDER`, `AGENTPOND_FILES_BUCKET`, optional
-endpoint and region values, the project ID, and the key prefix; provider
-credentials remain ambient.
+environment contains `FILES_SDK_PROVIDER`, the selected adapter's typed bucket,
+endpoint, region, or root configuration, the project ID, and the key prefix;
+provider credentials remain ambient.
 
 ## Idempotency
 
