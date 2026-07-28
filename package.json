@@ -17,15 +17,14 @@
 		"biome:ci": "biome ci . --files-ignore-unknown=true",
 		"prepare": "husky",
 		"test": "NODE_ENV=test node --test --import tsx tests/*.test.ts && pnpm -r --filter './apps/**' --reporter=append-only --if-present test && pnpm -r --filter './packages/**' --reporter=append-only --if-present test",
+		"test:ci": "pnpm test && NODE_ENV=test node --test --import tsx tests/ci/*.e2e.ts && deno run tests/ci/supabase-deno-smoke.ts",
 		"typecheck": "tsc --noEmit --pretty false",
 		"changeset": "changeset",
 		"version-packages": "changeset version",
 		"release": "changeset publish",
 		"ingest": "tsx apps/ingest/src/index.ts",
 		"cli": "tsx apps/cli/src/index.ts",
-		"perf:sync": "pnpm --filter @agentpond/perf sync",
-		"test:e2e:files-sdk:fs": "pnpm --filter @agentpond/files-sdk test:e2e:fs",
-		"test:e2e:files-sdk": "docker compose up -d minio && docker compose run --rm create-bucket && pnpm --filter @agentpond/files-sdk test:e2e:minio"
+		"perf:sync": "pnpm --filter @agentpond/perf sync"
 	},
 	"devDependencies": {
 		"@agentpond/core": "workspace:*",
@@ -36,6 +35,8 @@
 		"@agentpond/ingest": "workspace:*",
 		"@biomejs/biome": "^2.5.0",
 		"@changesets/cli": "^2.29.7",
+		"@opentelemetry/resources": "^2.9.0",
+		"@opentelemetry/sdk-trace-base": "^2.9.0",
 		"@types/node": "^24.10.1",
 		"husky": "^9.1.7",
 		"jscpd": "^5.0.11",

@@ -24,22 +24,22 @@ Object storage is the durable source of truth. The local DuckDB database is a re
 
 ## Getting started
 
-Start with the [Manual deployment setup](./docs/getting-started/manual-setup.md) to configure object storage, instrument your application, and sync its traces into AgentPond.
-
-For [Firebase](./docs/getting-started/firebase.md), [Supabase](./docs/getting-started/supabase.md), and [Vercel](./docs/getting-started/vercel.md) projects, to get started, just run:
-
 ```sh
 npx agentpond init
 ```
 
-The command installs AgentPond's instrumentation and analytics skills, and prints a install prompt for your coding agent. Your coding agent inspects then the application, proposes a setup, implements it after confirmation, and verifies a real trace end to end.
+Run this from your application directory. It installs AgentPond's instrumentation
+and analytics skills, and prints a setup prompt for your coding agent. The agent
+then inspects your application, proposes the appropriate instrumentation and
+storage setup, implements it after your confirmation, and verifies a real trace
+end to end.
 
-Once the application has emitted a trace:
-
-```sh
-npx agentpond sync
-npx agentpond traces list --limit 10
-```
+For platform-specific details and manual object-storage setup, see the
+[Firebase](./docs/getting-started/firebase.md),
+[Supabase](./docs/getting-started/supabase.md),
+[Vercel](./docs/getting-started/vercel.md), and
+[manual deployment](./docs/getting-started/manual-setup.md) guides. See the
+[CLI reference](./docs/cli.md) for all commands and options.
 
 ## Features
 

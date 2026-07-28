@@ -49,11 +49,8 @@ jobs:
         with:
           deno-version: 2.7.14
 
-      - name: Run Supabase Deno smoke test
-        run: pnpm --filter @agentpond/supabase test:deno
-
       - name: Run tests
-        run: pnpm test
+        run: pnpm test:ci
 
   cli-node-22:
     runs-on: ubuntu-latest

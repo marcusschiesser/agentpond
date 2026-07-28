@@ -15,8 +15,8 @@ import {
 	BasicTracerProvider,
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { main } from "../../../apps/cli/src/index.js";
-import { createFilesSpanExporterFromRuntimeEnv } from "../src/otel.js";
+import { main } from "../../apps/cli/src/index.js";
+import { createFilesSpanExporterFromRuntimeEnv } from "../../packages/files-sdk/src/otel.js";
 
 async function captureStdout(fn: () => Promise<void>): Promise<string> {
 	const consoleLog = console.log;
