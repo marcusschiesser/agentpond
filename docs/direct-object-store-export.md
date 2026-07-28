@@ -1,8 +1,8 @@
 # Direct OpenTelemetry Object-Store Export
 
-Node.js applications can skip the AgentPond ingestion service and write OpenTelemetry spans directly to the same object storage read by `npx agentpond sync`.
+Node.js applications can write OpenTelemetry spans directly to the same object storage read by `npx agentpond sync`.
 
-This path does not use an AgentPond server or `npx agentpond dev`. The application writes to object storage, and the CLI later reads that storage with `npx agentpond sync`.
+The application writes to object storage, and the CLI later reads that storage with `npx agentpond sync`.
 
 ## Install
 

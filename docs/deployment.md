@@ -1,6 +1,10 @@
 # Deployment reference
 
-For deployment onboarding, use automatic [Firebase](./getting-started/firebase.md), [Supabase](./getting-started/supabase.md), or [Vercel](./getting-started/vercel.md) setup, or start with [Manual deployment setup](./getting-started/manual-setup.md) for other providers.
+For deployment onboarding, start with the [setup guide](./getting-started/setup.md).
+Firebase, Supabase, and Vercel projects also have automatic
+[Firebase](./getting-started/firebase.md),
+[Supabase](./getting-started/supabase.md), and
+[Vercel](./getting-started/vercel.md) setup paths.
 
 ## Write paths
 
@@ -120,4 +124,5 @@ Run `ghcr.io/marcusschiesser/agentpond` on any container platform and configure
 Langfuse-compatible ingestion authentication directly on the deployment.
 
 `npx agentpond dev` writes directly to its local DuckDB cache and has no object
-store; see [Local testing](./getting-started/manual-setup.md#local-testing).
+store; see
+[Local HTTP testing without Docker](./getting-started/setup.md#local-http-testing-without-docker).

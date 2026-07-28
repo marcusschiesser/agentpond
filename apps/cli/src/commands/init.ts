@@ -10,8 +10,8 @@ import { providerForCommand } from "../providers.js";
 
 const require = createRequire(import.meta.url);
 
-export const MANUAL_SETUP_URL =
-	"https://github.com/marcusschiesser/agentpond/blob/main/docs/getting-started/manual-setup.md";
+export const SETUP_GUIDE_URL =
+	"https://github.com/marcusschiesser/agentpond/blob/main/docs/getting-started/setup.md";
 export const FILES_SDK_PROVIDER_DOCS_URL =
 	"https://files-sdk.dev/docs/providers";
 
@@ -29,7 +29,7 @@ filesystem environment with:
 Build the application, exercise one real AI request with the local environment
 loaded, then use $agentpond to sync and inspect the trace. After verification,
 help the user choose a production Files SDK provider from
-${FILES_SDK_PROVIDER_DOCS_URL} and follow ${MANUAL_SETUP_URL}.`;
+${FILES_SDK_PROVIDER_DOCS_URL} and follow ${SETUP_GUIDE_URL}.`;
 
 export const AGENTPOND_SKILLS_SOURCE = "marcusschiesser/agentpond";
 export const AGENTPOND_INIT_SKILLS = [

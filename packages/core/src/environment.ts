@@ -6,6 +6,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { basename, join } from "node:path";
+import { defaultAgentPondProjectId } from "./project-id.js";
 import { agentPondWorkspaceRoot } from "./workspace.js";
 
 export type FilesSdkEnvironmentConfig = {
@@ -171,7 +172,7 @@ function defaultEnvironmentFile(
 	if (isDev) return "";
 	const lines = [
 		"# Project id used to share the same object store across different projects.",
-		"AGENTPOND_PROJECT_ID=default-project",
+		`AGENTPOND_PROJECT_ID=${defaultAgentPondProjectId}`,
 		"# Optional key prefix inside the selected object store.",
 		"AGENTPOND_PREFIX=",
 		"",

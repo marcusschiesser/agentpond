@@ -31,6 +31,11 @@ Copy the generated prompt into the selected coding agent. The instrumentation sk
 
 Detailed Firebase exporter and Storage Rules requirements live in the [instrumentation skill](../../skills/agentpond-instrumentation/references/firebase.md).
 
+Firebase HTTP ingestion uses the same Firebase runtime project identity as the
+direct exporter and CLI. It resolves the project ID from `FIREBASE_CONFIG`,
+`GCLOUD_PROJECT`, `GCP_PROJECT`, or `GOOGLE_CLOUD_PROJECT`, and only falls back
+to `AGENTPOND_PROJECT_ID` when those standard Firebase values are unavailable.
+
 ## Verify
 
 After the coding agent builds the application and exercises one real AI request:

@@ -4,6 +4,7 @@ import {
 	parseEnvFile,
 	resolveAgentPondEnvironment,
 } from "./environment.js";
+import { resolveAgentPondProjectId } from "./project-id.js";
 
 export type AuthConfig = {
 	projectId: string;
@@ -39,7 +40,7 @@ export function configFromEnv(
 	const fileEnv = parseEnvFile(environment.envFilePath);
 	const env = envValue(fileEnv);
 	const dbPath = join(environment.envDir, "cache.duckdb");
-	const projectId = env("AGENTPOND_PROJECT_ID") ?? "default-project";
+	const projectId = resolveAgentPondProjectId(env("AGENTPOND_PROJECT_ID"));
 	const prefix = normalizePrefix(env("AGENTPOND_PREFIX") ?? "");
 	const publicKey = env("LANGFUSE_PUBLIC_KEY") ?? "pk-agentpond";
 	const secretKey = env("LANGFUSE_SECRET_KEY") ?? "sk-agentpond";
@@ -63,26 +64,20 @@ export function configFromEnv(
 export function configFromRuntimeEnv(
 	env: NodeJS.ProcessEnv = process.env,
 ): AgentPondRuntimeConfig {
-	const projectId = env.AGENTPOND_PROJECT_ID ?? "default-project";
+	const auth = authFromRuntimeEnv(env);
 	const prefix = normalizePrefix(env.AGENTPOND_PREFIX ?? "");
-	const publicKey = env.LANGFUSE_PUBLIC_KEY ?? "pk-agentpond";
-	const secretKey = env.LANGFUSE_SECRET_KEY ?? "sk-agentpond";
 
 	return {
-		projectId,
+		projectId: auth.projectId,
 		prefix,
-		auth: {
-			projectId,
-			publicKey,
-			secretKey,
-		},
+		auth,
 	};
 }
 
 export function authFromRuntimeEnv(
 	env: NodeJS.ProcessEnv = process.env,
 ): AuthConfig {
-	const projectId = env.AGENTPOND_PROJECT_ID ?? "default-project";
+	const projectId = resolveAgentPondProjectId(env.AGENTPOND_PROJECT_ID);
 	return {
 		projectId,
 		publicKey: env.LANGFUSE_PUBLIC_KEY ?? "pk-agentpond",

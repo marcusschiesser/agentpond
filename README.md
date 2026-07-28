@@ -34,11 +34,8 @@ then inspects your application, proposes the appropriate instrumentation and
 storage setup, implements it after your confirmation, and verifies a real trace
 end to end.
 
-For platform-specific details and manual object-storage setup, see the
-[Firebase](./docs/getting-started/firebase.md),
-[Supabase](./docs/getting-started/supabase.md),
-[Vercel](./docs/getting-started/vercel.md), and
-[manual deployment](./docs/getting-started/manual-setup.md) guides. See the
+For setup options and platform-specific details, see the
+[setup guide](./docs/getting-started/setup.md). See the
 [CLI reference](./docs/cli.md) for all commands and options.
 
 ## Features
@@ -60,7 +57,7 @@ AgentPond does not provide a web UI, hosted trace storage, prompt management, da
 - [Firebase setup](./docs/getting-started/firebase.md)
 - [Supabase setup](./docs/getting-started/supabase.md)
 - [Vercel setup](./docs/getting-started/vercel.md)
-- [Manual deployment setup](./docs/getting-started/manual-setup.md)
+- [Setup](./docs/getting-started/setup.md)
 - [CLI reference](./docs/cli.md)
 - [Deployment reference](./docs/deployment.md)
 - [Direct object-store export](./docs/direct-object-store-export.md)
