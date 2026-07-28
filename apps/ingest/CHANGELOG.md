@@ -1,5 +1,19 @@
 # @agentpond/ingest-service
 
+## 0.2.0
+
+### Minor Changes
+
+- b5a6ce0: Consolidate manual remote storage and container ingestion on Files SDK, validate adapter-required configuration for supported bucket providers, remove legacy local, S3, and GCS environment formats, keep persistent storage settings authoritative, reject accidental environment reinitialization, and keep platform-native Firebase, Supabase, and Vercel storage.
+
+### Patch Changes
+
+- Updated dependencies [b5a6ce0]
+- Updated dependencies [7c7a8c0]
+  - @agentpond/files-sdk@0.1.0
+  - @agentpond/core@0.6.0
+  - @agentpond/fastify-ingest@0.3.8
+
 ## 0.1.11
 
 ### Patch Changes

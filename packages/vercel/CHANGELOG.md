@@ -1,5 +1,15 @@
 # @agentpond/vercel
 
+## 0.5.2
+
+### Patch Changes
+
+- Updated dependencies [b5a6ce0]
+- Updated dependencies [7c7a8c0]
+  - @agentpond/core@0.6.0
+  - @agentpond/ingest@0.3.8
+  - @agentpond/otel@0.1.4
+
 ## 0.5.1
 
 ### Patch Changes
