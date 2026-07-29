@@ -59,6 +59,7 @@ For non-interactive setup, provide the adapter and its required options:
 
 ```sh
 npx agentpond env init production --provider s3 --bucket agentpond
+npx agentpond env init production --provider azure --container agentpond
 npx agentpond env init production --provider gcs --bucket agentpond
 npx agentpond env init production --provider r2 --bucket agentpond
 npx agentpond env init production --provider minio --bucket agentpond --endpoint https://minio.example.com
@@ -68,6 +69,11 @@ AgentPond stores the adapter configuration, `AGENTPOND_PROJECT_ID`, and optional
 `AGENTPOND_PREFIX` in `.agentpond/envs/production.env`. Provider credentials
 remain in the application and CLI process environments and are never written
 by `env init`.
+
+For Azure Blob Storage, install `@azure/storage-blob` next to Files SDK and set
+either `AZURE_STORAGE_CONNECTION_STRING` or
+`AZURE_STORAGE_ACCOUNT_NAME` with `AZURE_STORAGE_ACCOUNT_KEY` in both the
+application runtime and the shell running AgentPond.
 
 The application and CLI must use the same Files SDK provider configuration,
 project ID, prefix, and object-store credentials. After the application emits a
@@ -165,8 +171,8 @@ npx agentpond traces list --limit 10
 Deploy `ghcr.io/marcusschiesser/agentpond` to a container platform and
 configure:
 
-- `FILES_SDK_PROVIDER` and the selected adapter's bucket, endpoint, region, or
-  root
+- `FILES_SDK_PROVIDER` and the selected adapter's bucket, container, endpoint,
+  region, or root
 - provider credentials with permission to write trace objects
 - `AGENTPOND_PROJECT_ID` and optional `AGENTPOND_PREFIX`
 - unique `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` values

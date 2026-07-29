@@ -17,6 +17,9 @@ npm install @aws-sdk/client-s3 @aws-sdk/s3-presigned-post @aws-sdk/s3-request-pr
 
 # Google Cloud Storage
 npm install @google-cloud/storage
+
+# Azure Blob Storage
+npm install @azure/storage-blob
 ```
 
 Install only the provider peer SDKs for the adapter used by the application.
@@ -115,6 +118,16 @@ const exporter = createFilesSpanExporterFromRuntimeEnv();
 The helper reads `FILES_SDK_PROVIDER` and the selected adapter's typed
 configuration from runtime environment variables. This allows the same
 instrumentation code to use `fs` locally and a cloud adapter in production.
+For Azure Blob Storage, configure:
+
+```sh
+FILES_SDK_PROVIDER=azure
+AGENTPOND_FILES_CONTAINER=agentpond
+AZURE_STORAGE_CONNECTION_STRING=<connection-string>
+```
+
+Files SDK also supports Azure account-name and account-key credentials; keep
+those credential variables out of AgentPond environment files.
 
 Create Files SDK normally and pass the client to AgentPond:
 
@@ -150,7 +163,8 @@ npx agentpond sync
 ```
 
 For providers that declare an endpoint or region, pass `--endpoint` or
-`--region` during initialization. Root-based providers use `--root`. AgentPond
+`--region` during initialization. Azure Blob Storage uses `--container`, and
+root-based providers use `--root`. AgentPond
 persists those values with the provider. Provider credentials remain ambient in both the
 application runtime and the shell invoking AgentPond; AgentPond does not write
 secrets into its environment file. `npx agentpond sync` always reads the

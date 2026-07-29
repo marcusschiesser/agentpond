@@ -77,3 +77,9 @@ project-local CLI. Initialize a separate environment with
 and supply credentials through the runtime environment. Keep
 `createFilesSpanExporterFromRuntimeEnv()` in application code so changing
 storage requires environment configuration rather than another code change.
+
+For Azure Blob Storage, install `@azure/storage-blob`, initialize with
+`npx agentpond env init production --provider azure --container <container>`,
+and provide `AZURE_STORAGE_CONNECTION_STRING` or the matching
+`AZURE_STORAGE_ACCOUNT_NAME` and `AZURE_STORAGE_ACCOUNT_KEY` variables to both
+the trusted application runtime and AgentPond CLI shell.

@@ -12,6 +12,7 @@ import { agentPondWorkspaceRoot } from "./workspace.js";
 export type FilesSdkEnvironmentConfig = {
 	provider: string;
 	bucket?: string;
+	container?: string;
 	endpoint?: string;
 	region?: string;
 	root?: string;
@@ -190,6 +191,9 @@ function filesSdkEnvironmentLines(
 	const bucket = filesSdk.bucket
 		? environmentFileValue(filesSdk.bucket, "bucket")
 		: undefined;
+	const container = filesSdk.container
+		? environmentFileValue(filesSdk.container, "container")
+		: undefined;
 	const endpoint = filesSdk.endpoint
 		? environmentFileValue(filesSdk.endpoint, "endpoint")
 		: undefined;
@@ -206,6 +210,12 @@ function filesSdkEnvironmentLines(
 			? [
 					"# Bucket containing AgentPond ingestion objects.",
 					`AGENTPOND_FILES_BUCKET=${bucket}`,
+				]
+			: []),
+		...(container
+			? [
+					"# Container containing AgentPond ingestion objects.",
+					`AGENTPOND_FILES_CONTAINER=${container}`,
 				]
 			: []),
 		...(endpoint

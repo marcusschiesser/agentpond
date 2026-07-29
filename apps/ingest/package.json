@@ -21,6 +21,7 @@
 		"@agentpond/core": "workspace:*",
 		"@agentpond/fastify-ingest": "workspace:*",
 		"@agentpond/files-sdk": "workspace:*",
+		"@azure/storage-blob": "^12.26.0",
 		"@aws-sdk/client-s3": "3.1068.0",
 		"@aws-sdk/s3-presigned-post": "3.1068.0",
 		"@aws-sdk/s3-request-presigner": "3.1068.0",

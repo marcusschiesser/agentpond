@@ -21,6 +21,7 @@ const UNSUPPORTED_NODE_PROVIDERS = new Set(["bun-s3"]);
 const NON_PERSISTENT_PROVIDERS = new Set(["memory"]);
 const SUPPORTED_PROVIDER_CONFIG_FIELDS = [
 	"bucket",
+	"container",
 	"endpoint",
 	"region",
 	"root",
@@ -40,6 +41,7 @@ export type FilesClient = Pick<Files, "download" | "listAll" | "upload">;
 export type FilesSdkObjectStoreConfig = {
 	provider: string;
 	bucket?: string;
+	container?: string;
 	endpoint?: string;
 	region?: string;
 	root?: string;
@@ -216,12 +218,14 @@ function filesSdkConfigFromValues(
 		throw new Error("Files SDK object storage requires FILES_SDK_PROVIDER");
 	}
 	const bucket = nonEmpty(env("AGENTPOND_FILES_BUCKET"));
+	const container = nonEmpty(env("AGENTPOND_FILES_CONTAINER"));
 	const endpoint = nonEmpty(env("FILES_SDK_ENDPOINT"));
 	const region = nonEmpty(env("FILES_SDK_REGION"));
 	const root = nonEmpty(env("FILES_SDK_ROOT"));
 	const config = {
 		provider,
 		...(bucket ? { bucket } : {}),
+		...(container ? { container } : {}),
 		...(endpoint ? { endpoint } : {}),
 		...(region ? { region } : {}),
 		...(root ? { root } : {}),
@@ -287,6 +291,8 @@ function providerConfigEnvironmentVariable(
 	switch (field) {
 		case "bucket":
 			return "AGENTPOND_FILES_BUCKET";
+		case "container":
+			return "AGENTPOND_FILES_CONTAINER";
 		case "endpoint":
 			return "FILES_SDK_ENDPOINT";
 		case "region":
@@ -302,6 +308,7 @@ async function loadConfiguredFiles(
 	const { files } = await loadFiles({
 		provider: config.provider,
 		...(config.bucket ? { bucket: config.bucket } : {}),
+		...(config.container ? { container: config.container } : {}),
 		...(config.endpoint ? { endpoint: config.endpoint } : {}),
 		...(config.region ? { region: config.region } : {}),
 		...(config.root ? { root: config.root } : {}),

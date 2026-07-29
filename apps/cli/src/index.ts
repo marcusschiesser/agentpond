@@ -32,6 +32,7 @@ export const CLI_VERSION = packageJson.version;
 
 export type ProgramOptions = {
 	inputBucket?: InputPrompt;
+	inputContainer?: InputPrompt;
 	inputEndpoint?: InputPrompt;
 	inputRegion?: InputPrompt;
 	inputRoot?: InputPrompt;
@@ -64,6 +65,7 @@ export function createProgram(options: ProgramOptions = {}): Command {
 	registerDevCommand(program);
 	registerEnvCommand(program, {
 		inputBucket: options.inputBucket,
+		inputContainer: options.inputContainer,
 		inputEndpoint: options.inputEndpoint,
 		inputRegion: options.inputRegion,
 		inputRoot: options.inputRoot,
