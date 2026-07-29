@@ -48,6 +48,7 @@ export type InputPrompt = (config: {
 
 type EnvOptions = GlobalOptions & {
 	bucket?: string;
+	container?: string;
 	endpoint?: string;
 	langfuse?: boolean;
 	otel?: boolean;
@@ -62,6 +63,7 @@ export function registerEnvCommand(
 		selectEnvironment?: SelectEnvironmentPrompt;
 		selectFilesProvider?: SelectFilesProviderPrompt;
 		inputBucket?: InputPrompt;
+		inputContainer?: InputPrompt;
 		inputEndpoint?: InputPrompt;
 		inputRegion?: InputPrompt;
 		inputRoot?: InputPrompt;
@@ -70,6 +72,7 @@ export function registerEnvCommand(
 	const promptSelect = options.selectEnvironment ?? select<string>;
 	const promptFilesProvider = options.selectFilesProvider ?? select<string>;
 	const promptBucket = options.inputBucket ?? input;
+	const promptContainer = options.inputContainer ?? input;
 	const promptEndpoint = options.inputEndpoint ?? input;
 	const promptRegion = options.inputRegion ?? input;
 	const promptRoot = options.inputRoot ?? input;
@@ -130,6 +133,7 @@ export function registerEnvCommand(
 		.description("initialize a manual environment")
 		.option("--provider <provider>", "Files SDK provider")
 		.option("--bucket <bucket>", "Files SDK bucket name")
+		.option("--container <container>", "Files SDK container name")
 		.option("--endpoint <endpoint>", "Files SDK provider endpoint")
 		.option("--region <region>", "Files SDK provider region")
 		.option("--root <root>", "Files SDK provider root")
@@ -158,6 +162,7 @@ export function registerEnvCommand(
 					commandOptions,
 					promptFilesProvider,
 					promptBucket,
+					promptContainer,
 					promptEndpoint,
 					promptRegion,
 					promptRoot,
@@ -174,6 +179,7 @@ export function registerEnvCommand(
 						dbPath: environment.dbPath,
 						provider: filesSdk.provider,
 						...(filesSdk.bucket ? { bucket: filesSdk.bucket } : {}),
+						...(filesSdk.container ? { container: filesSdk.container } : {}),
 						...(filesSdk.endpoint ? { endpoint: filesSdk.endpoint } : {}),
 						...(filesSdk.region ? { region: filesSdk.region } : {}),
 						...(filesSdk.root ? { root: filesSdk.root } : {}),
@@ -234,10 +240,11 @@ async function selectEnvironmentForCommand(
 async function filesSdkConfigForOptions(
 	options: Pick<
 		EnvOptions,
-		"bucket" | "endpoint" | "provider" | "region" | "root"
+		"bucket" | "container" | "endpoint" | "provider" | "region" | "root"
 	>,
 	promptProvider: SelectFilesProviderPrompt,
 	promptBucket: InputPrompt,
+	promptContainer: InputPrompt,
 	promptEndpoint: InputPrompt,
 	promptRegion: InputPrompt,
 	promptRoot: InputPrompt,
@@ -252,12 +259,14 @@ async function filesSdkConfigForOptions(
 	}
 	const prompts = {
 		bucket: promptBucket,
+		container: promptContainer,
 		endpoint: promptEndpoint,
 		region: promptRegion,
 		root: promptRoot,
 	};
 	const configured = {
 		bucket: options.bucket,
+		container: options.container,
 		endpoint: options.endpoint,
 		region: options.region,
 		root: options.root,
@@ -267,6 +276,7 @@ async function filesSdkConfigForOptions(
 	> = {};
 	for (const field of [
 		"bucket",
+		"container",
 		"endpoint",
 		"region",
 		"root",
@@ -336,7 +346,7 @@ function missingFilesSdkProviderPeerDependencies(
 }
 
 async function configuredProviderValue(
-	field: "bucket" | "endpoint" | "region" | "root",
+	field: FilesSdkProviderConfigField,
 	value: string | undefined,
 	promptInput: InputPrompt,
 ): Promise<string> {
@@ -348,7 +358,9 @@ async function configuredProviderValue(
 	const prompted = (
 		await promptInput({
 			message: `Files SDK ${field}`,
-			...(field === "bucket" ? { default: "agentpond" } : {}),
+			...(field === "bucket" || field === "container"
+				? { default: "agentpond" }
+				: {}),
 		})
 	).trim();
 	if (!prompted) throw new CliError(`Missing --${field}`);

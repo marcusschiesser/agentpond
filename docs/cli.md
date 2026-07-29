@@ -98,6 +98,7 @@ Manual deployments use AgentPond environments:
 ```bash
 npx agentpond env init production --provider s3 --bucket agentpond
 npx agentpond env init production --provider r2 --bucket agentpond
+npx agentpond env init production --provider azure --container agentpond
 npx agentpond env init local-minio --provider minio --bucket agentpond --endpoint http://localhost:9000
 npx agentpond env init local --provider fs --root /absolute/project/.agentpond/envs/local/objects
 npx agentpond env use production
@@ -107,7 +108,9 @@ npx agentpond env list
 
 Every manual environment is a Files SDK environment. AgentPond dynamically
 supports persistent Node-compatible providers whose required configuration uses
-bucket, endpoint, region, or root. It rejects memory, Bun-only, unknown,
+bucket, container, endpoint, region, or root. Azure Blob Storage uses
+`--provider azure --container <name>` and reads credentials from the
+`AZURE_STORAGE_*` variables documented by Files SDK. AgentPond rejects memory, Bun-only, unknown,
 malformed, providers requiring other constructor configuration, and adapters
 whose peer SDKs the executing CLI cannot resolve. To make another compatible
 catalog adapter available, install `agentpond` locally alongside that adapter's

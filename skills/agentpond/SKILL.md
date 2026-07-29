@@ -27,7 +27,8 @@ Determine the provider before syncing:
 - For a Vercel-linked project, read [references/vercel.md](references/vercel.md).
 - Otherwise, use an existing manual AgentPond environment. Every manual
   environment is backed by a supported Node-compatible Files SDK provider, as
-  described in [references/cli.md](references/cli.md).
+  described in [references/cli.md](references/cli.md). Azure Blob manual
+  environments use the Files SDK `azure` provider and a container.
 
 Do not create provider-choice state. Select the provider's environment with
 `npx agentpond env use <name>`: a Firebase alias or project ID, a Supabase

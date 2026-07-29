@@ -149,6 +149,37 @@ test("generated environment files persist Files SDK filesystem roots", () => {
 	}
 });
 
+test("generated environment files persist Azure Blob containers", () => {
+	const originalCwd = process.cwd();
+	const cwd = mkdtempSync(join(tmpdir(), "agentpond-config-files-sdk-azure-"));
+	try {
+		process.chdir(cwd);
+		const environment = initAgentPondEnvironment("azure", {
+			filesSdk: {
+				provider: "azure",
+				container: "agentpond",
+			},
+		});
+		const content = readFileSync(environment.envFilePath, "utf8");
+
+		assert.match(content, /FILES_SDK_PROVIDER=azure/);
+		assert.match(content, /AGENTPOND_FILES_CONTAINER=agentpond/);
+		assert.doesNotMatch(content, /AGENTPOND_FILES_BUCKET=/);
+		assert.throws(
+			() =>
+				initAgentPondEnvironment("invalid-files-container", {
+					filesSdk: {
+						provider: "azure",
+						container: "objects\nINJECTED=value",
+					},
+				}),
+			/container must be a single-line value/,
+		);
+	} finally {
+		process.chdir(originalCwd);
+	}
+});
+
 test("config uses only the shared AgentPond prefix", () => {
 	const originalCwd = process.cwd();
 	const originalEnv = saveEnv(CONFIG_ENV_KEYS);
@@ -432,6 +463,7 @@ const CONFIG_ENV_KEYS = [
 	"AGENTPOND_PROJECT_ID",
 	"AGENTPOND_PREFIX",
 	"AGENTPOND_FILES_BUCKET",
+	"AGENTPOND_FILES_CONTAINER",
 	"AGENTPOND_S3_BUCKET",
 	"AGENTPOND_S3_ENDPOINT",
 	"AGENTPOND_S3_REGION",

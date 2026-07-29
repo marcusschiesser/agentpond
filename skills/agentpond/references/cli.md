@@ -40,14 +40,17 @@ npx agentpond sync
 ```
 
 The environment file stores `FILES_SDK_PROVIDER` plus the selected adapter's
-typed configuration: `AGENTPOND_FILES_BUCKET`, `FILES_SDK_ENDPOINT`,
-`FILES_SDK_REGION`, or `FILES_SDK_ROOT`. It does not store credentials. Run
+typed configuration: `AGENTPOND_FILES_BUCKET`,
+`AGENTPOND_FILES_CONTAINER`, `FILES_SDK_ENDPOINT`, `FILES_SDK_REGION`, or
+`FILES_SDK_ROOT`. It does not store credentials. Azure Blob environments are
+configured with the `azure` provider and `--container <container>`; they use
+Files SDK's `AZURE_STORAGE_*` credential variables. Run
 AgentPond with the selected provider's credential variables available in the
 process environment. Keep
 `AGENTPOND_PROJECT_ID` and `AGENTPOND_PREFIX` identical to the application
 runtime; `default-project` and an empty prefix are the defaults. Memory,
 Bun-only, unknown, malformed, and providers requiring constructor
-configuration beyond bucket, endpoint, region, and root are rejected. The CLI
+configuration beyond bucket, container, endpoint, region, and root are rejected. The CLI
 also rejects adapters whose peer SDKs it cannot resolve. To use another
 compatible catalog adapter, install `agentpond` locally alongside that
 adapter's peer SDK so `npx` uses the project-local CLI.

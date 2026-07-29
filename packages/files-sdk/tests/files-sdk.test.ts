@@ -185,6 +185,21 @@ test("FilesObjectStore parses runtime endpoint and region configuration", () => 
 			root: "/tmp/agentpond-files",
 		},
 	);
+	assert.deepEqual(
+		filesSdkConfigFromRuntimeEnv({
+			FILES_SDK_PROVIDER: "azure",
+			AGENTPOND_FILES_CONTAINER: "agentpond",
+			AZURE_STORAGE_CONNECTION_STRING: "not-read-by-agentpond",
+		}),
+		{
+			provider: "azure",
+			container: "agentpond",
+		},
+	);
+	assert.throws(
+		() => filesSdkConfigFromRuntimeEnv({ FILES_SDK_PROVIDER: "azure" }),
+		/requires AGENTPOND_FILES_CONTAINER/,
+	);
 	assert.throws(
 		() => filesSdkConfigFromRuntimeEnv({ FILES_SDK_PROVIDER: "fs" }),
 		/requires FILES_SDK_ROOT/,
@@ -235,7 +250,9 @@ test("Files SDK provider contracts reflect adapter-required configuration", () =
 	const supportedProviders = listFilesSdkProviders().map(({ slug }) => slug);
 	const bucketProviders = listFilesSdkBucketProviders().map(({ slug }) => slug);
 	assert.deepEqual(getFilesSdkProvider("fs").configFields, ["root"]);
+	assert.deepEqual(getFilesSdkProvider("azure").configFields, ["container"]);
 	assert.ok(supportedProviders.includes("fs"));
+	assert.ok(supportedProviders.includes("azure"));
 	assert.ok(supportedProviders.includes("box"));
 	assert.ok(supportedProviders.includes("akamai"));
 	assert.ok(supportedProviders.includes("backblaze-b2"));
@@ -244,6 +261,7 @@ test("Files SDK provider contracts reflect adapter-required configuration", () =
 	assert.ok(!supportedProviders.includes("bun-s3"));
 	assert.ok(!supportedProviders.includes("oracle-cloud"));
 	assert.ok(!bucketProviders.includes("fs"));
+	assert.ok(!bucketProviders.includes("azure"));
 });
 
 test("createFilesSpanExporter uses AgentPond runtime project and prefix", async () => {

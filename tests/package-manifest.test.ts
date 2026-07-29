@@ -115,12 +115,19 @@ test("publishable packages do not depend on private workspace packages", () => {
 });
 
 test("turnkey applications ship every supported Files SDK provider peer dependency", () => {
-	const supportedConfigFields = new Set(["bucket", "endpoint", "region"]);
+	const supportedConfigFields = new Set([
+		"bucket",
+		"container",
+		"endpoint",
+		"region",
+	]);
 	const providers = PROVIDER_NAMES.map((name) => getProvider(name)).filter(
 		(provider) =>
 			provider !== undefined &&
 			provider.slug !== "bun-s3" &&
-			provider.env.config?.includes("bucket") === true &&
+			provider.env.config?.some(
+				(field) => field === "bucket" || field === "container",
+			) === true &&
 			provider.env.config.every((field) => supportedConfigFields.has(field)),
 	);
 	const requiredPeerDependencies = [

@@ -2097,6 +2097,46 @@ test("CLI env init persists a Files SDK bucket provider", async () => {
 	}
 });
 
+test("CLI env init persists an Azure Blob Files SDK environment", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-azure-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		const output = await captureStdout(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"production",
+				"--provider",
+				"azure",
+				"--container",
+				"agentpond",
+				"--json",
+			]),
+		);
+		const result = JSON.parse(output) as {
+			container: string;
+			envFile: string;
+			provider: string;
+		};
+		const content = readFileSync(result.envFile, "utf8");
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.provider, "azure");
+		assert.equal(result.container, "agentpond");
+		assert.match(content, /FILES_SDK_PROVIDER=azure/);
+		assert.match(content, /AGENTPOND_FILES_CONTAINER=agentpond/);
+		assert.doesNotMatch(content, /AGENTPOND_FILES_BUCKET=/);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI env init persists a Files SDK filesystem provider", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-fs-"));
@@ -2262,6 +2302,21 @@ test("CLI env init validates Files SDK providers and required flags", async () =
 		);
 		assert.equal(process.exitCode, 2);
 		assert.match(missingRoot, /Missing --root/);
+
+		process.exitCode = undefined;
+		const missingContainer = await captureStderr(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"azure-env",
+				"--provider",
+				"azure",
+			]),
+		);
+		assert.equal(process.exitCode, 2);
+		assert.match(missingContainer, /Missing --container/);
 
 		process.exitCode = undefined;
 		const missingPeer = await captureStderr(() =>
@@ -3248,6 +3303,63 @@ test("CLI env init can select a Files SDK provider and bucket interactively", as
 			},
 			{ bucket: "traces", provider: "r2" },
 		);
+	} finally {
+		if (stdinDescriptor)
+			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+		if (stdoutDescriptor)
+			Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init prompts for Azure Blob containers", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-azure-tty-"));
+	const originalExitCode = process.exitCode;
+	const stdinDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdin,
+		"isTTY",
+	);
+	const stdoutDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdout,
+		"isTTY",
+	);
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		Object.defineProperty(process.stdin, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		Object.defineProperty(process.stdout, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "env", "init", "production", "--json"], {
+				inputBucket: async () => {
+					throw new Error("Azure must not prompt for a bucket");
+				},
+				inputContainer: async ({ default: defaultContainer, message }) => {
+					assert.equal(defaultContainer, "agentpond");
+					assert.equal(message, "Files SDK container");
+					return "traces";
+				},
+				selectFilesProvider: async ({ choices }) => {
+					assert.ok(choices.some((choice) => choice.value === "azure"));
+					return "azure";
+				},
+			}),
+		);
+		const result = JSON.parse(output) as {
+			container: string;
+			provider: string;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.provider, "azure");
+		assert.equal(result.container, "traces");
 	} finally {
 		if (stdinDescriptor)
 			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);

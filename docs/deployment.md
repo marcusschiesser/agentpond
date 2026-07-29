@@ -64,6 +64,23 @@ Set `FILES_SDK_PROVIDER=gcs` and `AGENTPOND_FILES_BUCKET=agentpond` on the
 container and use Application Default Credentials or a service account. There
 is no generic AgentPond Google Cloud Function handler.
 
+## Azure
+
+- Object store: Azure Blob Storage
+- Direct adapter: `azure` from `files-sdk/azure`
+- HTTP ingestion: the AgentPond Docker image
+- Container targets: Azure Container Apps, AKS, App Service, or another Node.js runtime
+
+```bash
+npx agentpond env init production --provider azure --container agentpond
+```
+
+Set `FILES_SDK_PROVIDER=azure` and
+`AGENTPOND_FILES_CONTAINER=agentpond`. Authenticate with
+`AZURE_STORAGE_CONNECTION_STRING` or with `AZURE_STORAGE_ACCOUNT_NAME` and
+`AZURE_STORAGE_ACCOUNT_KEY`. AgentPond stores the container name but never the
+Azure credential.
+
 ## Files SDK
 
 - Object store: a supported persistent Node-compatible Files SDK provider
@@ -77,10 +94,10 @@ npx agentpond env init production \
   --bucket agentpond
 ```
 
-Providers that declare an endpoint, region, or root receive matching typed
+Providers that declare a bucket, container, endpoint, region, or root receive matching typed
 flags. AgentPond discovers supported providers from Files SDK at runtime and
 excludes memory, Bun-only, and adapters requiring constructor configuration
-beyond bucket, endpoint, region, and root. CLI setup also excludes adapters
+beyond bucket, container, endpoint, region, and root. CLI setup also excludes adapters
 whose peer SDKs the executing AgentPond installation cannot resolve.
 
 ## Vercel
@@ -119,7 +136,8 @@ route. Review `storage.objects` RLS policies even when the bucket is private.
 ## Custom container infrastructure
 
 Run `ghcr.io/marcusschiesser/agentpond` on any container platform and configure
-`FILES_SDK_PROVIDER`, `AGENTPOND_FILES_BUCKET`, optional
+`FILES_SDK_PROVIDER`, `AGENTPOND_FILES_BUCKET` or
+`AGENTPOND_FILES_CONTAINER`, optional
 `FILES_SDK_ENDPOINT`/`FILES_SDK_REGION`, provider credentials, and
 Langfuse-compatible ingestion authentication directly on the deployment.
 
