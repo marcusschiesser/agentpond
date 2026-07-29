@@ -1,5 +1,16 @@
 # @agentpond/perf
 
+## 0.1.13
+
+### Patch Changes
+
+- Updated dependencies [bf77db3]
+  - @agentpond/core@0.7.0
+  - @agentpond/files-sdk@0.2.0
+  - @agentpond/duckdb@0.3.10
+  - @agentpond/fastify-ingest@0.3.9
+  - @agentpond/ingest@0.3.9
+
 ## 0.1.12
 
 ### Patch Changes

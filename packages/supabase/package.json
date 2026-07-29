@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/supabase",
-	"version": "0.6.1",
+	"version": "0.6.2",
 	"description": "Supabase Storage adapter and direct OpenTelemetry exporter for AgentPond",
 	"license": "MIT",
 	"type": "module",

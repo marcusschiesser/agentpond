@@ -1,5 +1,22 @@
 # agentpond
 
+## 0.9.0
+
+### Minor Changes
+
+- bf77db3: Add Azure Blob Storage support to Files SDK environments and the AgentPond CLI.
+
+### Patch Changes
+
+- Updated dependencies [bf77db3]
+  - @agentpond/core@0.7.0
+  - @agentpond/files-sdk@0.2.0
+  - @agentpond/duckdb@0.3.10
+  - @agentpond/fastify-ingest@0.3.9
+  - @agentpond/firebase@0.6.1
+  - @agentpond/supabase@0.6.2
+  - @agentpond/vercel@0.5.3
+
 ## 0.8.0
 
 ### Minor Changes

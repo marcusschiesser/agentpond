@@ -1,5 +1,12 @@
 # @agentpond/ingest
 
+## 0.3.9
+
+### Patch Changes
+
+- Updated dependencies [bf77db3]
+  - @agentpond/core@0.7.0
+
 ## 0.3.8
 
 ### Patch Changes

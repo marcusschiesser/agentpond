@@ -1,5 +1,12 @@
 # @agentpond/otel
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [bf77db3]
+  - @agentpond/core@0.7.0
+
 ## 0.1.4
 
 ### Patch Changes
