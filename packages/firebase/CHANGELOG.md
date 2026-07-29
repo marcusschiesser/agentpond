@@ -1,5 +1,14 @@
 # @agentpond/firebase
 
+## 0.6.1
+
+### Patch Changes
+
+- Updated dependencies [bf77db3]
+  - @agentpond/core@0.7.0
+  - @agentpond/ingest@0.3.9
+  - @agentpond/otel@0.1.5
+
 ## 0.6.0
 
 ### Minor Changes

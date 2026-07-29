@@ -1,5 +1,13 @@
 # @agentpond/supabase
 
+## 0.6.2
+
+### Patch Changes
+
+- Updated dependencies [bf77db3]
+  - @agentpond/core@0.7.0
+  - @agentpond/otel@0.1.5
+
 ## 0.6.1
 
 ### Patch Changes

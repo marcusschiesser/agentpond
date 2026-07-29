@@ -1,5 +1,11 @@
 # @agentpond/core
 
+## 0.7.0
+
+### Minor Changes
+
+- bf77db3: Add Azure Blob Storage support to Files SDK environments and the AgentPond CLI.
+
 ## 0.6.0
 
 ### Minor Changes
