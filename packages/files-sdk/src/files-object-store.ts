@@ -141,15 +141,18 @@ export class FilesObjectStore implements ObjectStore {
 	}
 
 	static fromAdapter(
-		adapter: Adapter,
+		adapter: Adapter | PromiseLike<Adapter>,
 		options: FilesObjectStoreOptions = {},
 	): FilesObjectStore {
 		return new FilesObjectStore(
-			new Files({
-				adapter,
-				retries: options.retries ?? DEFAULT_RETRIES,
-				timeout: options.timeout ?? DEFAULT_TIMEOUT_MS,
-			}),
+			Promise.resolve(adapter).then(
+				(resolvedAdapter) =>
+					new Files({
+						adapter: resolvedAdapter,
+						retries: options.retries ?? DEFAULT_RETRIES,
+						timeout: options.timeout ?? DEFAULT_TIMEOUT_MS,
+					}),
+			),
 			options,
 		);
 	}

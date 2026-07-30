@@ -1,9 +1,6 @@
 import { normalizePrefix, type ObjectStore } from "@agentpond/core";
 import { FilesObjectStore } from "@agentpond/files-sdk";
-import {
-	type FirebaseStorageAdapterOptions,
-	firebaseStorage,
-} from "files-sdk/firebase-storage";
+import type { FirebaseStorageAdapterOptions } from "files-sdk/firebase-storage";
 import {
 	type FirebaseStorage,
 	firebaseStorageForAppOptions,
@@ -60,11 +57,13 @@ function createFirebaseStorageStoreForBucket(
 	bucket: ReturnType<FirebaseStorage["bucket"]>,
 ): FilesObjectStore {
 	return FilesObjectStore.fromAdapter(
-		firebaseStorage({
-			app: bucket as unknown as NonNullable<
-				FirebaseStorageAdapterOptions["app"]
-			>,
-		}),
+		import("files-sdk/firebase-storage").then(({ firebaseStorage }) =>
+			firebaseStorage({
+				app: bucket as unknown as NonNullable<
+					FirebaseStorageAdapterOptions["app"]
+				>,
+			}),
+		),
 	);
 }
 

@@ -6,4 +6,4 @@
 "agentpond": patch
 ---
 
-Consolidate Vercel, Supabase, and Firebase storage on Files SDK adapters and add `FilesObjectStore.fromAdapter`.
+Consolidate Vercel, Supabase, and Firebase storage on Files SDK adapters, add lazy adapter support to `FilesObjectStore.fromAdapter`, and keep optional Firebase Admin loading lazy.

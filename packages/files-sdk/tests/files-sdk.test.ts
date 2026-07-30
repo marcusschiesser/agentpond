@@ -81,6 +81,14 @@ test("FilesObjectStore.fromAdapter applies retries and timeout defaults", async 
 	assert.deepEqual(await store.getJson("retry.json"), { ok: true });
 });
 
+test("FilesObjectStore.fromAdapter accepts a lazily loaded adapter", async () => {
+	const store = FilesObjectStore.fromAdapter(Promise.resolve(memory()));
+
+	await store.putJson("lazy.json", { ok: true });
+
+	assert.deepEqual(await store.getJson("lazy.json"), { ok: true });
+});
+
 test("FilesObjectStore readiness runs once for concurrent operations", async () => {
 	let readinessCalls = 0;
 	const store = FilesObjectStore.fromAdapter(memory(), {
