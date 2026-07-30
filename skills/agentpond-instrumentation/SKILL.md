@@ -23,9 +23,6 @@ Read only the references relevant to the detected provider:
 - Reuse the existing storage SDK and global OpenTelemetry provider. Do not register a competing provider.
 - Initialize tracing before importing or constructing instrumented AI clients.
 - Export directly to the selected object store. Do not add an ingestion HTTP route.
-- Establish the application's content-capture policy before enabling tracing.
-  Keep prompts, responses, tool arguments, tool results, exception messages, and
-  stack traces out of storage unless the repository explicitly opts in.
 - Keep tracing additive and follow the repository's conventions.
 - Never add credentials to source code or ask the user to paste secrets into chat.
 
@@ -43,9 +40,7 @@ Do not write files, install packages, link projects, or provision storage during
 
 1. Inspect platform configuration, AgentPond environments, package manifests, lockfiles, server entrypoints, and existing storage connections.
 2. Scan imports to identify AI providers, agent frameworks, existing OpenInference or OpenTelemetry setup, provider SDK initialization, and request, conversation, and tool boundaries.
-3. Review the selected storage path's privacy and credential requirements from
-   its reference. Identify the repository's existing telemetry/content-capture
-   policy; if none exists, propose metadata-only tracing.
+3. Review the selected storage path's privacy and credential requirements from its reference.
 4. Prefer a framework-native OpenInference integration when it captures model and tool spans. Add a provider instrumentor only for a documented gap.
 5. Return a concise proposal containing the target service, runtime, package manager, AI SDKs, packages, storage resources, existing initialization to reuse, files, and verification commands.
 
@@ -61,22 +56,15 @@ Stop after presenting the proposal and ask for explicit confirmation before inst
 6. Register OpenInference instrumentation before AI clients are created.
 7. Add manual CHAIN and TOOL spans only where auto-instrumentation leaves important behavior invisible.
 8. Preserve one `session.id` across all turns in the same conversation.
-9. Apply the storage-specific privacy, target, and flush requirements before
-   declaring completion. Do not set input/output payload attributes unless the
-   approved content policy permits them.
+9. Apply the storage-specific privacy, target, and flush requirements before declaring completion.
 
 ## Verification
 
 Treat the work as complete only when the project builds or typechecks, the trusted runtime loads without duplicate-provider errors, one real AI request exports OpenInference spans, and the trace appears after the sync workflow in the matching reference.
 
 Inspect the projected trace and its raw stored object. Confirm applicable model,
-CHAIN, TOOL, parent-child, token-usage, and session attributes. Under a
-metadata-only policy, require any emitted `input.value` and `output.value` to be
-`__REDACTED__`, require input/output attribute maps to be empty or absent, and
-search the raw object for the representative prompt, response, tool payload,
-and provider error text to prove they are not recoverable. If content capture
-is explicitly enabled, verify only the approved fields and still reject
-credentials or unrelated personal data.
+CHAIN, TOOL, input/output, parent-child, token-usage, and session attributes.
+Ensure captured data does not expose credentials or unnecessary personal data.
 
 For short-lived processes, force-flush before exit. Do not shut down a reusable
 module-level provider after every request.

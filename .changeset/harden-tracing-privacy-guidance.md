@@ -2,4 +2,4 @@
 "agentpond": patch
 ---
 
-Harden tracing guidance with explicit content-policy and raw-store privacy checks.
+Harden tracing guidance with exact versions and sensitive trace-data warnings.

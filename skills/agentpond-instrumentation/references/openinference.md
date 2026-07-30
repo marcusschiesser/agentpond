@@ -17,13 +17,6 @@ Set up the selected provider's AgentPond exporter and tracer provider, register 
 
 If the application already has a global provider, add the AgentPond exporter to it. Do not replace existing exporters unless the user explicitly asks.
 
-Before enabling instrumentation, identify and configure the application's
-content-capture policy. Default to metadata-only tracing when the repository has
-no explicit policy. Prompts, responses, tool arguments, tool results, exception
-messages, and stack traces may contain secrets or personal data and must not be
-stored without an explicit opt-in that follows the application's existing
-configuration and consent patterns.
-
 ## Manual spans
 
 Use manual spans for custom application steps that auto-instrumentation cannot see:
@@ -32,12 +25,8 @@ Use manual spans for custom application steps that auto-instrumentation cannot s
 - `TOOL`: each tool invocation, including input, output, and error status
 - `AGENT`: a meaningful agent execution boundary when the framework does not emit one
 
-Always set `openinference.span.kind`. Set `input.value`, `output.value`, their
-MIME types, or provider-specific message/tool payload attributes only when the
-approved content policy explicitly permits those fields. Metadata-only spans
-should retain operational attributes such as model, token usage, status code,
-duration, parent-child relationships, and session ID while omitting or
-redacting content and provider error details.
+Set `openinference.span.kind` and the applicable `input.value`, `output.value`,
+and MIME-type attributes. Avoid recording secrets or unnecessary personal data.
 
 ## Sessions
 
@@ -51,17 +40,6 @@ Set `session.id` on the outer CHAIN or AGENT span. Generate it once at the conve
 
 Run a real application request and verify the resulting trace rather than
 treating compilation alone as success. Confirm span kinds, parent-child
-relationships, token usage, tool execution, and session grouping.
-
-Read back the raw stored object as part of verification. Under a metadata-only
-policy:
-
-- `input.value` and `output.value` must be `__REDACTED__` when present.
-- `input.attributes` and `output.attributes` must be empty or absent.
-- Provider message, completion, tool payload, exception message, and stack
-  fields must be absent or redacted.
-- Searching the serialized object for the representative prompt, response,
-  tool payload, and provider error text must return no matches.
-
-Do not treat a redacted projected trace as sufficient evidence when the raw
-object still contains recoverable content.
+relationships, inputs/outputs, tool results, and session grouping. Read back the
+raw stored object and ensure it does not expose credentials or unnecessary
+personal data.
