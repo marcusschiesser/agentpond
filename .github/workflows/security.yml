@@ -66,8 +66,9 @@ jobs:
           fail-on-severity: high
           fail-on-scopes: runtime
           license-check: true
-          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, CC0-1.0, ISC
           allow-dependencies-licenses: >-
+            pkg:npm/@netlify/blobs@10.7.9,
             pkg:npm/jackspeak@3.4.3,
             pkg:npm/lodash.includes@4.3.0,
             pkg:npm/lodash.isinteger@4.0.4,
