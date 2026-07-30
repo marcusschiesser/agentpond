@@ -89,6 +89,42 @@ await sdk.shutdown();
 
 NodeSDK wraps `traceExporter` in a `BatchSpanProcessor`. AgentPond preserves each exporter invocation as one immutable object-store object, so a batch of spans is written as one object. If you configure span processors directly, prefer `BatchSpanProcessor` for production and force-flush at the application's real lifecycle boundary.
 
+## Lifecycle helpers
+
+Long-running Node.js processes can opt in to signal-safe shutdown:
+
+```ts
+import { registerAgentPondNodeShutdown } from "@agentpond/otel";
+
+sdk.start();
+const lifecycle = registerAgentPondNodeShutdown(sdk);
+```
+
+The first `SIGINT` or `SIGTERM` removes the helper's listeners, awaits
+`sdk.shutdown()`, and re-delivers the original signal so Node keeps its normal
+signal exit semantics. Register the helper once in the process that owns
+termination. Tests and hot-reload hosts can call `lifecycle.dispose()` to remove
+its listeners, or `await lifecycle.shutdown()` for an idempotent manual
+shutdown that does not terminate the process.
+
+Reusable serverless providers should stay alive between requests. Schedule a
+force-flush through the platform's request-lifetime primitive instead:
+
+```ts
+import {
+  flushAgentPondWithAfter,
+  flushAgentPondWithWaitUntil,
+} from "@agentpond/otel";
+
+flushAgentPondWithWaitUntil(spanProcessor, context.waitUntil.bind(context));
+flushAgentPondWithAfter(spanProcessor, after);
+```
+
+`flushAgentPondWithWaitUntil()` starts the flush immediately and passes its
+promise to a Cloudflare-style `waitUntil`. `flushAgentPondWithAfter()` passes a
+deferred task to a Vercel-style `after`. Both helpers flush without shutting
+down the reusable provider.
+
 ## Storage adapters
 
 Use the matching adapter for the deployment:
