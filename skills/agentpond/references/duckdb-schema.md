@@ -18,6 +18,14 @@ body_json TEXT
 event_json TEXT
 ```
 
+`events_raw.body_json` and `events_raw.event_json` can contain the complete raw
+telemetry payload. The projected `traces.input_json`, `traces.output_json`,
+`observations.input_json`, and `observations.output_json` fields can also contain
+prompts, responses, tool arguments, tool results, or provider error details
+when content capture is enabled. Treat these columns as sensitive: do not paste
+them into issues, review comments, logs, or reports. Select only the fields
+needed for the analysis and redact values before sharing query output.
+
 `traces` contains projected trace rows:
 
 ```text
