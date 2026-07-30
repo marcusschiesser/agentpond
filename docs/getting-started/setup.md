@@ -63,6 +63,8 @@ npx agentpond env init production --provider azure --container agentpond
 npx agentpond env init production --provider gcs --bucket agentpond
 npx agentpond env init production --provider r2 --bucket agentpond
 npx agentpond env init production --provider minio --bucket agentpond --endpoint https://minio.example.com
+npx agentpond env init production --provider netlify-blobs --store-name agentpond
+npx agentpond env init production --provider oracle-cloud --bucket agentpond --namespace <namespace> --region eu-frankfurt-1
 ```
 
 AgentPond stores the adapter configuration, `AGENTPOND_PROJECT_ID`, and optional
@@ -75,8 +77,15 @@ either `AZURE_STORAGE_CONNECTION_STRING` or
 `AZURE_STORAGE_ACCOUNT_NAME` with `AZURE_STORAGE_ACCOUNT_KEY` in both the
 application runtime and the shell running AgentPond.
 
+For Netlify Blobs, install `@netlify/blobs`; Netlify runtimes detect their site
+and token automatically, while external runtimes use `NETLIFY_SITE_ID` and
+`NETLIFY_API_TOKEN`. Oracle Cloud uses the AWS S3 client packages listed in the
+direct-export guide with `OCI_ACCESS_KEY_ID` and `OCI_SECRET_ACCESS_KEY` HMAC
+Customer Secret Keys.
+
 The application and CLI must use the same Files SDK provider configuration,
-project ID, prefix, and object-store credentials. After the application emits a
+project ID, prefix, and object-store credentials. The application installs the
+peer client for the adapter it imports directly. After the application emits a
 production trace:
 
 ```sh
@@ -87,7 +96,7 @@ npx agentpond traces list --limit 25
 
 See [Direct object-store export](../direct-object-store-export.md) for exporter
 and instrumentation examples, and the
-[Files SDK provider catalog](https://files-sdk.dev/docs/providers) for
+[Files SDK adapter catalog](https://files-sdk.dev/adapters) for
 available storage adapters.
 
 ## 2. HTTP ingestion with Docker
@@ -172,7 +181,7 @@ Deploy `ghcr.io/marcusschiesser/agentpond` to a container platform and
 configure:
 
 - `FILES_SDK_PROVIDER` and the selected adapter's bucket, container, endpoint,
-  region, or root
+  namespace, region, root, or store name
 - provider credentials with permission to write trace objects
 - `AGENTPOND_PROJECT_ID` and optional `AGENTPOND_PREFIX`
 - unique `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` values

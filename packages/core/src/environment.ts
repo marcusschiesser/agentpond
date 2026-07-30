@@ -14,8 +14,10 @@ export type FilesSdkEnvironmentConfig = {
 	bucket?: string;
 	container?: string;
 	endpoint?: string;
+	namespace?: string;
 	region?: string;
 	root?: string;
+	storeName?: string;
 };
 
 export type InitAgentPondEnvironmentOptions = {
@@ -197,11 +199,17 @@ function filesSdkEnvironmentLines(
 	const endpoint = filesSdk.endpoint
 		? environmentFileValue(filesSdk.endpoint, "endpoint")
 		: undefined;
+	const namespace = filesSdk.namespace
+		? environmentFileValue(filesSdk.namespace, "namespace")
+		: undefined;
 	const region = filesSdk.region
 		? environmentFileValue(filesSdk.region, "region")
 		: undefined;
 	const root = filesSdk.root
 		? environmentFileValue(filesSdk.root, "root")
+		: undefined;
+	const storeName = filesSdk.storeName
+		? environmentFileValue(filesSdk.storeName, "store name")
 		: undefined;
 	return [
 		"# Files SDK adapter used by the exporter and AgentPond CLI.",
@@ -224,6 +232,12 @@ function filesSdkEnvironmentLines(
 					`FILES_SDK_ENDPOINT=${endpoint}`,
 				]
 			: []),
+		...(namespace
+			? [
+					"# Namespace used by this Files SDK provider.",
+					`AGENTPOND_FILES_NAMESPACE=${namespace}`,
+				]
+			: []),
 		...(region
 			? [
 					"# Optional region required by this Files SDK provider.",
@@ -232,6 +246,12 @@ function filesSdkEnvironmentLines(
 			: []),
 		...(root
 			? ["# Root used by this Files SDK provider.", `FILES_SDK_ROOT=${root}`]
+			: []),
+		...(storeName
+			? [
+					"# Store name used by this Files SDK provider.",
+					`AGENTPOND_FILES_STORE_NAME=${storeName}`,
+				]
 			: []),
 		"# Authenticate with the provider-specific environment variables documented by Files SDK.",
 		"",

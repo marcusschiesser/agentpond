@@ -180,6 +180,53 @@ test("generated environment files persist Azure Blob containers", () => {
 	}
 });
 
+test("generated environment files persist Netlify and Oracle settings", () => {
+	const originalCwd = process.cwd();
+	const cwd = mkdtempSync(
+		join(tmpdir(), "agentpond-config-files-sdk-adapters-"),
+	);
+	try {
+		process.chdir(cwd);
+		const netlify = initAgentPondEnvironment("netlify", {
+			filesSdk: {
+				provider: "netlify-blobs",
+				storeName: "agentpond",
+			},
+		});
+		const oracle = initAgentPondEnvironment("oracle", {
+			filesSdk: {
+				provider: "oracle-cloud",
+				bucket: "agentpond",
+				namespace: "example-namespace",
+				region: "eu-madrid-1",
+			},
+		});
+
+		assert.match(
+			readFileSync(netlify.envFilePath, "utf8"),
+			/AGENTPOND_FILES_STORE_NAME=agentpond/,
+		);
+
+		const oracleContent = readFileSync(oracle.envFilePath, "utf8");
+		assert.match(oracleContent, /AGENTPOND_FILES_BUCKET=agentpond/);
+		assert.match(oracleContent, /AGENTPOND_FILES_NAMESPACE=example-namespace/);
+		assert.match(oracleContent, /FILES_SDK_REGION=eu-madrid-1/);
+
+		assert.throws(
+			() =>
+				initAgentPondEnvironment("invalid-files-namespace", {
+					filesSdk: {
+						provider: "oracle-cloud",
+						namespace: "namespace\nINJECTED=value",
+					},
+				}),
+			/namespace must be a single-line value/,
+		);
+	} finally {
+		process.chdir(originalCwd);
+	}
+});
+
 test("config uses only the shared AgentPond prefix", () => {
 	const originalCwd = process.cwd();
 	const originalEnv = saveEnv(CONFIG_ENV_KEYS);

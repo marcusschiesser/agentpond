@@ -2137,6 +2137,68 @@ test("CLI env init persists an Azure Blob Files SDK environment", async () => {
 	}
 });
 
+test("CLI env init persists Netlify and Oracle configuration", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-adapters-"));
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	const cases = [
+		{
+			name: "netlify",
+			args: ["--provider", "netlify-blobs", "--store-name", "agentpond"],
+			expected: [
+				"FILES_SDK_PROVIDER=netlify-blobs",
+				"AGENTPOND_FILES_STORE_NAME=agentpond",
+			],
+		},
+		{
+			name: "oracle",
+			args: [
+				"--provider",
+				"oracle-cloud",
+				"--bucket",
+				"agentpond",
+				"--namespace",
+				"example-namespace",
+				"--region",
+				"eu-madrid-1",
+			],
+			expected: [
+				"FILES_SDK_PROVIDER=oracle-cloud",
+				"AGENTPOND_FILES_BUCKET=agentpond",
+				"AGENTPOND_FILES_NAMESPACE=example-namespace",
+				"FILES_SDK_REGION=eu-madrid-1",
+			],
+		},
+	] as const;
+	try {
+		process.chdir(root);
+		for (const testCase of cases) {
+			const output = await captureStdout(() =>
+				main([
+					"node",
+					"agentpond",
+					"env",
+					"init",
+					testCase.name,
+					...testCase.args,
+					"--json",
+				]),
+			);
+			const result = JSON.parse(output) as { envFile: string };
+			const content = readFileSync(result.envFile, "utf8");
+
+			assert.equal(process.exitCode, undefined);
+			for (const expected of testCase.expected) {
+				assert.ok(content.includes(expected), `${testCase.name}: ${expected}`);
+			}
+		}
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI env init persists a Files SDK filesystem provider", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-env-init-fs-"));
@@ -2319,23 +2381,22 @@ test("CLI env init validates Files SDK providers and required flags", async () =
 		assert.match(missingContainer, /Missing --container/);
 
 		process.exitCode = undefined;
-		const missingPeer = await captureStderr(() =>
+		const unsupportedContext = await captureStderr(() =>
 			main([
 				"node",
 				"agentpond",
 				"env",
 				"init",
-				"box-env",
+				"convex-env",
 				"--provider",
-				"box",
+				"convex",
 			]),
 		);
 		assert.equal(process.exitCode, 2);
 		assert.match(
-			missingPeer,
-			/provider "box" is not available in this AgentPond CLI installation/,
+			unsupportedContext,
+			/provider "convex" requires unsupported configuration field "ctx \(Convex function context\)"/,
 		);
-		assert.match(missingPeer, /box-typescript-sdk-gen/);
 
 		process.exitCode = undefined;
 		const missingProvider = await captureStderr(() =>
@@ -2387,7 +2448,22 @@ test("CLI env init validates Files SDK providers and required flags", async () =
 		assert.match(bun, /not supported by AgentPond's Node\.js runtime/);
 
 		process.exitCode = undefined;
-		const unsupportedConfig = await captureStderr(() =>
+		const missingStoreName = await captureStderr(() =>
+			main([
+				"node",
+				"agentpond",
+				"env",
+				"init",
+				"netlify-env",
+				"--provider",
+				"netlify-blobs",
+			]),
+		);
+		assert.equal(process.exitCode, 2);
+		assert.match(missingStoreName, /Missing --store-name/);
+
+		process.exitCode = undefined;
+		const missingNamespace = await captureStderr(() =>
 			main([
 				"node",
 				"agentpond",
@@ -2398,17 +2474,12 @@ test("CLI env init validates Files SDK providers and required flags", async () =
 				"oracle-cloud",
 				"--bucket",
 				"agentpond",
-				"--endpoint",
-				"https://namespace.compat.objectstorage.example.com",
 				"--region",
 				"eu-madrid-1",
 			]),
 		);
 		assert.equal(process.exitCode, 2);
-		assert.match(
-			unsupportedConfig,
-			/provider "oracle-cloud" requires unsupported configuration field "namespace"/,
-		);
+		assert.match(missingNamespace, /Missing --namespace/);
 	} finally {
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
@@ -3282,10 +3353,15 @@ test("CLI env init can select a Files SDK provider and bucket interactively", as
 				selectFilesProvider: async ({ choices }) => {
 					assert.ok(choices.some((choice) => choice.value === "r2"));
 					assert.ok(choices.some((choice) => choice.value === "fs"));
+					assert.ok(choices.some((choice) => choice.value === "netlify-blobs"));
+					assert.ok(choices.some((choice) => choice.value === "oracle-cloud"));
 					assert.ok(choices.every((choice) => choice.value !== "box"));
+					assert.ok(choices.every((choice) => choice.value !== "ftp"));
+					assert.ok(choices.every((choice) => choice.value !== "sftp"));
+					assert.ok(choices.every((choice) => choice.value !== "webdav"));
 					assert.ok(choices.every((choice) => choice.value !== "bun-s3"));
+					assert.ok(choices.every((choice) => choice.value !== "convex"));
 					assert.ok(choices.every((choice) => choice.value !== "memory"));
-					assert.ok(choices.every((choice) => choice.value !== "oracle-cloud"));
 					return "r2";
 				},
 			}),
@@ -3360,6 +3436,68 @@ test("CLI env init prompts for Azure Blob containers", async () => {
 		assert.equal(process.exitCode, undefined);
 		assert.equal(result.provider, "azure");
 		assert.equal(result.container, "traces");
+	} finally {
+		if (stdinDescriptor)
+			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);
+		if (stdoutDescriptor)
+			Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor);
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI env init prompts for Netlify Blob store names", async () => {
+	const cwd = process.cwd();
+	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-netlify-tty-"));
+	const originalExitCode = process.exitCode;
+	const stdinDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdin,
+		"isTTY",
+	);
+	const stdoutDescriptor = Object.getOwnPropertyDescriptor(
+		process.stdout,
+		"isTTY",
+	);
+	process.exitCode = undefined;
+	try {
+		process.chdir(root);
+		Object.defineProperty(process.stdin, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		Object.defineProperty(process.stdout, "isTTY", {
+			configurable: true,
+			value: true,
+		});
+		const output = await captureStdout(() =>
+			main(
+				[
+					"node",
+					"agentpond",
+					"env",
+					"init",
+					"production",
+					"--provider",
+					"netlify-blobs",
+					"--json",
+				],
+				{
+					inputStoreName: async ({ default: defaultStoreName, message }) => {
+						assert.equal(defaultStoreName, "agentpond");
+						assert.equal(message, "Files SDK store name");
+						return "traces";
+					},
+				},
+			),
+		);
+		const result = JSON.parse(output) as {
+			provider: string;
+			storeName: string;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(result.provider, "netlify-blobs");
+		assert.equal(result.storeName, "traces");
 	} finally {
 		if (stdinDescriptor)
 			Object.defineProperty(process.stdin, "isTTY", stdinDescriptor);

@@ -39,6 +39,7 @@
 		"@duckdb/node-api": "^1.5.4-r.1",
 		"@google-cloud/storage": "^7.21.0",
 		"@inquirer/prompts": "8.5.2",
+		"@netlify/blobs": "^10.7.4",
 		"@supabase/storage-js": "2.110.6",
 		"commander": "15.0.0",
 		"disk": "^0.8.18",

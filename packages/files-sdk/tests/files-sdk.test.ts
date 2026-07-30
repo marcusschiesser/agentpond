@@ -214,6 +214,33 @@ test("FilesObjectStore parses runtime endpoint and region configuration", () => 
 	);
 });
 
+test("FilesObjectStore parses Netlify and Oracle configuration", () => {
+	assert.deepEqual(
+		filesSdkConfigFromRuntimeEnv({
+			FILES_SDK_PROVIDER: "netlify-blobs",
+			AGENTPOND_FILES_STORE_NAME: "agentpond",
+		}),
+		{
+			provider: "netlify-blobs",
+			storeName: "agentpond",
+		},
+	);
+	assert.deepEqual(
+		filesSdkConfigFromRuntimeEnv({
+			FILES_SDK_PROVIDER: "oracle-cloud",
+			AGENTPOND_FILES_BUCKET: "agentpond",
+			AGENTPOND_FILES_NAMESPACE: "example-namespace",
+			FILES_SDK_REGION: "eu-madrid-1",
+		}),
+		{
+			provider: "oracle-cloud",
+			bucket: "agentpond",
+			namespace: "example-namespace",
+			region: "eu-madrid-1",
+		},
+	);
+});
+
 test("Files SDK provider contracts reflect adapter-required configuration", () => {
 	assert.throws(
 		() =>
@@ -240,28 +267,52 @@ test("Files SDK provider contracts reflect adapter-required configuration", () =
 			filesSdkConfigFromRuntimeEnv({
 				FILES_SDK_PROVIDER: "oracle-cloud",
 				AGENTPOND_FILES_BUCKET: "agentpond",
-				FILES_SDK_ENDPOINT:
-					"https://namespace.compat.objectstorage.example.com",
 				FILES_SDK_REGION: "eu-madrid-1",
 			}),
-		/requires unsupported configuration field "namespace"/,
+		/requires AGENTPOND_FILES_NAMESPACE/,
 	);
 
 	const supportedProviders = listFilesSdkProviders().map(({ slug }) => slug);
 	const bucketProviders = listFilesSdkBucketProviders().map(({ slug }) => slug);
 	assert.deepEqual(getFilesSdkProvider("fs").configFields, ["root"]);
 	assert.deepEqual(getFilesSdkProvider("azure").configFields, ["container"]);
+	assert.deepEqual(getFilesSdkProvider("netlify-blobs").configFields, [
+		"storeName",
+	]);
+	assert.deepEqual(getFilesSdkProvider("oracle-cloud").configFields, [
+		"bucket",
+		"namespace",
+		"region",
+	]);
+	assert.throws(
+		() => getFilesSdkProvider("ftp"),
+		/requires unsupported configuration field "host"/,
+	);
+	assert.throws(
+		() => getFilesSdkProvider("sftp"),
+		/requires unsupported configuration field "host"/,
+	);
+	assert.throws(
+		() => getFilesSdkProvider("webdav"),
+		/requires unsupported configuration field "baseUrl"/,
+	);
 	assert.ok(supportedProviders.includes("fs"));
 	assert.ok(supportedProviders.includes("azure"));
 	assert.ok(supportedProviders.includes("box"));
 	assert.ok(supportedProviders.includes("akamai"));
 	assert.ok(supportedProviders.includes("backblaze-b2"));
 	assert.ok(supportedProviders.includes("ibm-cos"));
+	assert.ok(supportedProviders.includes("netlify-blobs"));
+	assert.ok(supportedProviders.includes("oracle-cloud"));
+	assert.ok(!supportedProviders.includes("ftp"));
+	assert.ok(!supportedProviders.includes("sftp"));
+	assert.ok(!supportedProviders.includes("webdav"));
 	assert.ok(!supportedProviders.includes("memory"));
 	assert.ok(!supportedProviders.includes("bun-s3"));
-	assert.ok(!supportedProviders.includes("oracle-cloud"));
+	assert.ok(!supportedProviders.includes("convex"));
 	assert.ok(!bucketProviders.includes("fs"));
 	assert.ok(!bucketProviders.includes("azure"));
+	assert.ok(bucketProviders.includes("oracle-cloud"));
 });
 
 test("createFilesSpanExporter uses AgentPond runtime project and prefix", async () => {

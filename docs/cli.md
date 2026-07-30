@@ -101,20 +101,21 @@ npx agentpond env init production --provider r2 --bucket agentpond
 npx agentpond env init production --provider azure --container agentpond
 npx agentpond env init local-minio --provider minio --bucket agentpond --endpoint http://localhost:9000
 npx agentpond env init local --provider fs --root /absolute/project/.agentpond/envs/local/objects
+npx agentpond env init netlify --provider netlify-blobs --store-name agentpond
+npx agentpond env init oracle --provider oracle-cloud --bucket agentpond --namespace <namespace> --region eu-frankfurt-1
 npx agentpond env use production
 npx agentpond env current
 npx agentpond env list
 ```
 
-Every manual environment is a Files SDK environment. AgentPond dynamically
-supports persistent Node-compatible providers whose required configuration uses
-bucket, container, endpoint, region, or root. Azure Blob Storage uses
-`--provider azure --container <name>` and reads credentials from the
-`AZURE_STORAGE_*` variables documented by Files SDK. AgentPond rejects memory, Bun-only, unknown,
-malformed, providers requiring other constructor configuration, and adapters
-whose peer SDKs the executing CLI cannot resolve. To make another compatible
-catalog adapter available, install `agentpond` locally alongside that adapter's
-peer SDK so `npx` uses the project-local CLI.
+Every manual environment is a Files SDK environment. AgentPond exposes
+`--bucket`, `--container`, `--endpoint`, `--namespace`, `--region`, `--root`,
+and `--store-name` for supported adapters. Azure Blob Storage uses
+`--container`; Netlify Blobs uses `--store-name`; Oracle Cloud uses `--bucket`,
+`--namespace`, and `--region`. Provider credentials remain in the variables
+documented by Files SDK. AgentPond rejects memory, Bun-only, unknown, malformed,
+and unsupported adapter configurations, as well as adapters whose peer SDKs the
+executing CLI cannot resolve.
 `AGENTPOND_PROJECT_ID` defaults to `default-project`; the optional
 `AGENTPOND_PREFIX` defaults to empty. Provider credentials remain ambient.
 `env init` refuses to replace an existing environment file; edit that file

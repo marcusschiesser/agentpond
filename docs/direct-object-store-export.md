@@ -12,7 +12,7 @@ peer SDKs, and your instrumentation packages:
 ```sh
 npm install @agentpond/files-sdk @agentpond/otel files-sdk @opentelemetry/sdk-node
 
-# R2, S3, and MinIO
+# R2, S3, MinIO, and Oracle Cloud
 npm install @aws-sdk/client-s3 @aws-sdk/s3-presigned-post @aws-sdk/s3-request-presigner
 
 # Google Cloud Storage
@@ -20,15 +20,16 @@ npm install @google-cloud/storage
 
 # Azure Blob Storage
 npm install @azure/storage-blob
+
+# Netlify Blobs
+npm install @netlify/blobs
 ```
 
 Install only the provider peer SDKs for the adapter used by the application.
-The [Files SDK provider catalog](https://files-sdk.dev/docs/providers) lists
+The [Files SDK adapter catalog](https://files-sdk.dev/adapters) lists
 the install command for every other provider. The dependency-free `fs` adapter
 is available for local development and trace verification. The executing
-AgentPond CLI must also be able to resolve the selected peer SDK. If the
-published CLI does not include it, install `agentpond` locally alongside the
-peer SDK so `npx` uses the project-local CLI.
+AgentPond CLI must also be able to resolve the selected peer SDK.
 
 ## Langfuse
 
@@ -129,6 +130,18 @@ AZURE_STORAGE_CONNECTION_STRING=<connection-string>
 Files SDK also supports Azure account-name and account-key credentials; keep
 those credential variables out of AgentPond environment files.
 
+Other adapter-specific configuration uses the same runtime variables written by
+`env init`:
+
+- Netlify Blobs uses `AGENTPOND_FILES_STORE_NAME`.
+- Oracle Cloud uses `AGENTPOND_FILES_BUCKET`,
+  `AGENTPOND_FILES_NAMESPACE`, and `FILES_SDK_REGION`.
+
+Netlify runtimes detect their site and token automatically; external runtimes
+use `NETLIFY_SITE_ID` and `NETLIFY_API_TOKEN`. Oracle Cloud uses
+`OCI_ACCESS_KEY_ID` and `OCI_SECRET_ACCESS_KEY` HMAC Customer Secret Keys.
+Credentials remain in the provider variables documented by Files SDK.
+
 Create Files SDK normally and pass the client to AgentPond:
 
 ```ts
@@ -162,13 +175,12 @@ npx agentpond env use production
 npx agentpond sync
 ```
 
-For providers that declare an endpoint or region, pass `--endpoint` or
-`--region` during initialization. Azure Blob Storage uses `--container`, and
-root-based providers use `--root`. AgentPond
-persists those values with the provider. Provider credentials remain ambient in both the
-application runtime and the shell invoking AgentPond; AgentPond does not write
-secrets into its environment file. `npx agentpond sync` always reads the
-selected persistent environment and takes no storage flags.
+AgentPond exposes `--bucket`, `--container`, `--endpoint`, `--namespace`,
+`--region`, `--root`, and `--store-name` when required by the selected adapter.
+It persists those values with the provider. Provider credentials remain ambient
+in both the application runtime and the shell invoking AgentPond; AgentPond does
+not write secrets into its environment file. `npx agentpond sync` always reads
+the selected persistent environment and takes no storage flags.
 
 ### Firebase
 
