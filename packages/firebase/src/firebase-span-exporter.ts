@@ -1,8 +1,12 @@
-import { AgentPondSpanExporter } from "@agentpond/otel";
+import {
+	type AgentPondContentPolicy,
+	AgentPondSpanExporter,
+} from "@agentpond/otel";
 import { configForInitializedFirebaseApp } from "./firebase-admin.js";
 import { FirebaseStorageObjectStore } from "./firebase-storage.js";
 
 export type FirebaseSpanExporterOptions = {
+	contentPolicy?: AgentPondContentPolicy;
 	prefix?: string;
 };
 
@@ -14,5 +18,9 @@ export function createFirebaseSpanExporter(
 		bucket: storageBucket,
 		prefix: options.prefix,
 	});
-	return new AgentPondSpanExporter({ store, projectId });
+	return new AgentPondSpanExporter({
+		contentPolicy: options.contentPolicy,
+		store,
+		projectId,
+	});
 }

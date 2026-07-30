@@ -1,5 +1,8 @@
 import { nonEmpty } from "@agentpond/core";
-import { AgentPondSpanExporter } from "@agentpond/otel";
+import {
+	type AgentPondContentPolicy,
+	AgentPondSpanExporter,
+} from "@agentpond/otel";
 import {
 	VercelBlobObjectStore,
 	vercelBlobConfigFromRuntimeEnv,
@@ -8,6 +11,7 @@ import {
 export const defaultVercelBlobPrefix = "agentpond";
 
 export type VercelSpanExporterOptions = {
+	contentPolicy?: AgentPondContentPolicy;
 	projectId?: string;
 	environment?: string;
 };
@@ -42,6 +46,7 @@ export function createVercelSpanExporter(
 	}
 
 	return new AgentPondSpanExporter({
+		contentPolicy: options.contentPolicy,
 		store: VercelBlobObjectStore.fromConfig(blobConfig),
 		projectId: vercelAgentPondProjectId(projectId, environment),
 		prefix: defaultVercelBlobPrefix,
