@@ -94,11 +94,13 @@ npx agentpond env init production \
   --bucket agentpond
 ```
 
-Providers that declare a bucket, container, endpoint, region, or root receive matching typed
-flags. AgentPond discovers supported providers from Files SDK at runtime and
-excludes memory, Bun-only, and adapters requiring constructor configuration
-beyond bucket, container, endpoint, region, and root. CLI setup also excludes adapters
-whose peer SDKs the executing AgentPond installation cannot resolve.
+Providers receive matching `--bucket`, `--container`, `--endpoint`,
+`--namespace`, `--region`, `--root`, or `--store-name` flags for their
+non-secret configuration. Azure Blob Storage uses a container, Netlify Blobs a
+store name, and Oracle Cloud a bucket, namespace, and region. AgentPond excludes
+memory, Bun-only, and adapters requiring unsupported constructor configuration.
+CLI setup also excludes adapters whose peer SDKs the executing installation
+cannot resolve.
 
 ## Vercel
 
@@ -136,9 +138,8 @@ route. Review `storage.objects` RLS policies even when the bucket is private.
 ## Custom container infrastructure
 
 Run `ghcr.io/marcusschiesser/agentpond` on any container platform and configure
-`FILES_SDK_PROVIDER`, `AGENTPOND_FILES_BUCKET` or
-`AGENTPOND_FILES_CONTAINER`, optional
-`FILES_SDK_ENDPOINT`/`FILES_SDK_REGION`, provider credentials, and
+`FILES_SDK_PROVIDER`, the selected adapter's bucket, container, endpoint,
+namespace, region, root, or store-name variable, provider credentials, and
 Langfuse-compatible ingestion authentication directly on the deployment.
 
 `npx agentpond dev` writes directly to its local DuckDB cache and has no object

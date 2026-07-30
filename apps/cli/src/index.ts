@@ -34,8 +34,10 @@ export type ProgramOptions = {
 	inputBucket?: InputPrompt;
 	inputContainer?: InputPrompt;
 	inputEndpoint?: InputPrompt;
+	inputNamespace?: InputPrompt;
 	inputRegion?: InputPrompt;
 	inputRoot?: InputPrompt;
+	inputStoreName?: InputPrompt;
 	installSkills?: SkillsInstaller;
 	selectEnvironment?: SelectEnvironmentPrompt;
 	selectFilesProvider?: SelectFilesProviderPrompt;
@@ -67,8 +69,10 @@ export function createProgram(options: ProgramOptions = {}): Command {
 		inputBucket: options.inputBucket,
 		inputContainer: options.inputContainer,
 		inputEndpoint: options.inputEndpoint,
+		inputNamespace: options.inputNamespace,
 		inputRegion: options.inputRegion,
 		inputRoot: options.inputRoot,
+		inputStoreName: options.inputStoreName,
 		selectEnvironment: options.selectEnvironment,
 		selectFilesProvider: options.selectFilesProvider,
 	});

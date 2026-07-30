@@ -51,10 +51,12 @@ type EnvOptions = GlobalOptions & {
 	container?: string;
 	endpoint?: string;
 	langfuse?: boolean;
+	namespace?: string;
 	otel?: boolean;
 	provider?: string;
 	region?: string;
 	root?: string;
+	storeName?: string;
 };
 
 export function registerEnvCommand(
@@ -65,8 +67,10 @@ export function registerEnvCommand(
 		inputBucket?: InputPrompt;
 		inputContainer?: InputPrompt;
 		inputEndpoint?: InputPrompt;
+		inputNamespace?: InputPrompt;
 		inputRegion?: InputPrompt;
 		inputRoot?: InputPrompt;
+		inputStoreName?: InputPrompt;
 	} = {},
 ): void {
 	const promptSelect = options.selectEnvironment ?? select<string>;
@@ -74,8 +78,10 @@ export function registerEnvCommand(
 	const promptBucket = options.inputBucket ?? input;
 	const promptContainer = options.inputContainer ?? input;
 	const promptEndpoint = options.inputEndpoint ?? input;
+	const promptNamespace = options.inputNamespace ?? input;
 	const promptRegion = options.inputRegion ?? input;
 	const promptRoot = options.inputRoot ?? input;
+	const promptStoreName = options.inputStoreName ?? input;
 	const env = addGlobalOptions(
 		program.command("env").description("select and manage environments"),
 	);
@@ -135,8 +141,10 @@ export function registerEnvCommand(
 		.option("--bucket <bucket>", "Files SDK bucket name")
 		.option("--container <container>", "Files SDK container name")
 		.option("--endpoint <endpoint>", "Files SDK provider endpoint")
+		.option("--namespace <namespace>", "Files SDK provider namespace")
 		.option("--region <region>", "Files SDK provider region")
 		.option("--root <root>", "Files SDK provider root")
+		.option("--store-name <storeName>", "Files SDK store name")
 		.action(
 			async (name: string, commandOptions: EnvOptions, command: Command) => {
 				if (name === "dev") {
@@ -164,8 +172,10 @@ export function registerEnvCommand(
 					promptBucket,
 					promptContainer,
 					promptEndpoint,
+					promptNamespace,
 					promptRegion,
 					promptRoot,
+					promptStoreName,
 				);
 				const environment = initAgentPondEnvironment(name, {
 					cwd: context.rootDir,
@@ -181,8 +191,10 @@ export function registerEnvCommand(
 						...(filesSdk.bucket ? { bucket: filesSdk.bucket } : {}),
 						...(filesSdk.container ? { container: filesSdk.container } : {}),
 						...(filesSdk.endpoint ? { endpoint: filesSdk.endpoint } : {}),
+						...(filesSdk.namespace ? { namespace: filesSdk.namespace } : {}),
 						...(filesSdk.region ? { region: filesSdk.region } : {}),
 						...(filesSdk.root ? { root: filesSdk.root } : {}),
+						...(filesSdk.storeName ? { storeName: filesSdk.storeName } : {}),
 					},
 					Boolean(globalOptions.json),
 				);
@@ -240,14 +252,23 @@ async function selectEnvironmentForCommand(
 async function filesSdkConfigForOptions(
 	options: Pick<
 		EnvOptions,
-		"bucket" | "container" | "endpoint" | "provider" | "region" | "root"
+		| "bucket"
+		| "container"
+		| "endpoint"
+		| "namespace"
+		| "provider"
+		| "region"
+		| "root"
+		| "storeName"
 	>,
 	promptProvider: SelectFilesProviderPrompt,
 	promptBucket: InputPrompt,
 	promptContainer: InputPrompt,
 	promptEndpoint: InputPrompt,
+	promptNamespace: InputPrompt,
 	promptRegion: InputPrompt,
 	promptRoot: InputPrompt,
+	promptStoreName: InputPrompt,
 ): Promise<FilesSdkEnvironmentConfig> {
 	const provider =
 		options.provider ?? (await promptForFilesProvider(promptProvider));
@@ -261,15 +282,19 @@ async function filesSdkConfigForOptions(
 		bucket: promptBucket,
 		container: promptContainer,
 		endpoint: promptEndpoint,
+		namespace: promptNamespace,
 		region: promptRegion,
 		root: promptRoot,
+		storeName: promptStoreName,
 	};
 	const configured = {
 		bucket: options.bucket,
 		container: options.container,
 		endpoint: options.endpoint,
+		namespace: options.namespace,
 		region: options.region,
 		root: options.root,
+		storeName: options.storeName,
 	};
 	const values: Partial<
 		Record<(typeof definition.configFields)[number], string>
@@ -278,8 +303,10 @@ async function filesSdkConfigForOptions(
 		"bucket",
 		"container",
 		"endpoint",
+		"namespace",
 		"region",
 		"root",
+		"storeName",
 	] as const satisfies readonly FilesSdkProviderConfigField[]) {
 		const value = configured[field]?.trim();
 		if (value) values[field] = value;
@@ -352,19 +379,38 @@ async function configuredProviderValue(
 ): Promise<string> {
 	const configured = value?.trim();
 	if (configured) return configured;
+	const flag = providerConfigFlag(field);
 	if (!process.stdin.isTTY || !process.stdout.isTTY) {
-		throw new CliError(`Missing --${field}`);
+		throw new CliError(`Missing ${flag}`);
 	}
 	const prompted = (
 		await promptInput({
-			message: `Files SDK ${field}`,
-			...(field === "bucket" || field === "container"
+			message: `Files SDK ${providerConfigLabel(field)}`,
+			...(field === "bucket" || field === "container" || field === "storeName"
 				? { default: "agentpond" }
 				: {}),
 		})
 	).trim();
-	if (!prompted) throw new CliError(`Missing --${field}`);
+	if (!prompted) throw new CliError(`Missing ${flag}`);
 	return prompted;
+}
+
+function providerConfigFlag(field: FilesSdkProviderConfigField): string {
+	switch (field) {
+		case "storeName":
+			return "--store-name";
+		default:
+			return `--${field}`;
+	}
+}
+
+function providerConfigLabel(field: FilesSdkProviderConfigField): string {
+	switch (field) {
+		case "storeName":
+			return "store name";
+		default:
+			return field;
+	}
 }
 
 async function promptForEnvironmentName(

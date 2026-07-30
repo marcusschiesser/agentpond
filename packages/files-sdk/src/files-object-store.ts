@@ -23,8 +23,10 @@ const SUPPORTED_PROVIDER_CONFIG_FIELDS = [
 	"bucket",
 	"container",
 	"endpoint",
+	"namespace",
 	"region",
 	"root",
+	"storeName",
 ] as const;
 const SUPPORTED_PROVIDER_CONFIG_FIELD_SET = new Set<string>(
 	SUPPORTED_PROVIDER_CONFIG_FIELDS,
@@ -33,6 +35,7 @@ const PROVIDER_CONFIG_FIELD_OVERRIDES: Record<string, readonly string[]> = {
 	akamai: ["bucket", "region"],
 	"backblaze-b2": ["bucket", "region"],
 	"ibm-cos": ["bucket", "region"],
+	"netlify-blobs": ["storeName"],
 	"oracle-cloud": ["bucket", "namespace", "region"],
 };
 
@@ -43,8 +46,10 @@ export type FilesSdkObjectStoreConfig = {
 	bucket?: string;
 	container?: string;
 	endpoint?: string;
+	namespace?: string;
 	region?: string;
 	root?: string;
+	storeName?: string;
 };
 
 type ProviderHelp = {
@@ -220,15 +225,19 @@ function filesSdkConfigFromValues(
 	const bucket = nonEmpty(env("AGENTPOND_FILES_BUCKET"));
 	const container = nonEmpty(env("AGENTPOND_FILES_CONTAINER"));
 	const endpoint = nonEmpty(env("FILES_SDK_ENDPOINT"));
+	const namespace = nonEmpty(env("AGENTPOND_FILES_NAMESPACE"));
 	const region = nonEmpty(env("FILES_SDK_REGION"));
 	const root = nonEmpty(env("FILES_SDK_ROOT"));
+	const storeName = nonEmpty(env("AGENTPOND_FILES_STORE_NAME"));
 	const config = {
 		provider,
 		...(bucket ? { bucket } : {}),
 		...(container ? { container } : {}),
 		...(endpoint ? { endpoint } : {}),
+		...(namespace ? { namespace } : {}),
 		...(region ? { region } : {}),
 		...(root ? { root } : {}),
+		...(storeName ? { storeName } : {}),
 	};
 	validateFilesSdkConfig(config);
 	return config;
@@ -295,10 +304,14 @@ function providerConfigEnvironmentVariable(
 			return "AGENTPOND_FILES_CONTAINER";
 		case "endpoint":
 			return "FILES_SDK_ENDPOINT";
+		case "namespace":
+			return "AGENTPOND_FILES_NAMESPACE";
 		case "region":
 			return "FILES_SDK_REGION";
 		case "root":
 			return "FILES_SDK_ROOT";
+		case "storeName":
+			return "AGENTPOND_FILES_STORE_NAME";
 	}
 }
 
@@ -312,6 +325,10 @@ async function loadConfiguredFiles(
 		...(config.endpoint ? { endpoint: config.endpoint } : {}),
 		...(config.region ? { region: config.region } : {}),
 		...(config.root ? { root: config.root } : {}),
+		...(config.storeName ? { storeName: config.storeName } : {}),
+		...(config.provider === "oracle-cloud"
+			? { configJson: { namespace: config.namespace } }
+			: {}),
 		retries: DEFAULT_RETRIES,
 		timeout: DEFAULT_TIMEOUT_MS,
 	});

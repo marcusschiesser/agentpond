@@ -119,22 +119,26 @@ test("turnkey applications ship every supported Files SDK provider peer dependen
 		"bucket",
 		"container",
 		"endpoint",
+		"namespace",
 		"region",
 	]);
 	const providers = PROVIDER_NAMES.map((name) => getProvider(name)).filter(
 		(provider) =>
 			provider !== undefined &&
-			provider.slug !== "bun-s3" &&
-			provider.env.config?.some(
-				(field) => field === "bucket" || field === "container",
-			) === true &&
-			provider.env.config.every((field) => supportedConfigFields.has(field)),
+			(provider.slug === "netlify-blobs" ||
+				(provider.slug !== "bun-s3" &&
+					provider.env.config?.some(
+						(field) => field === "bucket" || field === "container",
+					) === true &&
+					provider.env.config.every((field) =>
+						supportedConfigFields.has(field),
+					))),
 	);
 	const requiredPeerDependencies = [
 		...new Set(providers.flatMap((provider) => provider.peerDeps)),
 	].sort();
 
-	assert.ok(providers.length > 0, "Files SDK must expose bucket providers");
+	assert.ok(providers.length > 0, "Files SDK must expose supported providers");
 	for (const packagePath of ["apps/cli", "apps/ingest"]) {
 		const manifest = readManifest(packagePath);
 		const missingDependencies = requiredPeerDependencies.filter(
@@ -143,7 +147,7 @@ test("turnkey applications ship every supported Files SDK provider peer dependen
 		assert.deepEqual(
 			missingDependencies,
 			[],
-			`${manifest.name} must ship every Files SDK bucket provider peer dependency`,
+			`${manifest.name} must ship every supported Files SDK provider peer dependency`,
 		);
 		assert.ok(
 			manifest.dependencies?.["files-sdk"],

@@ -41,19 +41,22 @@ npx agentpond sync
 
 The environment file stores `FILES_SDK_PROVIDER` plus the selected adapter's
 typed configuration: `AGENTPOND_FILES_BUCKET`,
-`AGENTPOND_FILES_CONTAINER`, `FILES_SDK_ENDPOINT`, `FILES_SDK_REGION`, or
-`FILES_SDK_ROOT`. It does not store credentials. Azure Blob environments are
-configured with the `azure` provider and `--container <container>`; they use
-Files SDK's `AZURE_STORAGE_*` credential variables. Run
-AgentPond with the selected provider's credential variables available in the
-process environment. Keep
+`AGENTPOND_FILES_CONTAINER`, `AGENTPOND_FILES_NAMESPACE`,
+`AGENTPOND_FILES_STORE_NAME`, `FILES_SDK_ENDPOINT`, `FILES_SDK_REGION`, or
+`FILES_SDK_ROOT`. `env init` exposes the matching `--bucket`, `--container`,
+`--endpoint`, `--namespace`, `--region`, `--root`, and `--store-name` flags. It
+does not store credentials. Run AgentPond with the selected provider's
+credential variables available in the process environment. Keep
 `AGENTPOND_PROJECT_ID` and `AGENTPOND_PREFIX` identical to the application
 runtime; `default-project` and an empty prefix are the defaults. Memory,
-Bun-only, unknown, malformed, and providers requiring constructor
-configuration beyond bucket, container, endpoint, region, and root are rejected. The CLI
-also rejects adapters whose peer SDKs it cannot resolve. To use another
-compatible catalog adapter, install `agentpond` locally alongside that
-adapter's peer SDK so `npx` uses the project-local CLI.
+Bun-only, unknown, malformed, and unsupported adapter configurations are
+rejected. The CLI also rejects adapters whose peer SDKs it cannot resolve.
+
+Azure Blob uses Files SDK's `AZURE_STORAGE_*` variables. Netlify runtimes detect
+their site and token automatically; external runtimes use `NETLIFY_SITE_ID` and
+`NETLIFY_API_TOKEN`. Oracle Cloud uses `OCI_ACCESS_KEY_ID` and
+`OCI_SECRET_ACCESS_KEY` HMAC Customer Secret Keys.
+
 `env init` refuses to replace an existing environment file; edit that file
 deliberately or initialize a different name.
 
