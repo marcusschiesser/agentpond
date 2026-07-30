@@ -1,12 +1,7 @@
-import {
-	type IngestionSink,
-	nonEmpty,
-	normalizePrefix,
-	type ObjectStore,
-	type ObjectStoreIngestionSinkOptions,
-	sinkFromStore,
-} from "@agentpond/core";
+import { nonEmpty, type ObjectStore } from "@agentpond/core";
+import { FilesObjectStore } from "@agentpond/files-sdk";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { supabase } from "files-sdk/supabase";
 import type {
 	SupabaseCliProjectConfig,
 	SupabaseProcessRunner,
@@ -50,41 +45,11 @@ type StorageError = {
 	statusCode?: number | string;
 };
 
-type StorageResult<T> = Promise<{
-	data: T | null;
-	error: StorageError | null;
-}>;
-
-type StorageEntry = {
-	id?: string | null;
-	metadata?: unknown;
-	name: string;
-};
-
-type StorageBucketApi = {
-	upload(
-		path: string,
-		body: string,
-		options: {
-			cacheControl: string;
-			contentType: string;
-			upsert: boolean;
-		},
-	): StorageResult<unknown>;
-	download(path: string): StorageResult<Blob>;
-	list(
-		path: string,
-		options: {
-			limit: number;
-			offset: number;
-			sortBy: { column: "name"; order: "asc" };
-		},
-	): StorageResult<StorageEntry[]>;
-};
-
 type SupabaseStorageApi = {
-	getBucket(id: string): StorageResult<{ public: boolean }>;
-	from(id: string): StorageBucketApi;
+	getBucket(id: string): Promise<{
+		data: { public: boolean } | null;
+		error: StorageError | null;
+	}>;
 };
 
 export function supabaseStorageConfigFromEnv(
@@ -157,185 +122,88 @@ export function validateSupabaseSecretKey(secretKey: string): string {
 	throw invalidSupabaseCredentialError();
 }
 
-export class SupabaseStorageObjectStore implements ObjectStore {
-	private bucketValidation?: Promise<void>;
+export function createSupabaseStorageStoreFromConfig(
+	options: SupabaseStorageObjectStoreConfig,
+): FilesObjectStore {
+	const url = validatedSupabaseUrl(options.url);
+	const secretKey = validateSupabaseSecretKey(options.secretKey);
+	const client = createClient(url, secretKey, {
+		auth: {
+			autoRefreshToken: false,
+			detectSessionInUrl: false,
+			persistSession: false,
+		},
+	});
+	return createSupabaseStorageStoreFromClient(client, options);
+}
 
-	static fromConfig(
-		options: SupabaseStorageObjectStoreConfig,
-	): SupabaseStorageObjectStore {
-		const url = validatedSupabaseUrl(options.url);
-		const secretKey = validateSupabaseSecretKey(options.secretKey);
-		const client = createClient(url, secretKey, {
-			auth: {
-				autoRefreshToken: false,
-				detectSessionInUrl: false,
-				persistSession: false,
-			},
-		});
-		return SupabaseStorageObjectStore.fromClient(client, options);
-	}
+export function createSupabaseStorageStoreFromRuntimeEnv(
+	options: SupabaseStorageRuntimeOptions = {},
+): FilesObjectStore {
+	return createSupabaseStorageStoreFromConfig(
+		supabaseStorageConfigFromEnv(
+			options.env ?? supabaseRuntimeEnvironment(),
+			options,
+		),
+	);
+}
 
-	static fromRuntimeEnv(
-		options: SupabaseStorageRuntimeOptions = {},
-	): SupabaseStorageObjectStore {
-		return SupabaseStorageObjectStore.fromConfig(
-			supabaseStorageConfigFromEnv(
-				options.env ?? supabaseRuntimeEnvironment(),
-				options,
-			),
+export function createSupabaseStorageStoreFromClient(
+	client: SupabaseClient,
+	options: SupabaseStorageClientOptions = {},
+): FilesObjectStore {
+	const key = (client as unknown as { supabaseKey?: unknown }).supabaseKey;
+	if (typeof key !== "string") {
+		throw new Error(
+			"Supabase storage requires a client initialized with a Supabase secret or service-role key",
 		);
 	}
+	validateSupabaseSecretKey(key);
+	const bucket = options.bucket ?? defaultSupabaseStorageBucket;
+	return FilesObjectStore.fromAdapter(
+		supabase({
+			bucket,
+			client,
+		}),
+		{
+			beforeFirstOperation: () =>
+				validatePrivateBucket(
+					client.storage as unknown as SupabaseStorageApi,
+					bucket,
+				),
+		},
+	);
+}
 
-	static fromClient(
-		client: SupabaseClient,
-		options: SupabaseStorageClientOptions = {},
-	): SupabaseStorageObjectStore {
-		const key = (client as unknown as { supabaseKey?: unknown }).supabaseKey;
-		if (typeof key !== "string") {
-			throw new Error(
-				"SupabaseStorageObjectStore.fromClient() requires a client initialized with a Supabase secret or service-role key",
-			);
+export async function createSupabaseStorageStoreFromCliProject(
+	project: SupabaseCliProjectConfig,
+	dependencies: {
+		run?: SupabaseProcessRunner;
+		createStore?: (config: SupabaseStorageObjectStoreConfig) => ObjectStore;
+	} = {},
+): Promise<ObjectStore> {
+	const secretKey = await supabaseSecretKeyForProject(project, dependencies);
+	return (dependencies.createStore ?? createSupabaseStorageStoreFromConfig)({
+		url: supabaseHostedUrl(project.projectRef),
+		secretKey,
+	});
+}
+
+async function validatePrivateBucket(
+	storage: SupabaseStorageApi,
+	bucket: string,
+): Promise<void> {
+	const { data, error } = await storage.getBucket(bucket);
+	if (error || !data) {
+		if (isMissingStorageResource(error)) {
+			throw new Error(`Supabase Storage bucket "${bucket}" does not exist`);
 		}
-		validateSupabaseSecretKey(key);
-		return new SupabaseStorageObjectStore(
-			{
-				bucket: options.bucket ?? defaultSupabaseStorageBucket,
-				prefix: options.prefix ?? defaultSupabaseStoragePrefix,
-			},
-			client.storage as unknown as SupabaseStorageApi,
+		throw new Error(
+			`Could not inspect Supabase Storage bucket "${bucket}": ${storageErrorDetail(error)}`,
 		);
 	}
-
-	static async fromCliProject(
-		project: SupabaseCliProjectConfig,
-		dependencies: { run?: SupabaseProcessRunner } = {},
-	): Promise<SupabaseStorageObjectStore> {
-		const secretKey = await supabaseSecretKeyForProject(project, dependencies);
-		return SupabaseStorageObjectStore.fromConfig({
-			url: supabaseHostedUrl(project.projectRef),
-			secretKey,
-		});
-	}
-
-	private constructor(
-		readonly config: SupabaseStorageConfig,
-		private readonly storage: SupabaseStorageApi,
-	) {}
-
-	toSink(options: ObjectStoreIngestionSinkOptions = {}): IngestionSink {
-		return sinkFromStore(this, {
-			prefix: normalizePrefix(options.prefix ?? this.config.prefix),
-		});
-	}
-
-	async putJson(key: string, value: unknown): Promise<void> {
-		await this.ensurePrivateBucket();
-		const { error } = await this.storage
-			.from(this.config.bucket)
-			.upload(key, JSON.stringify(value), {
-				cacheControl: "0",
-				contentType: "application/json",
-				upsert: true,
-			});
-		if (error) {
-			throw new Error(
-				`Could not upload Supabase Storage object ${key}: ${storageErrorDetail(error)}`,
-			);
-		}
-	}
-
-	async getJson<T>(key: string): Promise<T> {
-		await this.ensurePrivateBucket();
-		const { data, error } = await this.storage
-			.from(this.config.bucket)
-			.download(key);
-		if (error || !data) {
-			throw new Error(
-				`Could not download Supabase Storage object ${key}: ${storageErrorDetail(error)}`,
-			);
-		}
-		const body = await data.text();
-		if (!body) throw new Error(`Supabase Storage object is empty: ${key}`);
-		try {
-			return JSON.parse(body) as T;
-		} catch {
-			throw new Error(`Supabase Storage object is not valid JSON: ${key}`);
-		}
-	}
-
-	async listKeys(prefix: string): Promise<string[]> {
-		await this.ensurePrivateBucket();
-		const initialDirectory = listingDirectoryForPrefix(prefix);
-		const keys = new Set<string>();
-		await this.listDirectory(initialDirectory, prefix, keys, new Set());
-		return [...keys].sort();
-	}
-
-	private async ensurePrivateBucket(): Promise<void> {
-		this.bucketValidation ??= this.validatePrivateBucket();
-		await this.bucketValidation;
-	}
-
-	private async validatePrivateBucket(): Promise<void> {
-		const { data, error } = await this.storage.getBucket(this.config.bucket);
-		if (error || !data) {
-			if (isMissingStorageResource(error)) {
-				throw new Error(
-					`Supabase Storage bucket "${this.config.bucket}" does not exist`,
-				);
-			}
-			throw new Error(
-				`Could not inspect Supabase Storage bucket "${this.config.bucket}": ${storageErrorDetail(error)}`,
-			);
-		}
-		if (data.public) {
-			throw new Error(
-				`Supabase Storage bucket "${this.config.bucket}" must be private`,
-			);
-		}
-	}
-
-	private async listDirectory(
-		directory: string,
-		prefix: string,
-		keys: Set<string>,
-		visited: Set<string>,
-	): Promise<void> {
-		if (visited.has(directory)) return;
-		visited.add(directory);
-		const entries: StorageEntry[] = [];
-		const limit = 100;
-		let offset = 0;
-		while (true) {
-			const { data, error } = await this.storage
-				.from(this.config.bucket)
-				.list(directory, {
-					limit,
-					offset,
-					sortBy: { column: "name", order: "asc" },
-				});
-			if (error || !data) {
-				throw new Error(
-					`Could not list Supabase Storage path ${directory || "/"}: ${storageErrorDetail(error)}`,
-				);
-			}
-			entries.push(...data);
-			if (data.length < limit) break;
-			offset += data.length;
-		}
-
-		for (const entry of entries.sort((left, right) =>
-			left.name.localeCompare(right.name),
-		)) {
-			const key = directory ? `${directory}/${entry.name}` : entry.name;
-			if (isStorageDirectory(entry)) {
-				if (key.startsWith(prefix) || prefix.startsWith(`${key}/`)) {
-					await this.listDirectory(key, prefix, keys, visited);
-				}
-				continue;
-			}
-			if (key.startsWith(prefix)) keys.add(key);
-		}
+	if (data.public) {
+		throw new Error(`Supabase Storage bucket "${bucket}" must be private`);
 	}
 }
 
@@ -394,22 +262,6 @@ function invalidSupabaseCredentialError(): Error {
 	return new Error(
 		"Supabase storage requires a secret key or legacy service-role key; publishable and anonymous keys are not allowed",
 	);
-}
-
-function listingDirectoryForPrefix(prefix: string): string {
-	let start = 0;
-	while (prefix[start] === "/") start += 1;
-	let end = prefix.length;
-	while (end > start && prefix[end - 1] === "/") end -= 1;
-	const trimmed = prefix.slice(start, end);
-	if (!trimmed) return "";
-	if (prefix.endsWith("/")) return trimmed;
-	const separator = trimmed.lastIndexOf("/");
-	return separator === -1 ? "" : trimmed.slice(0, separator);
-}
-
-function isStorageDirectory(entry: StorageEntry): boolean {
-	return entry.id == null && entry.metadata == null;
 }
 
 function isMissingStorageResource(error: StorageError | null): boolean {

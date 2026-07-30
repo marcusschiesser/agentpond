@@ -7,7 +7,7 @@ import {
 	parseEnvFile,
 	sinkFromStore,
 } from "@agentpond/core";
-import type { Files } from "files-sdk";
+import { type Adapter, Files } from "files-sdk";
 import { loadFiles } from "files-sdk/loader";
 import {
 	getProvider,
@@ -40,6 +40,12 @@ const PROVIDER_CONFIG_FIELD_OVERRIDES: Record<string, readonly string[]> = {
 };
 
 export type FilesClient = Pick<Files, "download" | "listAll" | "upload">;
+
+export type FilesObjectStoreOptions = {
+	beforeFirstOperation?: () => void | Promise<void>;
+	retries?: number;
+	timeout?: number;
+};
 
 export type FilesSdkObjectStoreConfig = {
 	provider: string;
@@ -134,7 +140,26 @@ export class FilesObjectStore implements ObjectStore {
 		return store;
 	}
 
-	constructor(files: FilesClient | PromiseLike<FilesClient>) {
+	static fromAdapter(
+		adapter: Adapter,
+		options: FilesObjectStoreOptions = {},
+	): FilesObjectStore {
+		return new FilesObjectStore(
+			new Files({
+				adapter,
+				retries: options.retries ?? DEFAULT_RETRIES,
+				timeout: options.timeout ?? DEFAULT_TIMEOUT_MS,
+			}),
+			options,
+		);
+	}
+
+	private readiness?: Promise<void>;
+
+	constructor(
+		files: FilesClient | PromiseLike<FilesClient>,
+		private readonly options: FilesObjectStoreOptions = {},
+	) {
 		this.files = Promise.resolve(files);
 	}
 
@@ -148,6 +173,7 @@ export class FilesObjectStore implements ObjectStore {
 			throw new Error(`Value for object "${key}" is not JSON serializable`);
 		}
 		try {
+			await this.ready();
 			const files = await this.files;
 			await files.upload(key, json, { contentType: "application/json" });
 		} catch (error) {
@@ -158,6 +184,7 @@ export class FilesObjectStore implements ObjectStore {
 	async getJson<T>(key: string): Promise<T> {
 		let content: string;
 		try {
+			await this.ready();
 			const files = await this.files;
 			content = await (await files.download(key)).text();
 		} catch (error) {
@@ -175,6 +202,7 @@ export class FilesObjectStore implements ObjectStore {
 	async listKeys(prefix: string): Promise<string[]> {
 		const keys: string[] = [];
 		try {
+			await this.ready();
 			const files = await this.files;
 			for await (const file of files.listAll({ prefix })) {
 				keys.push(file.key);
@@ -183,6 +211,13 @@ export class FilesObjectStore implements ObjectStore {
 			throw this.withProviderHelp(error);
 		}
 		return keys.sort();
+	}
+
+	private ready(): Promise<void> {
+		this.readiness ??= Promise.resolve().then(() =>
+			this.options.beforeFirstOperation?.(),
+		);
+		return this.readiness;
 	}
 
 	private withProviderHelp(error: unknown): unknown {

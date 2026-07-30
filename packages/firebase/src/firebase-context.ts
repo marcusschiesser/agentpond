@@ -5,6 +5,7 @@ import {
 	type AgentPondStorageEnvironmentContext,
 	configFromEnv,
 	normalizePrefix,
+	type ObjectStore,
 } from "@agentpond/core";
 import {
 	type FirebaseCliProjectConfig,
@@ -14,13 +15,19 @@ import {
 	selectFirebaseEnvironment,
 } from "./firebase-env.js";
 import {
+	createFirebaseStorageStoreFromCliProject,
 	defaultFirebaseStoragePrefix,
-	FirebaseStorageObjectStore,
 } from "./firebase-storage.js";
 
 export type FirebaseEnvironmentContextOptions = {
 	cwd?: string;
 	envName?: string;
+};
+
+type FirebaseEnvironmentContextDependencies = {
+	createStore?: (
+		project: FirebaseCliProjectConfig,
+	) => ObjectStore | Promise<ObjectStore>;
 };
 
 export const FIREBASE_INSTRUMENTATION_PROMPT = `Use $agentpond-instrumentation to inspect this Firebase project and add
@@ -37,6 +44,7 @@ Build the application, exercise one real AI request, then use $agentpond to:
 
 export function firebaseEnvironmentContextFromCwdIfAvailable(
 	options: FirebaseEnvironmentContextOptions = {},
+	dependencies: FirebaseEnvironmentContextDependencies = {},
 ): AgentPondEnvironmentContext | undefined {
 	const project = firebaseCliProjectConfigFromCwdIfAvailable(
 		options.cwd,
@@ -44,11 +52,12 @@ export function firebaseEnvironmentContextFromCwdIfAvailable(
 		options.envName,
 	);
 	if (!project) return undefined;
-	return firebaseEnvironmentContext(project);
+	return firebaseEnvironmentContext(project, dependencies);
 }
 
 function firebaseEnvironmentContext(
 	project: FirebaseCliProjectConfig,
+	dependencies: FirebaseEnvironmentContextDependencies = {},
 ): AgentPondStorageEnvironmentContext {
 	const config = configFromEnv({
 		cwd: project.root,
@@ -61,7 +70,9 @@ function firebaseEnvironmentContext(
 		config,
 		async resolveStorage() {
 			return {
-				store: await FirebaseStorageObjectStore.fromCliProject(project),
+				store: await (
+					dependencies.createStore ?? createFirebaseStorageStoreFromCliProject
+				)(project),
 				projectId: project.projectId,
 				prefix: normalizePrefix(defaultFirebaseStoragePrefix),
 			};

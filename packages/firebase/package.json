@@ -24,17 +24,19 @@
 	},
 	"dependencies": {
 		"@agentpond/core": "workspace:*",
+		"@agentpond/files-sdk": "workspace:*",
 		"@agentpond/ingest": "workspace:*",
-		"@agentpond/otel": "workspace:*"
+		"@agentpond/otel": "workspace:*",
+		"files-sdk": "2.2.2"
 	},
 	"devDependencies": {
 		"@agentpond/duckdb": "workspace:*",
 		"@opentelemetry/api": "^1.9.0",
 		"@opentelemetry/sdk-trace-base": "^2.9.0",
-		"firebase-admin": "14.0.0"
+		"firebase-admin": "14.2.0"
 	},
 	"peerDependencies": {
-		"firebase-admin": ">=13.6.0"
+		"firebase-admin": "^14.1.0"
 	},
 	"peerDependenciesMeta": {
 		"firebase-admin": {

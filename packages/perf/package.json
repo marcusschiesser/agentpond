@@ -18,7 +18,7 @@
 		"@langfuse/otel": "^5.4.1",
 		"@langfuse/tracing": "^5.4.1",
 		"@opentelemetry/sdk-node": "^0.220.0",
-		"files-sdk": "2.2.1"
+		"files-sdk": "2.2.2"
 	},
 	"devDependencies": {
 		"@types/node": "^24.10.1",

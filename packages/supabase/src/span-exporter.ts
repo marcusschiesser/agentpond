@@ -1,14 +1,15 @@
-import { AgentPondSpanExporter } from "@agentpond/otel";
+import { createFilesSpanExporter } from "@agentpond/files-sdk/otel";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
 	supabaseProjectRefFromUrl,
 	validateSupabaseProjectRef,
 } from "./supabase-project.js";
 import {
+	createSupabaseStorageStoreFromClient,
+	createSupabaseStorageStoreFromConfig,
 	defaultSupabaseStorageBucket,
 	defaultSupabaseStoragePrefix,
 	type SupabaseEnvironment,
-	SupabaseStorageObjectStore,
 	supabaseRuntimeEnvironment,
 	supabaseStorageConfigFromEnv,
 } from "./supabase-storage.js";
@@ -25,16 +26,20 @@ export type SupabaseSpanExporterOptions = {
 
 export function createSupabaseSpanExporter(
 	options: SupabaseSpanExporterOptions = {},
-): AgentPondSpanExporter {
+) {
 	if (options.client) {
 		const projectId = options.projectId
 			? validateSupabaseProjectRef(options.projectId)
 			: supabaseProjectRefFromUrl(supabaseClientUrl(options.client));
-		const store = SupabaseStorageObjectStore.fromClient(options.client, {
+		const store = createSupabaseStorageStoreFromClient(options.client, {
 			bucket: options.bucket ?? defaultSupabaseStorageBucket,
 			prefix: options.prefix ?? defaultSupabaseStoragePrefix,
 		});
-		return new AgentPondSpanExporter({ store, projectId });
+		return createFilesSpanExporter({
+			store,
+			projectId,
+			prefix: options.prefix ?? defaultSupabaseStoragePrefix,
+		});
 	}
 
 	const env =
@@ -54,9 +59,13 @@ export function createSupabaseSpanExporter(
 	const projectId = options.projectId
 		? validateSupabaseProjectRef(options.projectId)
 		: supabaseProjectRefFromUrl(storageConfig.url);
-	const store = SupabaseStorageObjectStore.fromConfig(storageConfig);
+	const store = createSupabaseStorageStoreFromConfig(storageConfig);
 
-	return new AgentPondSpanExporter({ store, projectId });
+	return createFilesSpanExporter({
+		store,
+		projectId,
+		prefix: options.prefix ?? defaultSupabaseStoragePrefix,
+	});
 }
 
 function supabaseClientUrl(client: SupabaseClient): string {

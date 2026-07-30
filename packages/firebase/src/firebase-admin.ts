@@ -58,7 +58,7 @@ export function firebaseStorageForInitializedApp(
 		return requireFirebaseAdminStorage(resolution).getStorage();
 	} catch (error) {
 		throw new Error(
-			`Firebase Admin is required for FirebaseStorageObjectStore.fromConfig(); install firebase-admin and call initializeApp() before creating the store. ${errorDetail(error)}`,
+			`Firebase Admin is required for AgentPond Firebase storage; install firebase-admin and call initializeApp() before creating the store. ${errorDetail(error)}`,
 			{ cause: error },
 		);
 	}

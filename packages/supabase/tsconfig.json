@@ -5,6 +5,10 @@
 		"rootDir": "src",
 		"outDir": "dist"
 	},
-	"references": [{ "path": "../core" }, { "path": "../otel" }],
+	"references": [
+		{ "path": "../core" },
+		{ "path": "../files-sdk" },
+		{ "path": "../otel" }
+	],
 	"include": ["src/**/*.ts"]
 }

@@ -24,12 +24,12 @@ import { AgentPondCache } from "@agentpond/duckdb";
 import { FilesObjectStore } from "@agentpond/files-sdk";
 import {
 	FIREBASE_INSTRUMENTATION_PROMPT,
-	FirebaseStorageObjectStore,
+	firebaseEnvironmentContextFromCwdIfAvailable,
 	firebaseProvider,
 } from "@agentpond/firebase";
 import {
 	SUPABASE_INSTRUMENTATION_PROMPT,
-	SupabaseStorageObjectStore,
+	supabaseEnvironmentContextFromCwdIfAvailable,
 	supabaseProvider,
 } from "@agentpond/supabase";
 import { VERCEL_INSTRUMENTATION_PROMPT } from "@agentpond/vercel";
@@ -2517,7 +2517,6 @@ test("CLI env init rejects the removed --store option", async () => {
 test("CLI object storage auto-detects Firebase projects from .firebaserc", async () => {
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-auto-"));
-	const originalFromCliProject = FirebaseStorageObjectStore.fromCliProject;
 	const store = new MemoryObjectStore();
 	let projectId: string | undefined;
 	try {
@@ -2527,18 +2526,24 @@ test("CLI object storage auto-detects Firebase projects from .firebaserc", async
 			JSON.stringify({ projects: { default: "firebase-demo" } }),
 			"utf8",
 		);
-		FirebaseStorageObjectStore.fromCliProject = (async (project) => {
-			projectId = project.projectId;
-			return store;
-		}) as typeof FirebaseStorageObjectStore.fromCliProject;
 
 		const context = environmentContextForCommand();
+		const injectedContext = firebaseEnvironmentContextFromCwdIfAvailable(
+			{ cwd: root },
+			{
+				createStore(project) {
+					projectId = project.projectId;
+					return store;
+				},
+			},
+		);
+		assert.ok(injectedContext);
 		writeFileSync(
 			join(root, ".firebaserc"),
 			JSON.stringify({ projects: { default: "changed-after-resolution" } }),
 			"utf8",
 		);
-		const storage = await context.resolveStorage();
+		const storage = await injectedContext.resolveStorage();
 
 		assert.equal(context.kind, "firebase");
 		assert.equal(storage.store, store);
@@ -2546,7 +2551,6 @@ test("CLI object storage auto-detects Firebase projects from .firebaserc", async
 		assert.equal(storage.prefix, "agentpond/");
 		assert.equal(projectId, "firebase-demo");
 	} finally {
-		FirebaseStorageObjectStore.fromCliProject = originalFromCliProject;
 		process.chdir(cwd);
 	}
 });
@@ -2555,7 +2559,6 @@ test("CLI object storage auto-detects Firebase monorepos from firebase.json", as
 	const cwd = process.cwd();
 	const root = mkdtempSync(join(tmpdir(), "agentpond-cli-firebase-json-"));
 	const nested = join(root, "packages", "functions");
-	const originalFromCliProject = FirebaseStorageObjectStore.fromCliProject;
 	const originalGoogleProject = process.env.GOOGLE_CLOUD_PROJECT;
 	const store = new MemoryObjectStore();
 	let projectId: string | undefined;
@@ -2568,20 +2571,26 @@ test("CLI object storage auto-detects Firebase monorepos from firebase.json", as
 		);
 		mkdirSync(nested, { recursive: true });
 		process.chdir(nested);
-		FirebaseStorageObjectStore.fromCliProject = (async (project) => {
-			projectId = project.projectId;
-			return store;
-		}) as typeof FirebaseStorageObjectStore.fromCliProject;
 
 		const context = environmentContextForCommand();
-		const storage = await context.resolveStorage();
+		const injectedContext = firebaseEnvironmentContextFromCwdIfAvailable(
+			{ cwd: nested },
+			{
+				createStore(project) {
+					projectId = project.projectId;
+					return store;
+				},
+			},
+		);
+		assert.ok(injectedContext);
+		const storage = await injectedContext.resolveStorage();
 
+		assert.equal(context.kind, "firebase");
 		assert.equal(storage.store, store);
 		assert.equal(storage.projectId, "firebase-json-project");
 		assert.equal(storage.prefix, "agentpond/");
 		assert.equal(projectId, "firebase-json-project");
 	} finally {
-		FirebaseStorageObjectStore.fromCliProject = originalFromCliProject;
 		if (originalGoogleProject === undefined) {
 			delete process.env.GOOGLE_CLOUD_PROJECT;
 		} else {
@@ -2598,7 +2607,6 @@ test("CLI object storage resolves linked Supabase projects from nested directori
 	);
 	const nested = join(root, "apps", "api");
 	const projectRef = "abcdefghijklmnopqrst";
-	const originalFromCliProject = SupabaseStorageObjectStore.fromCliProject;
 	const store = new MemoryObjectStore();
 	let resolvedProjectRef: string | undefined;
 	try {
@@ -2613,13 +2621,30 @@ test("CLI object storage resolves linked Supabase projects from nested directori
 			`${projectRef}\n`,
 		);
 		process.chdir(nested);
-		SupabaseStorageObjectStore.fromCliProject = (async (project) => {
-			resolvedProjectRef = project.projectRef;
-			return store;
-		}) as typeof SupabaseStorageObjectStore.fromCliProject;
 
 		const context = environmentContextForCommand();
-		const storage = await context.resolveStorage();
+		const injectedContext = supabaseEnvironmentContextFromCwdIfAvailable(
+			{ cwd: nested },
+			{
+				run: async () => ({
+					exitCode: 0,
+					stderr: "",
+					stdout: JSON.stringify([
+						{
+							name: "default",
+							type: "secret",
+							api_key: "sb_secret_agentpond_cli_test",
+						},
+					]),
+				}),
+				createStore(config) {
+					resolvedProjectRef = new URL(config.url).hostname.split(".")[0];
+					return store;
+				},
+			},
+		);
+		assert.ok(injectedContext);
+		const storage = await injectedContext.resolveStorage();
 
 		assert.equal(context.kind, "supabase");
 		assert.equal(context.rootDir, root);
@@ -2634,7 +2659,6 @@ test("CLI object storage resolves linked Supabase projects from nested directori
 		assert.equal(storage.prefix, "");
 		assert.equal(resolvedProjectRef, projectRef);
 	} finally {
-		SupabaseStorageObjectStore.fromCliProject = originalFromCliProject;
 		process.chdir(cwd);
 	}
 });

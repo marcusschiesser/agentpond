@@ -1,27 +1,38 @@
-import { configFromRuntimeEnv } from "@agentpond/core";
+import { configFromRuntimeEnv, normalizePrefix } from "@agentpond/core";
 import { AgentPondSpanExporter } from "@agentpond/otel";
 import { type FilesClient, FilesObjectStore } from "./files-object-store.js";
 
-export type FilesSpanExporterOptions = {
-	files: FilesClient;
+type FilesSpanExporterDestinationOptions = {
 	projectId?: string;
 	prefix?: string;
 };
 
+export type FilesSpanExporterOptions = FilesSpanExporterDestinationOptions &
+	(
+		| {
+				files: FilesClient;
+				store?: never;
+		  }
+		| {
+				files?: never;
+				store: FilesObjectStore;
+		  }
+	);
+
 export type FilesSpanExporterFromRuntimeEnvOptions = {
 	env?: NodeJS.ProcessEnv;
-	projectId?: string;
-	prefix?: string;
-};
+} & FilesSpanExporterDestinationOptions;
 
 export function createFilesSpanExporter(
 	options: FilesSpanExporterOptions,
 ): AgentPondSpanExporter {
-	const config = configFromRuntimeEnv();
+	const destination = spanExporterDestination(options);
 	return new AgentPondSpanExporter({
-		store: new FilesObjectStore(options.files),
-		projectId: options.projectId ?? config.projectId,
-		prefix: options.prefix ?? config.prefix,
+		store:
+			"store" in options && options.store
+				? options.store
+				: new FilesObjectStore(options.files),
+		...destination,
 	});
 }
 
@@ -29,10 +40,25 @@ export function createFilesSpanExporterFromRuntimeEnv(
 	options: FilesSpanExporterFromRuntimeEnvOptions = {},
 ): AgentPondSpanExporter {
 	const env = options.env ?? process.env;
-	const config = configFromRuntimeEnv(env);
 	return new AgentPondSpanExporter({
 		store: FilesObjectStore.fromRuntimeEnv(env),
-		projectId: options.projectId ?? config.projectId,
-		prefix: options.prefix ?? config.prefix,
+		...spanExporterDestination(options, env),
 	});
+}
+
+function spanExporterDestination(
+	options: FilesSpanExporterDestinationOptions,
+	env: NodeJS.ProcessEnv = process.env,
+): { projectId: string; prefix: string } {
+	if (options.projectId === undefined) {
+		const runtimeConfig = configFromRuntimeEnv(env);
+		return {
+			projectId: runtimeConfig.projectId,
+			prefix: options.prefix ?? runtimeConfig.prefix,
+		};
+	}
+	return {
+		projectId: options.projectId,
+		prefix: options.prefix ?? normalizePrefix(env.AGENTPOND_PREFIX ?? ""),
+	};
 }

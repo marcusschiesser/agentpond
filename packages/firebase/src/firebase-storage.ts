@@ -1,17 +1,14 @@
+import { normalizePrefix, type ObjectStore } from "@agentpond/core";
+import { FilesObjectStore } from "@agentpond/files-sdk";
 import {
-	type IngestionSink,
-	normalizePrefix,
-	type ObjectStore,
-	type ObjectStoreIngestionSinkOptions,
-} from "@agentpond/core";
+	type FirebaseStorageAdapterOptions,
+	firebaseStorage,
+} from "files-sdk/firebase-storage";
 import {
+	type FirebaseStorage,
 	firebaseStorageForAppOptions,
 	firebaseStorageForInitializedApp,
 } from "./firebase-admin.js";
-import {
-	type FirebaseBucket,
-	FirebaseBucketObjectStore,
-} from "./firebase-bucket-store.js";
 import {
 	type FirebaseCliProjectConfig,
 	firebaseFunctionsSourceDirectories,
@@ -19,89 +16,56 @@ import {
 
 export const defaultFirebaseStoragePrefix = "agentpond";
 
-export type FirebaseStorageConfig = {
-	bucket?: string;
-	prefix: string;
-};
-
 export type FirebaseStorageObjectStoreConfig = {
 	bucket?: string;
-	prefix?: string;
 };
 
-export class FirebaseStorageObjectStore implements ObjectStore {
-	private readonly store: FirebaseBucketObjectStore;
+export function createFirebaseStorageStoreFromConfig(
+	options: FirebaseStorageObjectStoreConfig = {},
+): FilesObjectStore {
+	return createFirebaseStorageStoreForBucket(
+		firebaseStorageForInitializedApp().bucket(options.bucket),
+	);
+}
 
-	static fromConfig(
-		options: FirebaseStorageObjectStoreConfig = {},
-	): FirebaseStorageObjectStore {
-		const config = {
-			...(options.bucket ? { bucket: options.bucket } : {}),
-			prefix: options.prefix ?? defaultFirebaseStoragePrefix,
-		};
-		return new FirebaseStorageObjectStore(
-			config,
-			new FirebaseBucketObjectStore(
-				firebaseStorageForInitializedApp().bucket(
-					config.bucket,
-				) as FirebaseBucket,
-			),
-		);
-	}
+export async function createFirebaseStorageStoreFromCliProject(
+	project: FirebaseCliProjectConfig,
+	dependencies: {
+		createStore?: (
+			bucket: ReturnType<FirebaseStorage["bucket"]>,
+		) => ObjectStore;
+	} = {},
+): Promise<ObjectStore> {
+	const moduleDirectories = firebaseFunctionsSourceDirectories(project.root);
+	const storage = firebaseStorageForAppOptions(
+		{
+			projectId: project.projectId,
+			...(project.bucket ? { storageBucket: project.bucket } : {}),
+		},
+		"Firebase Admin is required for AgentPond Firebase storage; install firebase-admin in the Firebase project and authenticate with credentials supported by Firebase Admin",
+		{ moduleDirectories },
+	);
+	const createStore =
+		dependencies.createStore ?? createFirebaseStorageStoreForBucket;
+	const stores = firebaseCliBucketCandidates(project).map((bucketName) =>
+		createStore(storage.bucket(bucketName)),
+	);
+	return await selectFirebaseCliStore(
+		stores,
+		normalizePrefix(defaultFirebaseStoragePrefix),
+	);
+}
 
-	static async fromCliProject(
-		project: FirebaseCliProjectConfig,
-	): Promise<FirebaseStorageObjectStore> {
-		const moduleDirectories = firebaseFunctionsSourceDirectories(project.root);
-		const storage = firebaseStorageForAppOptions(
-			{
-				projectId: project.projectId,
-				...(project.bucket ? { storageBucket: project.bucket } : {}),
-			},
-			"Firebase Admin is required for FirebaseStorageObjectStore.fromCliProject(); install firebase-admin in the Firebase project and authenticate with credentials supported by Firebase Admin",
-			{ moduleDirectories },
-		);
-		const stores = firebaseCliBucketCandidates(project).map(
-			(bucketName) =>
-				new FirebaseBucketObjectStore(
-					storage.bucket(bucketName) as FirebaseBucket,
-				),
-		);
-		const store = await selectFirebaseCliStore(
-			stores,
-			normalizePrefix(defaultFirebaseStoragePrefix),
-		);
-		return new FirebaseStorageObjectStore(
-			{ prefix: defaultFirebaseStoragePrefix },
-			store,
-		);
-	}
-
-	private constructor(
-		readonly config: FirebaseStorageConfig,
-		store: FirebaseBucketObjectStore,
-	) {
-		this.store = store;
-	}
-
-	toSink(options: ObjectStoreIngestionSinkOptions = {}): IngestionSink {
-		return this.store.toSink({
-			...options,
-			prefix: normalizePrefix(this.config.prefix),
-		});
-	}
-
-	async putJson(key: string, value: unknown): Promise<void> {
-		await this.store.putJson(key, value);
-	}
-
-	async getJson<T>(key: string): Promise<T> {
-		return this.store.getJson<T>(key);
-	}
-
-	async listKeys(prefix: string): Promise<string[]> {
-		return this.store.listKeys(prefix);
-	}
+function createFirebaseStorageStoreForBucket(
+	bucket: ReturnType<FirebaseStorage["bucket"]>,
+): FilesObjectStore {
+	return FilesObjectStore.fromAdapter(
+		firebaseStorage({
+			app: bucket as unknown as NonNullable<
+				FirebaseStorageAdapterOptions["app"]
+			>,
+		}),
+	);
 }
 
 function firebaseCliBucketCandidates(
@@ -115,10 +79,10 @@ function firebaseCliBucketCandidates(
 }
 
 async function selectFirebaseCliStore(
-	stores: FirebaseBucketObjectStore[],
+	stores: ObjectStore[],
 	prefix: string,
-): Promise<FirebaseBucketObjectStore> {
-	let firstExistingStore: FirebaseBucketObjectStore | undefined;
+): Promise<ObjectStore> {
+	let firstExistingStore: ObjectStore | undefined;
 	let lastMissingBucketError: unknown;
 	for (const store of stores) {
 		try {
@@ -138,5 +102,8 @@ async function selectFirebaseCliStore(
 function isMissingBucketError(error: unknown): boolean {
 	if (!error || typeof error !== "object") return false;
 	const maybeCode = (error as { code?: unknown }).code;
-	return maybeCode === 404 || maybeCode === "404";
+	if (maybeCode === 404 || maybeCode === "404" || maybeCode === "NotFound") {
+		return true;
+	}
+	return isMissingBucketError((error as { cause?: unknown }).cause);
 }

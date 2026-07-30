@@ -1,6 +1,9 @@
-import { AgentPondSpanExporter } from "@agentpond/otel";
+import { createFilesSpanExporter } from "@agentpond/files-sdk/otel";
 import { configForInitializedFirebaseApp } from "./firebase-admin.js";
-import { FirebaseStorageObjectStore } from "./firebase-storage.js";
+import {
+	createFirebaseStorageStoreFromConfig,
+	defaultFirebaseStoragePrefix,
+} from "./firebase-storage.js";
 
 export type FirebaseSpanExporterOptions = {
 	prefix?: string;
@@ -8,11 +11,14 @@ export type FirebaseSpanExporterOptions = {
 
 export function createFirebaseSpanExporter(
 	options: FirebaseSpanExporterOptions = {},
-): AgentPondSpanExporter {
+) {
 	const { projectId, storageBucket } = configForInitializedFirebaseApp();
-	const store = FirebaseStorageObjectStore.fromConfig({
+	const store = createFirebaseStorageStoreFromConfig({
 		bucket: storageBucket,
-		prefix: options.prefix,
 	});
-	return new AgentPondSpanExporter({ store, projectId });
+	return createFilesSpanExporter({
+		store,
+		projectId,
+		prefix: options.prefix ?? defaultFirebaseStoragePrefix,
+	});
 }
