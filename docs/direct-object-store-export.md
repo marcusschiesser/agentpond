@@ -31,6 +31,26 @@ the install command for every other provider. The dependency-free `fs` adapter
 is available for local development and trace verification. The executing
 AgentPond CLI must also be able to resolve the selected peer SDK.
 
+## Content policy
+
+AgentPond exporters use `contentPolicy: "metadata-only"` by default. Before an
+OTLP object is written, AgentPond redacts standard input, output, prompt,
+response, and provider error details while preserving operational metadata such
+as model names, token counts, latency, status codes, and span relationships.
+
+Only enable content capture when the application's privacy policy explicitly
+permits storing prompts, responses, tool payloads, and error details:
+
+```ts
+const exporter = createFilesSpanExporterFromRuntimeEnv({
+  contentPolicy: "capture",
+});
+```
+
+The same `contentPolicy` option is available on `AgentPondSpanExporter`,
+`createFilesSpanExporter()`, `createFirebaseSpanExporter()`,
+`createSupabaseSpanExporter()`, and `createVercelSpanExporter()`.
+
 ## Langfuse
 
 Create Files SDK normally, pass it to the AgentPond exporter, and give the

@@ -12,6 +12,7 @@ import { AgentPondCache } from "@agentpond/duckdb";
 import { OITracer } from "@arizeai/openinference-core";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
 import { getActiveTraceId, startActiveObservation } from "@langfuse/tracing";
+import { SpanStatusCode } from "@opentelemetry/api";
 import { type ExportResult, ExportResultCode } from "@opentelemetry/core";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { NodeSDK } from "@opentelemetry/sdk-node";
@@ -39,6 +40,41 @@ async function readableSpans(): Promise<ReadableSpan[]> {
 				"test.attribute": "preserved",
 			},
 		});
+	span.end();
+	const spans = [...collector.getFinishedSpans()];
+	await provider.shutdown();
+	return spans;
+}
+
+async function sensitiveReadableSpans(): Promise<ReadableSpan[]> {
+	const collector = new InMemorySpanExporter();
+	const provider = new BasicTracerProvider({
+		resource: resourceFromAttributes({ "service.name": "privacy-policy-test" }),
+		spanProcessors: [new SimpleSpanProcessor(collector)],
+	});
+	const span = provider
+		.getTracer("privacy-policy-test", "1.0.0")
+		.startSpan("private generation", {
+			attributes: {
+				"openinference.span.kind": "LLM",
+				"input.value": "PRIVATE_PROMPT",
+				"input.attributes": '{"context":"PRIVATE_INPUT_CONTEXT"}',
+				"output.value": "PRIVATE_RESPONSE",
+				"output.attributes": '{"context":"PRIVATE_OUTPUT_CONTEXT"}',
+				"llm.input_messages.0.message.role": "user",
+				"llm.input_messages.0.message.content": "PRIVATE_MESSAGE",
+				"test.attribute": "preserved",
+			},
+		});
+	span.recordException({
+		name: "ProviderError",
+		message: "PRIVATE_PROVIDER_ERROR",
+		stack: "PRIVATE_PROVIDER_STACK",
+	});
+	span.setStatus({
+		code: SpanStatusCode.ERROR,
+		message: "PRIVATE_STATUS_MESSAGE",
+	});
 	span.end();
 	const spans = [...collector.getFinishedSpans()];
 	await provider.shutdown();
@@ -128,6 +164,105 @@ test("exports OTLP resource spans directly to the AgentPond object layout", asyn
 			(attribute) => attribute.key === "service.name",
 		),
 	);
+	await exporter.shutdown();
+});
+
+test("metadata-only exports redact content and provider error details by default", async () => {
+	const store = new MemoryObjectStore();
+	const exporter = new AgentPondSpanExporter({
+		store,
+		projectId: "privacy-project",
+	});
+
+	const result = await exportSpans(exporter, await sensitiveReadableSpans());
+
+	assert.equal(result.code, ExportResultCode.SUCCESS);
+	const [key] = await store.listKeys("otel/privacy-project/");
+	assert.ok(key);
+	const resourceSpans =
+		await store.getJson<
+			Array<{
+				scopeSpans: Array<{
+					spans: Array<{
+						attributes: Array<{
+							key: string;
+							value: { stringValue?: string };
+						}>;
+						events: Array<{
+							attributes: Array<{
+								key: string;
+								value: { stringValue?: string };
+							}>;
+						}>;
+						status: { message?: string };
+					}>;
+				}>;
+			}>
+		>(key);
+	const storedSpan = resourceSpans[0].scopeSpans[0].spans[0];
+	const storedAttributes = new Map(
+		storedSpan.attributes.map((attribute) => [
+			attribute.key,
+			attribute.value.stringValue,
+		]),
+	);
+	assert.equal(storedAttributes.get("input.value"), "__REDACTED__");
+	assert.equal(storedAttributes.get("output.value"), "__REDACTED__");
+	assert.equal(storedAttributes.has("input.attributes"), false);
+	assert.equal(storedAttributes.has("output.attributes"), false);
+	assert.equal(storedAttributes.get("test.attribute"), "preserved");
+	assert.equal(
+		storedAttributes.has("llm.input_messages.0.message.role"),
+		false,
+	);
+	assert.equal(
+		storedAttributes.has("llm.input_messages.0.message.content"),
+		false,
+	);
+	const exceptionAttributes = new Map(
+		storedSpan.events[0].attributes.map((attribute) => [
+			attribute.key,
+			attribute.value.stringValue,
+		]),
+	);
+	assert.equal(exceptionAttributes.get("exception.type"), "ProviderError");
+	assert.equal(exceptionAttributes.get("exception.message"), "__REDACTED__");
+	assert.equal(exceptionAttributes.get("exception.stacktrace"), "__REDACTED__");
+	assert.equal(storedSpan.status.message, "__REDACTED__");
+	const rawObject = JSON.stringify(resourceSpans);
+	for (const privateValue of [
+		"PRIVATE_PROMPT",
+		"PRIVATE_INPUT_CONTEXT",
+		"PRIVATE_RESPONSE",
+		"PRIVATE_OUTPUT_CONTEXT",
+		"PRIVATE_MESSAGE",
+		"PRIVATE_PROVIDER_ERROR",
+		"PRIVATE_PROVIDER_STACK",
+		"PRIVATE_STATUS_MESSAGE",
+	]) {
+		assert.doesNotMatch(rawObject, new RegExp(privateValue));
+	}
+	await exporter.shutdown();
+});
+
+test("capture policy preserves explicitly opted-in content", async () => {
+	const store = new MemoryObjectStore();
+	const exporter = new AgentPondSpanExporter({
+		contentPolicy: "capture",
+		store,
+		projectId: "capture-project",
+	});
+
+	const result = await exportSpans(exporter, await sensitiveReadableSpans());
+
+	assert.equal(result.code, ExportResultCode.SUCCESS);
+	const [key] = await store.listKeys("otel/capture-project/");
+	assert.ok(key);
+	const rawObject = JSON.stringify(await store.getJson(key));
+	assert.match(rawObject, /PRIVATE_PROMPT/);
+	assert.match(rawObject, /PRIVATE_RESPONSE/);
+	assert.match(rawObject, /PRIVATE_PROVIDER_ERROR/);
+	assert.match(rawObject, /PRIVATE_STATUS_MESSAGE/);
 	await exporter.shutdown();
 });
 
@@ -283,6 +418,7 @@ test("Langfuse and OpenInference traces export to an in-memory store and sync in
 		const store = new MemoryObjectStore();
 
 		const langfuseExporter = new AgentPondSpanExporter({
+			contentPolicy: "capture",
 			store,
 			projectId: config.projectId,
 			prefix: config.prefix,
@@ -323,6 +459,7 @@ test("Langfuse and OpenInference traces export to an in-memory store and sync in
 		assert.ok(langfuseTraceId);
 
 		const openInferenceExporter = new AgentPondSpanExporter({
+			contentPolicy: "capture",
 			store,
 			projectId: config.projectId,
 			prefix: config.prefix,

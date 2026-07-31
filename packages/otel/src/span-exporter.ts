@@ -2,8 +2,13 @@ import type { IngestionSink, ObjectStore } from "@agentpond/core";
 import { type ExportResult, ExportResultCode } from "@opentelemetry/core";
 import { JsonTraceSerializer } from "@opentelemetry/otlp-transformer";
 import type { ReadableSpan, SpanExporter } from "@opentelemetry/sdk-trace-base";
+import {
+	type AgentPondContentPolicy,
+	applyAgentPondContentPolicy,
+} from "./content-policy.js";
 
 export type AgentPondSpanExporterOptions = {
+	contentPolicy?: AgentPondContentPolicy;
 	store: ObjectStore;
 	projectId: string;
 	prefix?: string;
@@ -76,6 +81,10 @@ export class AgentPondSpanExporter implements SpanExporter {
 			throw new Error("Serialized OpenTelemetry request has no resourceSpans");
 		}
 		if (resourceSpans.length === 0) return;
+		applyAgentPondContentPolicy(
+			resourceSpans,
+			this.options.contentPolicy ?? "metadata-only",
+		);
 
 		await this.sink.writeOtelResourceSpans({
 			projectId: this.options.projectId,

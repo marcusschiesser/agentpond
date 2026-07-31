@@ -1,4 +1,7 @@
-import { AgentPondSpanExporter } from "@agentpond/otel";
+import {
+	type AgentPondContentPolicy,
+	AgentPondSpanExporter,
+} from "@agentpond/otel";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
 	supabaseProjectRefFromUrl,
@@ -16,6 +19,7 @@ import {
 export type SupabaseSpanExporterOptions = {
 	bucket?: string;
 	client?: SupabaseClient;
+	contentPolicy?: AgentPondContentPolicy;
 	env?: SupabaseEnvironment;
 	prefix?: string;
 	projectId?: string;
@@ -34,7 +38,11 @@ export function createSupabaseSpanExporter(
 			bucket: options.bucket ?? defaultSupabaseStorageBucket,
 			prefix: options.prefix ?? defaultSupabaseStoragePrefix,
 		});
-		return new AgentPondSpanExporter({ store, projectId });
+		return new AgentPondSpanExporter({
+			contentPolicy: options.contentPolicy,
+			store,
+			projectId,
+		});
 	}
 
 	const env =
@@ -56,7 +64,11 @@ export function createSupabaseSpanExporter(
 		: supabaseProjectRefFromUrl(storageConfig.url);
 	const store = SupabaseStorageObjectStore.fromConfig(storageConfig);
 
-	return new AgentPondSpanExporter({ store, projectId });
+	return new AgentPondSpanExporter({
+		contentPolicy: options.contentPolicy,
+		store,
+		projectId,
+	});
 }
 
 function supabaseClientUrl(client: SupabaseClient): string {
