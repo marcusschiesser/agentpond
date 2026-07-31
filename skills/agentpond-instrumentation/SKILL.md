@@ -62,12 +62,9 @@ Stop after presenting the proposal and ask for explicit confirmation before inst
 
 Treat the work as complete only when the project builds or typechecks, the trusted runtime loads without duplicate-provider errors, one real AI request exports OpenInference spans, and the trace appears after the sync workflow in the matching reference.
 
-Inspect the projected trace and its raw stored object. Confirm applicable model,
-CHAIN, TOOL, input/output, parent-child, token-usage, and session attributes.
-Ensure captured data does not expose credentials or unnecessary personal data.
+Inspect the trace and confirm applicable model, CHAIN, TOOL, input/output, parent-child, and session attributes. For short-lived processes, force-flush before exit. Do not shut down a reusable module-level provider after every request.
 
-For short-lived processes, force-flush before exit. Do not shut down a reusable
-module-level provider after every request.
+Inspect the raw stored object and ensure it does not expose credentials or unnecessary personal data.
 
 ## Attribution
 

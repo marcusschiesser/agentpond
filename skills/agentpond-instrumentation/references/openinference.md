@@ -25,8 +25,7 @@ Use manual spans for custom application steps that auto-instrumentation cannot s
 - `TOOL`: each tool invocation, including input, output, and error status
 - `AGENT`: a meaningful agent execution boundary when the framework does not emit one
 
-Set `openinference.span.kind` and the applicable `input.value`, `output.value`,
-and MIME-type attributes. Avoid recording secrets or unnecessary personal data.
+Set `openinference.span.kind` and the applicable `input.value`, `output.value`, and MIME-type attributes. Avoid recording secrets or unnecessary personal data.
 
 ## Sessions
 
@@ -38,8 +37,6 @@ Set `session.id` on the outer CHAIN or AGENT span. Generate it once at the conve
 - Short-lived scripts and test commands: force-flush and shut down before process exit.
 - Reusable Firebase, Supabase, or Vercel request handlers: do not shut down a module-level provider after every request.
 
-Run a real application request and verify the resulting trace rather than
-treating compilation alone as success. Confirm span kinds, parent-child
-relationships, inputs/outputs, tool results, and session grouping. Read back the
-raw stored object and ensure it does not expose credentials or unnecessary
-personal data.
+Run a real application request and verify the resulting trace rather than treating compilation alone as success. Confirm span kinds, inputs/outputs, parent-child relationships, tool results, and session grouping.
+
+Read back the raw stored object and ensure it does not expose credentials or unnecessary personal data.
