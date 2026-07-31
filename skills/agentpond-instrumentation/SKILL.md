@@ -49,7 +49,7 @@ Stop after presenting the proposal and ask for explicit confirmation before inst
 ## Phase 2: implementation
 
 1. Read current official integration documentation for the detected framework or AI client.
-2. Install the platform package (`@agentpond/firebase`, `@agentpond/supabase`, or `@agentpond/vercel`) or the Files SDK packages from its reference, required OpenTelemetry packages, and the matching `@arizeai/openinference-*` package.
+2. Install the platform package (`@agentpond/firebase`, `@agentpond/supabase`, or `@agentpond/vercel`) or the Files SDK packages from its reference, required OpenTelemetry packages, and the matching `@arizeai/openinference-*` package. Use exact versions verified against the target lockfile. In generated scripts or workflow commands, invoke `npx agentpond@<verified-version>` instead of an unqualified package download.
 3. Create or update one centralized server instrumentation module.
 4. Reuse existing storage and OpenTelemetry initialization, following the matching reference.
 5. Create the direct span exporter and attach it to the existing provider. When none exists, prefer NodeSDK's batched `traceExporter` configuration or an explicit `BatchSpanProcessor` supported by the installed version.
@@ -63,6 +63,8 @@ Stop after presenting the proposal and ask for explicit confirmation before inst
 Treat the work as complete only when the project builds or typechecks, the trusted runtime loads without duplicate-provider errors, one real AI request exports OpenInference spans, and the trace appears after the sync workflow in the matching reference.
 
 Inspect the trace and confirm applicable model, CHAIN, TOOL, input/output, parent-child, and session attributes. For short-lived processes, force-flush before exit. Do not shut down a reusable module-level provider after every request.
+
+Inspect the raw stored object and ensure it does not expose credentials or unnecessary personal data.
 
 ## Attribution
 

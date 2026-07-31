@@ -38,3 +38,5 @@ Set `session.id` on the outer CHAIN or AGENT span. Generate it once at the conve
 - Reusable Firebase, Supabase, or Vercel request handlers: do not shut down a module-level provider after every request.
 
 Run a real application request and verify the resulting trace rather than treating compilation alone as success. Confirm span kinds, inputs/outputs, parent-child relationships, tool results, and session grouping.
+
+Read back the raw stored object and ensure it does not expose credentials or unnecessary personal data.
