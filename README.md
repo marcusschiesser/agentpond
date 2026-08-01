@@ -25,11 +25,18 @@ Object storage is the durable source of truth. The local DuckDB database is a re
 ## Getting started
 
 ```sh
+npx agentpond init check
 npx agentpond init
 ```
 
-Run this from your application directory. It installs AgentPond's instrumentation
-and analytics skills, and prints a setup prompt for your coding agent. The agent
+`init check` reports the detected project root, package manager, provider, setup
+mode, and later requirements without installing packages, writing files,
+prompting, or requiring credentials. Add `--json` for a stable machine-readable
+result.
+
+Run `init` from your application directory. It installs AgentPond's
+instrumentation and analytics skills, and prints a setup prompt for your coding
+agent. The agent
 then inspects your application, proposes the appropriate instrumentation and
 storage setup, implements it after your confirmation, and verifies a real trace
 end to end.

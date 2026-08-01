@@ -20,6 +20,12 @@ credential access:
 
 ## Select the data source
 
+Before setup automation changes a project, run
+`npx agentpond init check --json`. Treat its versioned JSON as the authoritative
+preflight for the executing CLI version, project root, package manager, provider,
+setup mode, requirements, and structured unsupported reasons. The check is
+non-mutating and does not prompt or require provider credentials.
+
 Determine the provider before syncing:
 
 - For a Firebase project, read [references/firebase.md](references/firebase.md).

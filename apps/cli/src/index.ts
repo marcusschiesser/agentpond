@@ -63,7 +63,10 @@ export function createProgram(options: ProgramOptions = {}): Command {
 		});
 
 	addGlobalOptions(program);
-	registerInitCommand(program, { installSkills: options.installSkills });
+	registerInitCommand(program, {
+		cliVersion: CLI_VERSION,
+		installSkills: options.installSkills,
+	});
 	registerDevCommand(program);
 	registerEnvCommand(program, {
 		inputBucket: options.inputBucket,

@@ -1,10 +1,10 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { agentPondWorkspaceRoot } from "@agentpond/core";
 import type { Command } from "commander";
-import { CliError } from "../cli-support.js";
+import { CliError, print } from "../cli-support.js";
 import type { GlobalOptions } from "../command-support.js";
 import { providerForCommand } from "../providers.js";
 
@@ -68,7 +68,40 @@ type InitSetup = {
 	displayName: string;
 	instrumentationPrompt: string;
 	projectLabel: string;
+	provider: InitProvider;
 	rootDir: string;
+	setupMode: InitSetupMode;
+};
+
+type InitProvider = "files-sdk" | "firebase" | "supabase" | "vercel";
+type InitSetupMode = "files-sdk" | "provider-managed";
+type PackageManager = "bun" | "npm" | "pnpm" | "yarn";
+
+export type InitCheckReason = {
+	code:
+		| "detection-failed"
+		| "invalid-platform"
+		| "multiple-providers"
+		| "provider-not-found"
+		| "provider-not-ready";
+	message: string;
+	nextSteps: string[];
+};
+
+export type InitCheckResult = {
+	schemaVersion: 1;
+	cliVersion: string;
+	credentialsRequiredLater: boolean;
+	packageManager: PackageManager | null;
+	projectLabel: string | null;
+	projectRoot: string;
+	provider: InitProvider | null;
+	providerLinkingRequired: boolean;
+	reasons: InitCheckReason[];
+	requiredConfiguration: string[];
+	requiredDependencies: string[];
+	setupMode: InitSetupMode | null;
+	supported: boolean;
 };
 
 export type SkillsProcessRequest = {
@@ -83,70 +116,380 @@ export type SkillsProcessRunner = (
 
 export function registerInitCommand(
 	program: Command,
-	options: { installSkills?: SkillsInstaller } = {},
+	options: { cliVersion: string; installSkills?: SkillsInstaller },
 ): void {
-	program
+	const init = program
 		.command("init")
-		.description("set up AgentPond for the current project")
-		.action(async (_commandOptions: GlobalOptions, command: Command) => {
+		.description("set up AgentPond for the current project");
+
+	init
+		.command("check")
+		.description("check AgentPond setup support without changing the project")
+		.action((_commandOptions: GlobalOptions, command: Command) => {
 			const globalOptions = command.optsWithGlobals<GlobalOptions>();
-			if (globalOptions.json) {
-				throw new CliError("--json is not supported by npx agentpond init");
-			}
-
-			let setup: InitSetup;
-			try {
-				const context = providerForCommand({
-					allowUnlinked: true,
-					platform: globalOptions.platform,
-				});
-				setup = context
-					? {
-							displayName: context.provider.displayName,
-							instrumentationPrompt: context.provider.instrumentationPrompt,
-							projectLabel: context.project.projectLabel,
-							rootDir: context.project.rootDir,
-						}
-					: filesSdkInitSetup();
-			} catch (error) {
-				throw new CliError(
-					error instanceof Error ? error.message : String(error),
-				);
-			}
-
-			console.log(
-				agentPondInitHeader({
-					displayName: setup.displayName,
-					projectLabel: setup.projectLabel,
-				}),
-			);
-
-			await (options.installSkills ?? installSkillsWithBundledCli)({
-				cwd: setup.rootDir,
-				source: AGENTPOND_SKILLS_SOURCE,
-				skills: AGENTPOND_INIT_SKILLS,
+			const result = checkInitSupport({
+				cliVersion: options.cliVersion,
+				platform: globalOptions.platform,
 			});
-
-			console.log(
-				[
-					`AgentPond skills ready for ${setup.displayName} project: ${setup.projectLabel}`,
-					"",
-					"Paste this prompt into your coding agent:",
-					"",
-					setup.instrumentationPrompt,
-				].join("\n"),
-			);
+			if (globalOptions.json) print(result, true);
+			else console.log(formatInitCheck(result));
+			if (!result.supported) process.exitCode = 2;
 		});
+
+	init.action(async (_commandOptions: GlobalOptions, command: Command) => {
+		const globalOptions = command.optsWithGlobals<GlobalOptions>();
+		if (globalOptions.json) {
+			throw new CliError("--json is not supported by npx agentpond init");
+		}
+
+		let setup: InitSetup;
+		try {
+			setup = initSetup({ platform: globalOptions.platform });
+		} catch (error) {
+			throw new CliError(
+				error instanceof Error ? error.message : String(error),
+			);
+		}
+
+		console.log(
+			agentPondInitHeader({
+				displayName: setup.displayName,
+				projectLabel: setup.projectLabel,
+			}),
+		);
+
+		await (options.installSkills ?? installSkillsWithBundledCli)({
+			cwd: setup.rootDir,
+			source: AGENTPOND_SKILLS_SOURCE,
+			skills: AGENTPOND_INIT_SKILLS,
+		});
+
+		console.log(
+			[
+				`AgentPond skills ready for ${setup.displayName} project: ${setup.projectLabel}`,
+				"",
+				"Paste this prompt into your coding agent:",
+				"",
+				setup.instrumentationPrompt,
+			].join("\n"),
+		);
+	});
 }
 
-function filesSdkInitSetup(): InitSetup {
-	const rootDir = agentPondWorkspaceRoot();
+export function checkInitSupport(options: {
+	cliVersion: string;
+	cwd?: string;
+	platform?: string;
+}): InitCheckResult {
+	const cwd = options.cwd ?? process.cwd();
+	const fallbackRoot = agentPondWorkspaceRoot(cwd);
+	let context: ReturnType<typeof providerForCommand>;
+	try {
+		context = providerForCommand({
+			allowUnlinked: true,
+			cwd,
+			platform: options.platform,
+		});
+	} catch (error) {
+		const reason = initCheckReason(error);
+		const provider = providerFromFailedCheck(options.platform, reason);
+		return unsupportedInitCheckResult({
+			cliVersion: options.cliVersion,
+			projectRoot: fallbackRoot,
+			provider,
+			reason,
+		});
+	}
+
+	if (!context) {
+		return supportedInitCheckResult(filesSdkInitSetup(cwd), options.cliVersion);
+	}
+
+	try {
+		return supportedInitCheckResult(
+			{
+				displayName: context.provider.displayName,
+				instrumentationPrompt: context.provider.instrumentationPrompt,
+				projectLabel: context.project.projectLabel,
+				provider: context.provider.kind,
+				rootDir: context.project.rootDir,
+				setupMode: "provider-managed",
+			},
+			options.cliVersion,
+		);
+	} catch (error) {
+		return unsupportedInitCheckResult({
+			cliVersion: options.cliVersion,
+			projectRoot: context.project.rootDir,
+			provider: context.provider.kind,
+			reason: initCheckReason(error),
+		});
+	}
+}
+
+function supportedInitCheckResult(
+	setup: InitSetup,
+	cliVersion: string,
+): InitCheckResult {
+	const requirements = initRequirements(setup.provider);
+	return {
+		schemaVersion: 1,
+		cliVersion,
+		credentialsRequiredLater: true,
+		packageManager: packageManagerForProject(setup.rootDir),
+		projectLabel: setup.projectLabel,
+		projectRoot: setup.rootDir,
+		provider: setup.provider,
+		providerLinkingRequired: setup.projectLabel === "unlinked",
+		reasons: [],
+		requiredConfiguration: requirements.configuration,
+		requiredDependencies: requirements.dependencies,
+		setupMode: setup.setupMode,
+		supported: true,
+	};
+}
+
+function unsupportedInitCheckResult(options: {
+	cliVersion: string;
+	projectRoot: string;
+	provider: InitProvider | null;
+	reason: InitCheckReason;
+}): InitCheckResult {
+	const requirements = options.provider
+		? initRequirements(options.provider)
+		: { configuration: [], dependencies: [] };
+	return {
+		schemaVersion: 1,
+		cliVersion: options.cliVersion,
+		credentialsRequiredLater: options.provider !== null,
+		packageManager: packageManagerForProject(options.projectRoot),
+		projectLabel: null,
+		projectRoot: options.projectRoot,
+		provider: options.provider,
+		providerLinkingRequired: options.reason.code === "provider-not-ready",
+		reasons: [options.reason],
+		requiredConfiguration: requirements.configuration,
+		requiredDependencies: requirements.dependencies,
+		setupMode:
+			options.provider === null
+				? null
+				: options.provider === "files-sdk"
+					? "files-sdk"
+					: "provider-managed",
+		supported: false,
+	};
+}
+
+function initSetup(
+	options: { cwd?: string; platform?: string } = {},
+): InitSetup {
+	const context = providerForCommand({
+		allowUnlinked: true,
+		cwd: options.cwd,
+		platform: options.platform,
+	});
+	return context
+		? {
+				displayName: context.provider.displayName,
+				instrumentationPrompt: context.provider.instrumentationPrompt,
+				projectLabel: context.project.projectLabel,
+				provider: context.provider.kind,
+				rootDir: context.project.rootDir,
+				setupMode: "provider-managed",
+			}
+		: filesSdkInitSetup(options.cwd);
+}
+
+function filesSdkInitSetup(cwd = process.cwd()): InitSetup {
+	const rootDir = agentPondWorkspaceRoot(cwd);
 	return {
 		displayName: "Files SDK",
 		instrumentationPrompt: FILES_SDK_INSTRUMENTATION_PROMPT,
 		projectLabel: rootDir,
+		provider: "files-sdk",
 		rootDir,
+		setupMode: "files-sdk",
 	};
+}
+
+function packageManagerForProject(rootDir: string): PackageManager | null {
+	const packageJsonPath = join(rootDir, "package.json");
+	if (!existsSync(packageJsonPath)) return null;
+	try {
+		const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+			packageManager?: unknown;
+		};
+		if (typeof parsed.packageManager === "string") {
+			const match = /^(bun|npm|pnpm|yarn)(?:@|$)/.exec(parsed.packageManager);
+			if (match) return match[1] as PackageManager;
+		}
+	} catch {
+		return null;
+	}
+	for (const [packageManager, lockfiles] of [
+		["pnpm", ["pnpm-lock.yaml"]],
+		["yarn", ["yarn.lock"]],
+		["bun", ["bun.lock", "bun.lockb"]],
+		["npm", ["package-lock.json", "npm-shrinkwrap.json"]],
+	] as const) {
+		if (lockfiles.some((lockfile) => existsSync(join(rootDir, lockfile)))) {
+			return packageManager;
+		}
+	}
+	return "npm";
+}
+
+function initRequirements(provider: InitProvider): {
+	configuration: string[];
+	dependencies: string[];
+} {
+	switch (provider) {
+		case "files-sdk":
+			return {
+				configuration: [
+					"FILES_SDK_PROVIDER and provider-specific storage configuration",
+					"provider credentials in the trusted application and CLI environments",
+				],
+				dependencies: [
+					"@agentpond/files-sdk",
+					"@agentpond/otel",
+					"files-sdk",
+					"compatible OpenTelemetry runtime and OpenInference instrumentation",
+				],
+			};
+		case "firebase":
+			return {
+				configuration: [
+					"an active Firebase project and default Firebase Admin app",
+					"Storage Rules that protect agentpond/** from client access",
+				],
+				dependencies: [
+					"@agentpond/firebase",
+					"compatible OpenTelemetry runtime and OpenInference instrumentation",
+				],
+			};
+		case "supabase":
+			return {
+				configuration: [
+					"a linked hosted Supabase project and private agentpond bucket",
+					"a server-only Supabase secret key",
+				],
+				dependencies: [
+					"@agentpond/supabase",
+					"compatible OpenTelemetry runtime and OpenInference instrumentation",
+				],
+			};
+		case "vercel":
+			return {
+				configuration: [
+					"a linked Vercel project and connected private Blob store",
+					"Vercel system environment variables in the trusted runtime",
+				],
+				dependencies: [
+					"@agentpond/vercel",
+					"compatible OpenTelemetry runtime and OpenInference instrumentation",
+				],
+			};
+	}
+}
+
+function initCheckReason(error: unknown): InitCheckReason {
+	const message = error instanceof Error ? error.message : String(error);
+	if (message.startsWith("Multiple AgentPond platforms were detected:")) {
+		return {
+			code: "multiple-providers",
+			message,
+			nextSteps: [
+				"Rerun with --platform firebase, --platform supabase, or --platform vercel.",
+			],
+		};
+	}
+	if (message.startsWith("--platform must be ")) {
+		return {
+			code: "invalid-platform",
+			message,
+			nextSteps: ["Use firebase, supabase, or vercel as the platform value."],
+		};
+	}
+	if (/^No (Firebase|Supabase|Vercel) project was detected\./.test(message)) {
+		return {
+			code: "provider-not-found",
+			message,
+			nextSteps: [
+				"Run the check from that provider's project or omit --platform to use automatic detection.",
+			],
+		};
+	}
+	if (
+		message.includes("No active Firebase project is selected") ||
+		message.includes("before using AgentPond with this")
+	) {
+		return {
+			code: "provider-not-ready",
+			message,
+			nextSteps: [
+				"Link or select the provider project, then rerun agentpond init check.",
+			],
+		};
+	}
+	return {
+		code: "detection-failed",
+		message,
+		nextSteps: [
+			"Resolve the reported project-detection error, then rerun agentpond init check.",
+		],
+	};
+}
+
+function providerFromFailedCheck(
+	platform: string | undefined,
+	reason: InitCheckReason,
+): InitProvider | null {
+	if (
+		reason.code === "invalid-platform" ||
+		reason.code === "multiple-providers"
+	) {
+		return null;
+	}
+	return platform === "firebase" ||
+		platform === "supabase" ||
+		platform === "vercel"
+		? platform
+		: null;
+}
+
+function formatInitCheck(result: InitCheckResult): string {
+	const lines = [
+		"AgentPond init check",
+		`CLI version: ${result.cliVersion}`,
+		`Supported: ${result.supported ? "yes" : "no"}`,
+		`Project root: ${result.projectRoot}`,
+		`Package manager: ${result.packageManager ?? "not detected"}`,
+		`Provider: ${result.provider ?? "not determined"}`,
+		`Setup mode: ${result.setupMode ?? "not determined"}`,
+		`Provider linking required later: ${result.providerLinkingRequired ? "yes" : "no"}`,
+		`Credentials required later: ${result.credentialsRequiredLater ? "yes" : "no"}`,
+	];
+	if (result.requiredDependencies.length > 0) {
+		lines.push(
+			"Required dependencies:",
+			...result.requiredDependencies.map((dependency) => `- ${dependency}`),
+		);
+	}
+	if (result.requiredConfiguration.length > 0) {
+		lines.push(
+			"Required configuration:",
+			...result.requiredConfiguration.map((item) => `- ${item}`),
+		);
+	}
+	for (const reason of result.reasons) {
+		lines.push(
+			`Reason (${reason.code}): ${reason.message}`,
+			"Next steps:",
+			...reason.nextSteps.map((nextStep) => `- ${nextStep}`),
+		);
+	}
+	return lines.join("\n");
 }
 
 export async function installSkillsWithBundledCli(

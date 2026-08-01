@@ -10,8 +10,19 @@ npx agentpond --version
 ## Automatic setup
 
 ```bash
+npx agentpond init check
+npx agentpond init check --json
 npx agentpond init
 ```
+
+`init check` is a non-mutating preflight. It reports the exact executing CLI
+version, project root, package manager, detected provider or Files SDK fallback,
+selected setup mode, dependencies, configuration, and whether provider linking
+or credentials will be needed later. Human-readable output is the default;
+`--json` returns a versioned machine-readable result. Unsupported checks exit
+with status 2 and include structured reason codes and next steps. The command
+does not install packages or skills, write files, create environments, prompt,
+or require provider credentials.
 
 `init` detects Firebase, Supabase, or Vercel, installs the
 `agentpond-instrumentation` and `agentpond` project skills, and prints the
@@ -21,7 +32,7 @@ trace verification before choosing production storage. `init` does not edit
 application code, provision storage, link a provider project, initialize an
 environment, or create `.agentpond`.
 
-When multiple platform markers exist, select one explicitly with `--platform firebase`, `--platform supabase`, or `--platform vercel`. The override is stateless and works with setup, environment, sync, and query commands. Forced Supabase or Vercel setup may begin before the project is linked; the coding agent asks for confirmation before linking or provisioning storage. `init` is interactive and does not support `--json`.
+When multiple platform markers exist, select one explicitly with `--platform firebase`, `--platform supabase`, or `--platform vercel`. The override is stateless and works with setup, environment, sync, and query commands. Forced Supabase or Vercel setup may begin before the project is linked; the coding agent asks for confirmation before linking or provisioning storage. The mutating `init` command is interactive and does not support `--json`; `init check --json` is the automation interface.
 
 ## Global options
 

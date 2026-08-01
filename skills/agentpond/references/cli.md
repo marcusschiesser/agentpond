@@ -2,6 +2,23 @@
 
 Run AgentPond through `npx` unless it is installed globally.
 
+## Check setup support
+
+Use the non-mutating preflight before setup automation changes a project:
+
+```bash
+npx agentpond init check
+npx agentpond init check --json
+```
+
+The default output is readable by a person. `--json` returns a versioned stable
+result containing the exact executing CLI version, project root, package
+manager, provider or Files SDK fallback, setup mode, dependencies,
+configuration, later linking and credential requirements, and structured
+reasons and next steps when unsupported. Unsupported results exit with status
+2. The check does not install packages or skills, write files, create
+environments, prompt, or require provider credentials.
+
 ## Select data
 
 Use the provider-specific reference for Firebase, Supabase, or Vercel. Environment
