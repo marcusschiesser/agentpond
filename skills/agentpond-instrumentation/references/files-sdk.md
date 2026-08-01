@@ -78,27 +78,6 @@ and supply credentials through the runtime environment. Keep
 `createFilesSpanExporterFromRuntimeEnv()` in application code so changing
 storage requires environment configuration rather than another code change.
 
-AgentPond uses one storage implementation for cloud adapters:
-`FilesObjectStore`. Do not use the removed `VercelBlobObjectStore`,
-`SupabaseStorageObjectStore`, or `FirebaseStorageObjectStore` classes in custom
-instrumentation. Prefer the retained platform exporter factory for those
-platforms. When custom object-store access is required, wrap the appropriate
-Files SDK adapter directly and put the prefix on the sink:
-
-```ts
-import { FilesObjectStore } from "@agentpond/files-sdk";
-import { r2 } from "files-sdk/r2";
-
-const store = FilesObjectStore.fromAdapter(
-  r2({ bucket: "agentpond" }),
-);
-const sink = store.toSink({ prefix: "production" });
-```
-
-`fromAdapter()` supplies AgentPond's standard retry and timeout policy. Accept
-the adapter's normal metadata/read requests; do not add a provider-specific
-fast path.
-
 For Azure Blob Storage, install `@azure/storage-blob`, initialize with
 `npx agentpond env init production --provider azure --container <container>`,
 and provide `AZURE_STORAGE_CONNECTION_STRING` or the matching

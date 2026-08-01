@@ -101,41 +101,10 @@ Use the matching adapter for the deployment:
 - `createFirebaseSpanExporter()` from `@agentpond/firebase`
 - `createSupabaseSpanExporter()` from `@agentpond/supabase`
 
-All of these paths now converge on `FilesObjectStore` and the one
-`AgentPondSpanExporter` implementation. The platform factories remain the
-recommended API when the application runs on Vercel, Firebase, or Supabase:
-they preserve each platform's project, credentials, bucket checks, and prefix
-rules without introducing platform-specific exporter classes.
-
-The old `VercelBlobObjectStore`, `SupabaseStorageObjectStore`, and
-`FirebaseStorageObjectStore` classes have been removed. Existing users have two
-migration paths:
-
-1. For OpenTelemetry export, replace direct store construction with the
-   retained `createVercelSpanExporter()`, `createSupabaseSpanExporter()`, or
-   `createFirebaseSpanExporter()` factory.
-2. For custom object-store workflows, construct the matching Files SDK adapter
-   and wrap it with `FilesObjectStore.fromAdapter()`. Apply the object prefix to
-   the ingestion sink rather than the store:
-
-```ts
-import { FilesObjectStore } from "@agentpond/files-sdk";
-import { vercelBlob } from "files-sdk/vercel-blob";
-
-const store = FilesObjectStore.fromAdapter(
-  vercelBlob({
-    access: "private",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  }),
-);
-const sink = store.toSink({ prefix: "agentpond" });
-```
-
-`FilesObjectStore.fromAdapter()` applies AgentPond's standard three retries and
-10-second timeout unless overridden. AgentPond deliberately uses the Files SDK
-adapter's normal read path; some providers may perform an additional metadata
-request. There are no provider-specific read fast paths.
+All of these paths converge on one `AgentPondSpanExporter` implementation. The
+platform factories remain the recommended API when the application runs on
+Vercel, Firebase, or Supabase: they preserve each platform's project,
+credentials, bucket checks, and prefix rules.
 
 The application needs write credentials for the selected object store.
 `AGENTPOND_PROJECT_ID` defaults to `default-project`, and
@@ -193,27 +162,6 @@ const exporter = createFilesSpanExporter({
     retries: 3,
     timeout: 10_000,
   }),
-});
-```
-
-Alternatively, let AgentPond construct the Files client with its standard
-retry and timeout policy:
-
-```ts
-import { FilesObjectStore } from "@agentpond/files-sdk";
-import { createFilesSpanExporter } from "@agentpond/files-sdk/otel";
-import { r2 } from "files-sdk/r2";
-
-const store = FilesObjectStore.fromAdapter(
-  r2({
-    bucket: "agentpond",
-  }),
-);
-
-const exporter = createFilesSpanExporter({
-  store,
-  projectId: "my-project",
-  prefix: "production",
 });
 ```
 
