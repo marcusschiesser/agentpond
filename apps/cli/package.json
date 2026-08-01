@@ -44,7 +44,7 @@
 		"commander": "15.0.0",
 		"disk": "^0.8.18",
 		"fastify": "^5.6.2",
-		"files-sdk": "2.2.1",
+		"files-sdk": "2.2.2",
 		"node-appwrite": "^26.0.0",
 		"protobufjs": "^7.6.5",
 		"skills": "1.5.9",

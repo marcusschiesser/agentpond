@@ -24,8 +24,11 @@
 	},
 	"dependencies": {
 		"@agentpond/core": "workspace:*",
+		"@agentpond/files-sdk": "workspace:*",
 		"@agentpond/otel": "workspace:*",
-		"@supabase/supabase-js": "^2.110.6"
+		"@supabase/storage-js": "2.110.6",
+		"@supabase/supabase-js": "^2.110.6",
+		"files-sdk": "2.2.2"
 	},
 	"devDependencies": {
 		"@opentelemetry/sdk-trace-base": "^2.9.0"

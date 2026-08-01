@@ -4,6 +4,7 @@ import {
 	type AgentPondProviderProject,
 	type AgentPondStorageEnvironmentContext,
 	agentPondWorkspaceRoot,
+	type ObjectStore,
 	resolveAgentPondEnvironment,
 } from "@agentpond/core";
 import {
@@ -16,16 +17,24 @@ import {
 	supabaseProjectDirectory,
 	validateSupabaseProjectRef,
 } from "./supabase-project.js";
-import { SupabaseStorageObjectStore } from "./supabase-storage.js";
+import {
+	createSupabaseStorageStoreFromCliProject,
+	type SupabaseStorageObjectStoreConfig,
+} from "./supabase-storage.js";
 
 export type SupabaseEnvironmentContextOptions = {
 	cwd?: string;
 	envName?: string;
 };
 
+type SupabaseEnvironmentContextDependencies = {
+	run?: SupabaseProcessRunner;
+	createStore?: (config: SupabaseStorageObjectStoreConfig) => ObjectStore;
+};
+
 export function supabaseEnvironmentContextFromCwdIfAvailable(
 	options: SupabaseEnvironmentContextOptions = {},
-	dependencies: { run?: SupabaseProcessRunner } = {},
+	dependencies: SupabaseEnvironmentContextDependencies = {},
 ): AgentPondEnvironmentContext | undefined {
 	const root = supabaseProjectDirectory(options.cwd);
 	if (!root) return undefined;
@@ -42,7 +51,7 @@ export function supabaseEnvironmentContextFromCwdIfAvailable(
 
 function supabaseEnvironmentContext(
 	project: SupabaseCliProjectConfig,
-	dependencies: { run?: SupabaseProcessRunner } = {},
+	dependencies: SupabaseEnvironmentContextDependencies = {},
 ): AgentPondStorageEnvironmentContext {
 	const environment = resolveAgentPondEnvironment({
 		cwd: project.root,
@@ -66,10 +75,10 @@ function supabaseEnvironmentContext(
 		config,
 		async resolveStorage() {
 			return {
-				store: await SupabaseStorageObjectStore.fromCliProject(
-					project,
-					dependencies,
-				),
+				store: await createSupabaseStorageStoreFromCliProject(project, {
+					run: dependencies.run,
+					createStore: dependencies.createStore,
+				}),
 				projectId: project.projectRef,
 				prefix: "",
 			};

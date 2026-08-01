@@ -10,13 +10,13 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { type AuthConfig, eventTypes, sinkFromStore } from "@agentpond/core";
+import { MemoryObjectStore } from "@agentpond/core";
 import { AgentPondSpanExporter } from "@agentpond/otel";
+import * as vercelPackage from "@agentpond/vercel";
 import {
 	createVercelSpanExporter,
 	selectVercelEnvironment,
-	type VercelBlobClient,
-	VercelBlobObjectStore,
+	type VercelBlobConfig,
 	type VercelProcessRunner,
 	vercelAgentPondProjectId,
 	vercelBlobConfigFromEnv,
@@ -26,12 +26,7 @@ import {
 	vercelProjectCandidateDirectory,
 	vercelProvider,
 } from "@agentpond/vercel";
-
-const auth: AuthConfig = {
-	projectId: "project-a",
-	publicKey: "pk",
-	secretKey: "sk",
-};
+import { vercelBlobAdapterOptions } from "../src/blob.js";
 
 test("Vercel Blob runtime config leaves OIDC resolution to the SDK", () => {
 	const originalEnv = saveEnv(VERCEL_ENV_KEYS);
@@ -41,8 +36,6 @@ test("Vercel Blob runtime config leaves OIDC resolution to the SDK", () => {
 
 		assert.deepEqual(vercelBlobConfigFromRuntimeEnv(), {
 			access: "private",
-			token: undefined,
-			storeId: undefined,
 		});
 
 		process.env.AGENTPOND_BLOB_ACCESS = "public";
@@ -52,8 +45,6 @@ test("Vercel Blob runtime config leaves OIDC resolution to the SDK", () => {
 
 		assert.deepEqual(vercelBlobConfigFromRuntimeEnv(), {
 			access: "public",
-			token: "rw-token",
-			storeId: "store_123",
 		});
 		assert.deepEqual(vercelBlobConfigFromEnv(process.env), {
 			access: "public",
@@ -82,18 +73,46 @@ test("Vercel Blob config rejects invalid access settings", () => {
 	}
 });
 
+test("Vercel Blob uses private overwrite-safe stable keys", () => {
+	assert.deepEqual(
+		vercelBlobAdapterOptions({
+			access: "private",
+			token: "rw-token",
+			storeId: "store_123",
+			oidcToken: "oidc-token",
+		}),
+		{
+			access: "private",
+			addRandomSuffix: false,
+			allowOverwrite: true,
+			token: "rw-token",
+			storeId: "store_123",
+			oidcToken: "oidc-token",
+		},
+	);
+});
+
+test("Vercel retains its exporter factory without exporting its old store", () => {
+	assert.equal("VercelBlobObjectStore" in vercelPackage, false);
+	assert.equal(typeof vercelPackage.createVercelSpanExporter, "function");
+});
+
 test("Vercel span exporter scopes projects by project and target", () => {
 	const originalEnv = saveEnv(VERCEL_ENV_KEYS);
 	try {
 		clearEnv(VERCEL_ENV_KEYS);
 		process.env.VERCEL_PROJECT_ID = "prj_demo";
 		process.env.VERCEL_TARGET_ENV = "staging";
+		process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_demo";
 
 		assert.equal(
 			vercelAgentPondProjectId("prj_demo", "staging"),
 			"prj_demo-staging",
 		);
-		assert.ok(createVercelSpanExporter() instanceof AgentPondSpanExporter);
+		assert.ok(
+			createVercelSpanExporter({ retries: 0, timeout: 1_000 }) instanceof
+				AgentPondSpanExporter,
+		);
 		assert.throws(
 			() => vercelAgentPondProjectId("prj_demo", "feature/unsafe"),
 			/Invalid Vercel environment/,
@@ -177,6 +196,7 @@ test("Vercel environment context resolves one target without pre-listing targets
 		mkdtempSync(join(tmpdir(), "agentpond-vercel-context-")),
 	);
 	const pulledFiles: string[] = [];
+	let resolvedConfig: VercelBlobConfig | undefined;
 	const run: VercelProcessRunner = async ({ args }) => {
 		assert.equal(args[0], "env");
 		assert.equal(args[1], "pull");
@@ -201,7 +221,13 @@ test("Vercel environment context resolves one target without pre-listing targets
 
 	const context = vercelEnvironmentContextFromCwdIfAvailable(
 		{ cwd: root, envName: "staging" },
-		{ run },
+		{
+			run,
+			createStore(config) {
+				resolvedConfig = config;
+				return new MemoryObjectStore();
+			},
+		},
 	);
 	assert.ok(context);
 	assert.equal(context.kind, "vercel");
@@ -215,6 +241,12 @@ test("Vercel environment context resolves one target without pre-listing targets
 	const storage = await context.resolveStorage();
 	assert.equal(storage.projectId, "prj_demo-staging");
 	assert.equal(storage.prefix, "agentpond/");
+	assert.deepEqual(resolvedConfig, {
+		access: "private",
+		token: undefined,
+		storeId: "store_demo",
+		oidcToken: "oidc_demo",
+	});
 	assert.equal(pulledFiles.length, 1);
 	assert.equal(existsSync(pulledFiles[0]), false);
 });
@@ -271,165 +303,6 @@ test("Vercel ignores selected targets saved for a different linked project", asy
 	assert.equal(context?.config.environment?.name, "production");
 	assert.equal(context?.config.projectId, "prj_new-production");
 });
-
-test("Vercel Blob object store writes, reads, and lists JSON objects", async () => {
-	const objects = new Map<string, string>();
-	const putOptions: unknown[] = [];
-	const listOptions: unknown[] = [];
-	const store = new VercelBlobObjectStore(
-		{
-			access: "private",
-			token: "rw-token",
-			storeId: "store_123",
-			oidcToken: "oidc-token",
-		},
-		createMockBlobClient(objects, putOptions, listOptions),
-	);
-
-	await store.putJson("project-a/trace/trace-2/event.json", { ok: 2 });
-	await store.putJson("project-a/trace/trace-1/event.json", { ok: true });
-
-	assert.deepEqual(putOptions[0], {
-		access: "private",
-		allowOverwrite: true,
-		contentType: "application/json",
-		token: "rw-token",
-		storeId: "store_123",
-		oidcToken: "oidc-token",
-	});
-	assert.deepEqual(await store.getJson("project-a/trace/trace-1/event.json"), {
-		ok: true,
-	});
-	assert.deepEqual(await store.listKeys("project-a/trace/"), [
-		"project-a/trace/trace-1/event.json",
-		"project-a/trace/trace-2/event.json",
-	]);
-	assert.equal(listOptions.length, 2);
-	assert.deepEqual(listOptions[0], {
-		prefix: "project-a/trace/",
-		cursor: undefined,
-		mode: "expanded",
-		token: "rw-token",
-		storeId: "store_123",
-		oidcToken: "oidc-token",
-	});
-	assert.deepEqual(listOptions[1], {
-		prefix: "project-a/trace/",
-		cursor: "next-page",
-		mode: "expanded",
-		token: "rw-token",
-		storeId: "store_123",
-		oidcToken: "oidc-token",
-	});
-});
-
-test("Vercel Blob object store reports missing or empty objects", async () => {
-	const objects = new Map<string, string>();
-	const store = new VercelBlobObjectStore(
-		{ access: "private" },
-		createMockBlobClient(objects),
-	);
-
-	await assert.rejects(
-		() => store.getJson("missing.json"),
-		/Vercel Blob object not found: missing\.json/,
-	);
-
-	objects.set("empty.json", "");
-	await assert.rejects(
-		() => store.getJson("empty.json"),
-		/Vercel Blob object is empty: empty\.json/,
-	);
-});
-
-test("Vercel Blob object store creates sink with runtime prefix", async () => {
-	const objects = new Map<string, string>();
-	const store = new VercelBlobObjectStore(
-		{ access: "private" },
-		createMockBlobClient(objects),
-	);
-
-	await store.toSink({ prefix: "prod" }).writeEvents({
-		projectId: auth.projectId,
-		events: [
-			{
-				id: "event-vercel-sink-1",
-				timestamp: "2026-06-14T00:00:00.000Z",
-				type: eventTypes.TRACE_CREATE,
-				body: { id: "trace-vercel-sink-1" },
-			},
-		],
-	});
-
-	assert.equal((await store.listKeys("prod/project-a/")).length > 0, true);
-});
-
-test("Vercel Blob object store can be used as a generic ingestion sink", async () => {
-	const objects = new Map<string, string>();
-	const store = new VercelBlobObjectStore(
-		{ access: "private" },
-		createMockBlobClient(objects),
-	);
-
-	await sinkFromStore(store).writeEvents({
-		projectId: auth.projectId,
-		events: [
-			{
-				id: "event-vercel-generic-1",
-				timestamp: "2026-06-14T00:00:00.000Z",
-				type: eventTypes.TRACE_CREATE,
-				body: { id: "trace-vercel-generic-1" },
-			},
-		],
-	});
-
-	assert.equal((await store.listKeys("project-a/")).length > 0, true);
-});
-
-function createMockBlobClient(
-	objects: Map<string, string>,
-	putOptions: unknown[] = [],
-	listOptions: unknown[] = [],
-): VercelBlobClient {
-	return {
-		put: async (pathname, body, options) => {
-			putOptions.push(options);
-			objects.set(pathname, body);
-			return { pathname };
-		},
-		get: async (pathname) => {
-			if (!objects.has(pathname)) return null;
-			return {
-				statusCode: 200,
-				stream: streamFromString(objects.get(pathname) ?? ""),
-			};
-		},
-		list: async (options) => {
-			listOptions.push(options);
-			const keys = [...objects.keys()]
-				.filter((key) => key.startsWith(options.prefix))
-				.sort();
-			const pageSize = 1;
-			const start = options.cursor === "next-page" ? 1 : 0;
-			const page = keys.slice(start, start + pageSize);
-			const next = start + pageSize;
-			return {
-				blobs: page.map((pathname) => ({ pathname })),
-				cursor: next < keys.length ? "next-page" : undefined,
-				hasMore: next < keys.length,
-			};
-		},
-	};
-}
-
-function streamFromString(value: string): ReadableStream<Uint8Array> {
-	return new ReadableStream({
-		start(controller) {
-			controller.enqueue(new TextEncoder().encode(value));
-			controller.close();
-		},
-	});
-}
 
 const VERCEL_ENV_KEYS = [
 	"AGENTPOND_BLOB_ACCESS",

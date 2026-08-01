@@ -3,10 +3,11 @@ import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { MemoryObjectStore } from "@agentpond/core";
+import * as supabasePackage from "@agentpond/supabase";
 import {
 	createSupabaseSpanExporter,
 	type SupabaseProcessRunner,
-	SupabaseStorageObjectStore,
 	selectSupabaseEnvironment,
 	supabaseCliProjectConfigFromCwd,
 	supabaseCliProjectConfigFromCwdIfAvailable,
@@ -24,6 +25,10 @@ import {
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+	createSupabaseStorageStoreFromClient,
+	createSupabaseStorageStoreFromConfig,
+} from "../src/supabase-storage.js";
 
 const PROJECT_REF = "abcdefghijklmnopqrst";
 const OTHER_PROJECT_REF = "bcdefghijklmnopqrstu";
@@ -87,13 +92,18 @@ test("Supabase storage rejects publishable and anonymous credentials", () => {
 	]) {
 		assert.throws(
 			() =>
-				SupabaseStorageObjectStore.fromConfig({
+				createSupabaseStorageStoreFromConfig({
 					url: `https://${PROJECT_REF}.supabase.co`,
 					secretKey,
 				}),
 			/secret key or legacy service-role key/,
 		);
 	}
+});
+
+test("Supabase storage no longer exports a platform-specific object store", () => {
+	assert.equal("SupabaseStorageObjectStore" in supabasePackage, false);
+	assert.equal(typeof supabasePackage.createSupabaseSpanExporter, "function");
 });
 
 test("Supabase hosted URLs derive and validate project refs", () => {
@@ -215,7 +225,7 @@ test("Supabase CLI failures never include captured secrets", async () => {
 
 test("Supabase Storage validates private buckets lazily and only once", async () => {
 	const storage = new MockSupabaseStorage();
-	const store = SupabaseStorageObjectStore.fromClient(mockClient(storage));
+	const store = createSupabaseStorageStoreFromClient(mockClient(storage));
 	assert.equal(storage.getBucketCalls, 0);
 
 	await store.putJson("one.json", { ok: true });
@@ -223,7 +233,6 @@ test("Supabase Storage validates private buckets lazily and only once", async ()
 	assert.deepEqual(await store.getJson("one.json"), { ok: true });
 	assert.equal(storage.getBucketCalls, 1);
 	assert.deepEqual(storage.uploadOptions[0], {
-		cacheControl: "0",
 		contentType: "application/json",
 		upsert: true,
 	});
@@ -233,14 +242,14 @@ test("Supabase Storage rejects missing and public buckets", async () => {
 	const missing = new MockSupabaseStorage({ missing: true });
 	await assert.rejects(
 		() =>
-			SupabaseStorageObjectStore.fromClient(mockClient(missing)).listKeys(""),
+			createSupabaseStorageStoreFromClient(mockClient(missing)).listKeys(""),
 		/bucket "agentpond" does not exist/,
 	);
 
 	const publicStorage = new MockSupabaseStorage({ public: true });
 	await assert.rejects(
 		() =>
-			SupabaseStorageObjectStore.fromClient(mockClient(publicStorage)).putJson(
+			createSupabaseStorageStoreFromClient(mockClient(publicStorage)).putJson(
 				"one.json",
 				{},
 			),
@@ -261,7 +270,7 @@ test("Supabase Storage recursively paginates and returns stable keys", async () 
 		JSON.stringify(2),
 	);
 	storage.objects.set("unrelated/object.json", JSON.stringify(false));
-	const store = SupabaseStorageObjectStore.fromClient(mockClient(storage));
+	const store = createSupabaseStorageStoreFromClient(mockClient(storage));
 
 	const keys = await store.listKeys(`otel/${PROJECT_REF}/`);
 	assert.equal(keys.length, 106);
@@ -270,7 +279,7 @@ test("Supabase Storage recursively paginates and returns stable keys", async () 
 	assert.ok(
 		storage.listRequests.some(
 			(request) =>
-				request.path === `otel/${PROJECT_REF}` && request.offset === 100,
+				request.prefix === `otel/${PROJECT_REF}/` && request.cursor === "100",
 		),
 	);
 });
@@ -278,7 +287,12 @@ test("Supabase Storage recursively paginates and returns stable keys", async () 
 test("Supabase environment contexts use project refs for overrides and cache paths", async () => {
 	const root = supabaseProjectRoot("agentpond-supabase-context-");
 	linkSupabaseProject(root, PROJECT_REF);
-	const storage = new MockSupabaseStorage();
+	let resolvedConfig:
+		| {
+				url: string;
+				secretKey: string;
+		  }
+		| undefined;
 	const run: SupabaseProcessRunner = async () => ({
 		exitCode: 0,
 		stderr: "",
@@ -288,7 +302,13 @@ test("Supabase environment contexts use project refs for overrides and cache pat
 	});
 	const context = supabaseEnvironmentContextFromCwdIfAvailable(
 		{ cwd: root, envName: OTHER_PROJECT_REF },
-		{ run },
+		{
+			run,
+			createStore(config) {
+				resolvedConfig = config;
+				return new MemoryObjectStore();
+			},
+		},
 	);
 	assert.ok(context);
 	assert.equal(context.kind, "supabase");
@@ -306,24 +326,21 @@ test("Supabase environment contexts use project refs for overrides and cache pat
 	);
 	assert.doesNotMatch(supabaseProvider.instrumentationPrompt, /EdgeRuntime/);
 
-	const original = SupabaseStorageObjectStore.fromConfig;
-	SupabaseStorageObjectStore.fromConfig = (() =>
-		SupabaseStorageObjectStore.fromClient(
-			mockClient(storage),
-		)) as typeof SupabaseStorageObjectStore.fromConfig;
-	try {
-		const resolved = await context.resolveStorage();
-		assert.equal(resolved.projectId, OTHER_PROJECT_REF);
-		assert.equal(resolved.prefix, "");
-	} finally {
-		SupabaseStorageObjectStore.fromConfig = original;
-	}
+	const resolved = await context.resolveStorage();
+	assert.equal(resolved.projectId, OTHER_PROJECT_REF);
+	assert.equal(resolved.prefix, "");
+	assert.deepEqual(resolvedConfig, {
+		url: `https://${OTHER_PROJECT_REF}.supabase.co`,
+		secretKey: SECRET_KEY,
+	});
 });
 
 test("Supabase exporter writes to otel/<project-ref> with no bucket prefix", async () => {
 	const storage = new MockSupabaseStorage();
 	const exporter = createSupabaseSpanExporter({
 		client: mockClient(storage),
+		retries: 0,
+		timeout: 1_000,
 	});
 	const provider = new BasicTracerProvider({
 		spanProcessors: [new SimpleSpanProcessor(exporter)],
@@ -371,8 +388,8 @@ type MockStorageOptions = {
 };
 
 class MockSupabaseStorage {
-	readonly listRequests: Array<{ offset: number; path: string }> = [];
-	readonly objects = new Map<string, string>();
+	readonly listRequests: Array<{ cursor?: string; prefix?: string }> = [];
+	readonly objects = new Map<string, unknown>();
 	readonly uploadOptions: unknown[] = [];
 	getBucketCalls = 0;
 
@@ -390,7 +407,7 @@ class MockSupabaseStorage {
 	};
 
 	from = () => ({
-		upload: async (path: string, body: string, options: unknown) => {
+		upload: async (path: string, body: unknown, options: unknown) => {
 			this.uploadOptions.push(options);
 			this.objects.set(path, body);
 			return { data: { path }, error: null };
@@ -402,13 +419,40 @@ class MockSupabaseStorage {
 						data: null,
 						error: { message: "Object not found", statusCode: 404 },
 					}
-				: { data: new Blob([body]), error: null };
+				: {
+						data: new Blob([body as BlobPart], {
+							type: "application/json",
+						}),
+						error: null,
+					};
 		},
-		list: async (path: string, options: { limit: number; offset: number }) => {
-			this.listRequests.push({ path, offset: options.offset });
-			const entries = immediateStorageEntries(this.objects, path);
+		listV2: async (options: {
+			cursor?: string;
+			limit: number;
+			prefix?: string;
+		}) => {
+			this.listRequests.push({
+				cursor: options.cursor,
+				prefix: options.prefix,
+			});
+			const entries = [...this.objects.keys()]
+				.filter((key) => key.startsWith(options.prefix ?? ""))
+				.sort();
+			const offset = Number(options.cursor ?? 0);
+			const page = entries.slice(offset, offset + options.limit);
+			const nextOffset = offset + page.length;
 			return {
-				data: entries.slice(options.offset, options.offset + options.limit),
+				data: {
+					folders: [],
+					hasNext: nextOffset < entries.length,
+					nextCursor:
+						nextOffset < entries.length ? String(nextOffset) : undefined,
+					objects: page.map((key) => ({
+						key,
+						metadata: {},
+						name: key,
+					})),
+				},
 				error: null,
 			};
 		},
@@ -425,32 +469,6 @@ function mockClient(
 		supabaseKey: key,
 		supabaseUrl: url,
 	} as unknown as SupabaseClient;
-}
-
-function immediateStorageEntries(
-	objects: Map<string, string>,
-	directory: string,
-): Array<{ id: string | null; metadata: unknown; name: string }> {
-	const base = directory ? `${directory}/` : "";
-	const entries = new Map<
-		string,
-		{ id: string | null; metadata: unknown; name: string }
-	>();
-	for (const key of objects.keys()) {
-		if (!key.startsWith(base)) continue;
-		const remainder = key.slice(base.length);
-		const [name, ...rest] = remainder.split("/");
-		if (!name) continue;
-		entries.set(
-			name,
-			rest.length > 0
-				? { id: null, metadata: null, name }
-				: { id: `id-${name}`, metadata: {}, name },
-		);
-	}
-	return [...entries.values()].sort((left, right) =>
-		left.name.localeCompare(right.name),
-	);
 }
 
 function supabaseProjectRoot(prefix: string): string {

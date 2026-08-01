@@ -32,6 +32,11 @@ For manually configured Files SDK deployments, `env list`, `env init`, and
 operations and the local testing server are unavailable when AgentPond detects
 Firebase, Supabase, or Vercel.
 
+Detected Firebase, Supabase, and Vercel projects use the same shared
+Files SDK object-store layer internally, but their provider contexts choose the
+adapter, credentials, bucket, project identity, and prefix. Do not replace a
+detected provider context with a manual Files SDK environment.
+
 Select and sync an existing Files SDK environment:
 
 ```bash

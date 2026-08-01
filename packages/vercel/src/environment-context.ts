@@ -15,10 +15,15 @@ import {
 	type AgentPondStorageEnvironmentContext,
 	agentPondWorkspaceRoot,
 	normalizePrefix,
+	type ObjectStore,
 	parseEnvFile,
 	resolveAgentPondEnvironment,
 } from "@agentpond/core";
-import { VercelBlobObjectStore, vercelBlobConfigFromEnv } from "./blob.js";
+import {
+	createVercelBlobStore,
+	type VercelBlobConfig,
+	vercelBlobConfigFromEnv,
+} from "./blob.js";
 import {
 	defaultVercelBlobPrefix,
 	vercelAgentPondProjectId,
@@ -51,6 +56,11 @@ export type VercelContextOptions = {
 	envName?: string;
 };
 
+type VercelContextDependencies = {
+	run?: VercelProcessRunner;
+	createStore?: (config: VercelBlobConfig) => ObjectStore;
+};
+
 type VercelAgentPondState = {
 	projectId: string;
 	target: string;
@@ -58,7 +68,7 @@ type VercelAgentPondState = {
 
 export function vercelEnvironmentContextFromCwdIfAvailable(
 	options: VercelContextOptions = {},
-	dependencies: { run?: VercelProcessRunner } = {},
+	dependencies: VercelContextDependencies = {},
 ): AgentPondEnvironmentContext | undefined {
 	const root = vercelProjectCandidateDirectory(options.cwd);
 	if (!root) return undefined;
@@ -74,7 +84,7 @@ export function vercelEnvironmentContextFromCwdIfAvailable(
 function vercelEnvironmentContext(
 	project: VercelCliProjectConfig,
 	envName: string | undefined,
-	dependencies: { run?: VercelProcessRunner } = {},
+	dependencies: VercelContextDependencies = {},
 ): AgentPondStorageEnvironmentContext {
 	const target = envName ?? vercelSelectedTarget(project) ?? "production";
 	const projectId = vercelAgentPondProjectId(project.projectId, target);
@@ -104,6 +114,7 @@ function vercelEnvironmentContext(
 					project.root,
 					target,
 					dependencies.run ?? runVercelProcess,
+					dependencies.createStore ?? createVercelBlobStore,
 				),
 				projectId,
 				prefix: config.prefix,
@@ -202,7 +213,8 @@ async function vercelStoreForTarget(
 	root: string,
 	target: string,
 	run: VercelProcessRunner,
-): Promise<VercelBlobObjectStore> {
+	createStore: (config: VercelBlobConfig) => ObjectStore,
+): Promise<ObjectStore> {
 	const tempDir = mkdtempSync(join(tmpdir(), "agentpond-vercel-"));
 	const envPath = join(tempDir, "environment.env");
 	try {
@@ -230,7 +242,7 @@ async function vercelStoreForTarget(
 				`Vercel environment "${target}" is not connected to a Blob store. Connect a private Blob store and try again.`,
 			);
 		}
-		return VercelBlobObjectStore.fromConfig({ ...config, access: "private" });
+		return createStore({ ...config, access: "private" });
 	} finally {
 		rmSync(tempDir, { force: true, recursive: true });
 	}

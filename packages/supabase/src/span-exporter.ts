@@ -1,3 +1,4 @@
+import type { FilesClientOptions } from "@agentpond/files-sdk";
 import { AgentPondSpanExporter } from "@agentpond/otel";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -5,15 +6,16 @@ import {
 	validateSupabaseProjectRef,
 } from "./supabase-project.js";
 import {
+	createSupabaseStorageStoreFromClient,
+	createSupabaseStorageStoreFromConfig,
 	defaultSupabaseStorageBucket,
 	defaultSupabaseStoragePrefix,
 	type SupabaseEnvironment,
-	SupabaseStorageObjectStore,
 	supabaseRuntimeEnvironment,
 	supabaseStorageConfigFromEnv,
 } from "./supabase-storage.js";
 
-export type SupabaseSpanExporterOptions = {
+export type SupabaseSpanExporterOptions = FilesClientOptions & {
 	bucket?: string;
 	client?: SupabaseClient;
 	env?: SupabaseEnvironment;
@@ -25,16 +27,22 @@ export type SupabaseSpanExporterOptions = {
 
 export function createSupabaseSpanExporter(
 	options: SupabaseSpanExporterOptions = {},
-): AgentPondSpanExporter {
+) {
 	if (options.client) {
 		const projectId = options.projectId
 			? validateSupabaseProjectRef(options.projectId)
 			: supabaseProjectRefFromUrl(supabaseClientUrl(options.client));
-		const store = SupabaseStorageObjectStore.fromClient(options.client, {
+		const store = createSupabaseStorageStoreFromClient(options.client, {
 			bucket: options.bucket ?? defaultSupabaseStorageBucket,
 			prefix: options.prefix ?? defaultSupabaseStoragePrefix,
+			retries: options.retries,
+			timeout: options.timeout,
 		});
-		return new AgentPondSpanExporter({ store, projectId });
+		return new AgentPondSpanExporter({
+			store,
+			projectId,
+			prefix: options.prefix ?? defaultSupabaseStoragePrefix,
+		});
 	}
 
 	const env =
@@ -49,14 +57,20 @@ export function createSupabaseSpanExporter(
 		{
 			bucket: options.bucket ?? defaultSupabaseStorageBucket,
 			prefix: options.prefix ?? defaultSupabaseStoragePrefix,
+			retries: options.retries,
+			timeout: options.timeout,
 		},
 	);
 	const projectId = options.projectId
 		? validateSupabaseProjectRef(options.projectId)
 		: supabaseProjectRefFromUrl(storageConfig.url);
-	const store = SupabaseStorageObjectStore.fromConfig(storageConfig);
+	const store = createSupabaseStorageStoreFromConfig(storageConfig);
 
-	return new AgentPondSpanExporter({ store, projectId });
+	return new AgentPondSpanExporter({
+		store,
+		projectId,
+		prefix: options.prefix ?? defaultSupabaseStoragePrefix,
+	});
 }
 
 function supabaseClientUrl(client: SupabaseClient): string {

@@ -15,6 +15,7 @@ import {
 import { Files } from "files-sdk";
 import { memory } from "files-sdk/memory";
 import {
+	defaultFilesClientOptions,
 	FilesObjectStore,
 	filesSdkConfigFromRuntimeEnv,
 	getFilesSdkProvider,
@@ -45,7 +46,7 @@ async function readableSpans(): Promise<ReadableSpan[]> {
 
 test("FilesObjectStore implements JSON reads, writes, and sorted prefix lists", async () => {
 	const files = new Files({ adapter: memory() });
-	const store = new FilesObjectStore(files);
+	const store = FilesObjectStore.fromFiles(files);
 
 	await store.putJson("traces/z.json", { id: "z" });
 	await store.putJson("traces/a.json", { id: "a" });
@@ -59,9 +60,60 @@ test("FilesObjectStore implements JSON reads, writes, and sorted prefix lists", 
 	assert.equal((await files.head("traces/a.json")).type, "application/json");
 });
 
+test("AgentPond Files clients have stable retry and timeout defaults", () => {
+	assert.deepEqual(defaultFilesClientOptions, {
+		retries: 3,
+		timeout: 10_000,
+	});
+});
+
+test("FilesObjectStore.fromFiles accepts a lazily loaded client", async () => {
+	const files = new Files({ adapter: memory() });
+	const store = FilesObjectStore.fromFiles(Promise.resolve(files));
+
+	await store.putJson("lazy.json", { ok: true });
+
+	assert.deepEqual(await store.getJson("lazy.json"), { ok: true });
+});
+
+test("FilesObjectStore readiness runs once for concurrent operations", async () => {
+	let readinessCalls = 0;
+	const store = FilesObjectStore.fromFiles(new Files({ adapter: memory() }), {
+		beforeFirstOperation: async () => {
+			readinessCalls += 1;
+			await Promise.resolve();
+		},
+	});
+
+	await Promise.all([
+		store.putJson("a.json", { id: "a" }),
+		store.putJson("b.json", { id: "b" }),
+		store.listKeys(""),
+	]);
+	assert.equal(readinessCalls, 1);
+});
+
+test("FilesObjectStore memoizes readiness failures", async () => {
+	const failure = new Error("bucket is public");
+	let readinessCalls = 0;
+	const store = FilesObjectStore.fromFiles(new Files({ adapter: memory() }), {
+		beforeFirstOperation: () => {
+			readinessCalls += 1;
+			throw failure;
+		},
+	});
+
+	await assert.rejects(store.listKeys(""), (error) => error === failure);
+	await assert.rejects(
+		store.putJson("a.json", { id: "a" }),
+		(error) => error === failure,
+	);
+	assert.equal(readinessCalls, 1);
+});
+
 test("FilesObjectStore reports invalid JSON with the object key", async () => {
 	const files = new Files({ adapter: memory() });
-	const store = new FilesObjectStore(files);
+	const store = FilesObjectStore.fromFiles(files);
 	await files.upload("broken.json", "{");
 
 	await assert.rejects(
@@ -340,6 +392,47 @@ test("createFilesSpanExporter uses AgentPond runtime project and prefix", async 
 			keys[0],
 			/^shared\/otel\/files-project\/\d{4}\/\d{2}\/\d{2}\/\d{2}\/\d{2}\/[0-9a-f-]+\.json$/,
 		);
+		await exporter.shutdown();
+	} finally {
+		if (originalProjectId === undefined) {
+			delete process.env.AGENTPOND_PROJECT_ID;
+		} else {
+			process.env.AGENTPOND_PROJECT_ID = originalProjectId;
+		}
+		if (originalPrefix === undefined) {
+			delete process.env.AGENTPOND_PREFIX;
+		} else {
+			process.env.AGENTPOND_PREFIX = originalPrefix;
+		}
+	}
+});
+
+test("createFilesSpanExporter accepts lazy Files with an explicit destination", async () => {
+	const adapter = memory();
+	const files = new Files({ adapter });
+	const originalProjectId = process.env.AGENTPOND_PROJECT_ID;
+	const originalPrefix = process.env.AGENTPOND_PREFIX;
+	delete process.env.AGENTPOND_PROJECT_ID;
+	delete process.env.AGENTPOND_PREFIX;
+	try {
+		const exporter = createFilesSpanExporter({
+			files: Promise.resolve(files),
+			projectId: "explicit-project",
+			prefix: "explicit-prefix",
+		});
+		const spans = await readableSpans();
+		const result = await new Promise<ExportResult>((resolve) =>
+			exporter.export(spans, resolve),
+		);
+
+		assert.equal(result.code, ExportResultCode.SUCCESS);
+		const keys: string[] = [];
+		for await (const file of files.listAll({
+			prefix: "explicit-prefix/otel/explicit-project/",
+		})) {
+			keys.push(file.key);
+		}
+		assert.equal(keys.length, 1);
 		await exporter.shutdown();
 	} finally {
 		if (originalProjectId === undefined) {

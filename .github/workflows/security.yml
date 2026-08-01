@@ -75,6 +75,7 @@ jobs:
             pkg:npm/lodash.isplainobject@4.0.6,
             pkg:npm/lodash.once@4.1.1,
             pkg:npm/lru-cache@11.5.1,
+            pkg:npm/minimatch@10.2.6,
             pkg:npm/minipass@7.1.3,
             pkg:npm/package-json-from-dist@1.0.1,
             pkg:npm/path-scurry@1.11.1

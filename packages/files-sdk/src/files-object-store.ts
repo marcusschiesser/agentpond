@@ -7,7 +7,7 @@ import {
 	parseEnvFile,
 	sinkFromStore,
 } from "@agentpond/core";
-import type { Files } from "files-sdk";
+import type { Files, OperationOptions } from "files-sdk";
 import { loadFiles } from "files-sdk/loader";
 import {
 	getProvider,
@@ -15,8 +15,6 @@ import {
 	type Provider,
 } from "files-sdk/providers";
 
-const DEFAULT_RETRIES = 3;
-const DEFAULT_TIMEOUT_MS = 10_000;
 const UNSUPPORTED_NODE_PROVIDERS = new Set(["bun-s3"]);
 const NON_PERSISTENT_PROVIDERS = new Set(["memory"]);
 const SUPPORTED_PROVIDER_CONFIG_FIELDS = [
@@ -40,6 +38,17 @@ const PROVIDER_CONFIG_FIELD_OVERRIDES: Record<string, readonly string[]> = {
 };
 
 export type FilesClient = Pick<Files, "download" | "listAll" | "upload">;
+
+export type FilesClientOptions = Pick<OperationOptions, "retries" | "timeout">;
+
+export const defaultFilesClientOptions = {
+	retries: 3,
+	timeout: 10_000,
+} as const satisfies Required<FilesClientOptions>;
+
+export type FilesObjectStoreOptions = {
+	beforeFirstOperation?: () => void | Promise<void>;
+};
 
 export type FilesSdkObjectStoreConfig = {
 	provider: string;
@@ -126,7 +135,7 @@ export class FilesObjectStore implements ObjectStore {
 
 	static fromConfig(config: FilesSdkObjectStoreConfig): FilesObjectStore {
 		const definition = validateFilesSdkConfig(config);
-		const store = new FilesObjectStore(loadConfiguredFiles(config));
+		const store = FilesObjectStore.fromFiles(loadConfiguredFiles(config));
 		store.providerHelp = {
 			provider: config.provider,
 			peerDependencies: definition.peerDeps,
@@ -134,7 +143,19 @@ export class FilesObjectStore implements ObjectStore {
 		return store;
 	}
 
-	constructor(files: FilesClient | PromiseLike<FilesClient>) {
+	static fromFiles(
+		files: FilesClient | PromiseLike<FilesClient>,
+		options: FilesObjectStoreOptions = {},
+	): FilesObjectStore {
+		return new FilesObjectStore(files, options);
+	}
+
+	private readiness?: Promise<void>;
+
+	private constructor(
+		files: FilesClient | PromiseLike<FilesClient>,
+		private readonly options: FilesObjectStoreOptions = {},
+	) {
 		this.files = Promise.resolve(files);
 	}
 
@@ -148,6 +169,7 @@ export class FilesObjectStore implements ObjectStore {
 			throw new Error(`Value for object "${key}" is not JSON serializable`);
 		}
 		try {
+			await this.ready();
 			const files = await this.files;
 			await files.upload(key, json, { contentType: "application/json" });
 		} catch (error) {
@@ -158,6 +180,7 @@ export class FilesObjectStore implements ObjectStore {
 	async getJson<T>(key: string): Promise<T> {
 		let content: string;
 		try {
+			await this.ready();
 			const files = await this.files;
 			content = await (await files.download(key)).text();
 		} catch (error) {
@@ -175,6 +198,7 @@ export class FilesObjectStore implements ObjectStore {
 	async listKeys(prefix: string): Promise<string[]> {
 		const keys: string[] = [];
 		try {
+			await this.ready();
 			const files = await this.files;
 			for await (const file of files.listAll({ prefix })) {
 				keys.push(file.key);
@@ -183,6 +207,13 @@ export class FilesObjectStore implements ObjectStore {
 			throw this.withProviderHelp(error);
 		}
 		return keys.sort();
+	}
+
+	private ready(): Promise<void> {
+		this.readiness ??= Promise.resolve().then(() =>
+			this.options.beforeFirstOperation?.(),
+		);
+		return this.readiness;
 	}
 
 	private withProviderHelp(error: unknown): unknown {
@@ -329,8 +360,7 @@ async function loadConfiguredFiles(
 		...(config.provider === "oracle-cloud"
 			? { configJson: { namespace: config.namespace } }
 			: {}),
-		retries: DEFAULT_RETRIES,
-		timeout: DEFAULT_TIMEOUT_MS,
+		...defaultFilesClientOptions,
 	});
 	return files;
 }

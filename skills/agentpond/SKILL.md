@@ -31,6 +31,12 @@ Determine the provider before syncing:
   Blobs, and Oracle Cloud environments use their corresponding Files SDK
   adapters.
 
+Firebase Storage, Supabase Storage, and Vercel Blob also run through
+AgentPond's shared Files SDK object-store layer. Keep using their detected
+provider contexts: those contexts own credentials, bucket selection, project
+identity, and the platform-specific `agentpond/` prefix instead of a manual
+Files SDK environment.
+
 Do not create provider-choice state. Select the provider's environment with
 `npx agentpond env use <name>`: a Firebase alias or project ID, a Supabase
 project ref, an exact Vercel target, or a manual AgentPond environment. Use

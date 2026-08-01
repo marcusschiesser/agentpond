@@ -15,10 +15,15 @@ import {
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
 import {
+	createFirebaseStorageStoreFromCliProject,
+	createFirebaseStorageStoreFromConfig,
+} from "../src/firebase-storage.js";
+import * as firebasePackage from "../src/index.js";
+import {
 	createFirebaseIngestFunction,
 	createFirebaseSpanExporter,
+	defaultFirebaseStoragePrefix,
 	type FirebaseProcessRunner,
-	FirebaseStorageObjectStore,
 	firebaseAuthFromRuntimeEnv,
 	firebaseCliProjectConfigFromCwd,
 	firebaseCliProjectConfigFromCwdIfAvailable,
@@ -54,8 +59,8 @@ test("Firebase storage ignores Firebase env bucket and prefix settings", async (
 
 		const objects = new Map<string, string>();
 		await withFakeFirebaseProject(objects, async ({ selectedBuckets }) => {
-			const store = FirebaseStorageObjectStore.fromConfig();
-			await store.toSink().writeEvents({
+			const store = createFirebaseStorageStoreFromConfig();
+			await store.toSink({ prefix: defaultFirebaseStoragePrefix }).writeEvents({
 				projectId: "project-a",
 				events: [
 					{
@@ -80,6 +85,12 @@ test("Firebase storage ignores Firebase env bucket and prefix settings", async (
 	} finally {
 		restoreEnv(originalEnv);
 	}
+});
+
+test("Firebase storage no longer exports a platform-specific object store", () => {
+	assert.equal("FirebaseStorageObjectStore" in firebasePackage, false);
+	assert.equal("FirebaseBucketObjectStore" in firebasePackage, false);
+	assert.equal(typeof firebasePackage.createFirebaseSpanExporter, "function");
 });
 
 test("Firebase CLI project config reads .firebaserc from cwd", () => {
@@ -336,9 +347,16 @@ test("Firebase environment context owns platform storage", async () => {
 	try {
 		process.env.AGENTPOND_PREFIX = "ignored-prefix";
 		await withFakeFirebaseProject(new Map(), async ({ root }) => {
-			const context = firebaseEnvironmentContextFromCwdIfAvailable({
-				cwd: root,
-			});
+			let resolvedProjectId: string | undefined;
+			const context = firebaseEnvironmentContextFromCwdIfAvailable(
+				{ cwd: root },
+				{
+					createStore(project) {
+						resolvedProjectId = project.projectId;
+						return new MemoryObjectStore();
+					},
+				},
+			);
 			assert.ok(context);
 			assert.equal(context.kind, "firebase");
 			assert.equal(context.rootDir, root);
@@ -347,6 +365,7 @@ test("Firebase environment context owns platform storage", async () => {
 			const storage = await context.resolveStorage();
 			assert.equal(storage.projectId, "demo-project");
 			assert.equal(storage.prefix, "agentpond/");
+			assert.equal(resolvedProjectId, "demo-project");
 		});
 	} finally {
 		restoreEnv(originalEnv);
@@ -376,7 +395,7 @@ test("Firebase CLI store reads the default bucket from the initialized project",
 	await withFakeFirebaseProject(
 		new Map(),
 		async ({ initializedApps, selectedBuckets }) => {
-			await FirebaseStorageObjectStore.fromCliProject(testProject);
+			await createFirebaseStorageStoreFromCliProject(testProject);
 
 			assert.deepEqual(initializedApps, [
 				{
@@ -395,7 +414,7 @@ test("Firebase CLI store initializes the default app when only named apps exist"
 	await withFakeFirebaseProject(
 		new Map(),
 		async ({ initializedApps }) => {
-			await FirebaseStorageObjectStore.fromCliProject(testProject);
+			await createFirebaseStorageStoreFromCliProject(testProject);
 
 			assert.deepEqual(initializedApps, [
 				{ name: "existing-named-app" },
@@ -410,7 +429,7 @@ test("Firebase CLI store loads Firebase Admin from a configured Functions source
 	await withFakeFirebaseProject(
 		new Map(),
 		async ({ root, initializedApps }) => {
-			await FirebaseStorageObjectStore.fromCliProject({
+			await createFirebaseStorageStoreFromCliProject({
 				projectId: "demo-project",
 				root,
 			});
@@ -437,7 +456,7 @@ test("Firebase CLI store reports how to install Firebase Admin", async () => {
 		process.chdir(root);
 
 		await assert.rejects(
-			FirebaseStorageObjectStore.fromCliProject({
+			createFirebaseStorageStoreFromCliProject({
 				projectId: "demo-project",
 				root,
 			}),
@@ -450,7 +469,7 @@ test("Firebase CLI store reports how to install Firebase Admin", async () => {
 
 test("Firebase programmatic store uses an already initialized app by default", async () => {
 	await withFakeFirebaseProject(new Map(), async ({ initializedApps }) => {
-		FirebaseStorageObjectStore.fromConfig();
+		createFirebaseStorageStoreFromConfig();
 
 		assert.deepEqual(initializedApps, []);
 	});
@@ -460,7 +479,7 @@ test("Firebase programmatic store passes custom buckets to initialized storage",
 	await withFakeFirebaseProject(
 		new Map(),
 		async ({ initializedApps, selectedBuckets }) => {
-			FirebaseStorageObjectStore.fromConfig({ bucket: "custom-bucket" });
+			createFirebaseStorageStoreFromConfig({ bucket: "custom-bucket" });
 
 			assert.deepEqual(initializedApps, []);
 			assert.deepEqual(selectedBuckets, ["custom-bucket"]);
@@ -484,7 +503,7 @@ test("Firebase span exporter derives the default app project and bucket and sync
 				/^agentpond\/otel\/demo-project\/\d{4}\/\d{2}\/\d{2}\/\d{2}\/\d{2}\/[0-9a-f-]+\.json$/,
 			);
 
-			const store = FirebaseStorageObjectStore.fromConfig({
+			const store = createFirebaseStorageStoreFromConfig({
 				bucket: "demo-project.firebasestorage.app",
 			});
 			const db = new AgentPondCache(
@@ -524,7 +543,13 @@ test("Firebase span exporter supports a custom object prefix", async () => {
 	await withFakeFirebaseProject(
 		objects,
 		async () => {
-			await emitTestSpan(createFirebaseSpanExporter({ prefix: "custom" }));
+			await emitTestSpan(
+				createFirebaseSpanExporter({
+					prefix: "custom",
+					retries: 0,
+					timeout: 1_000,
+				}),
+			);
 
 			assert.equal(
 				[...objects.keys()].some((key) =>
@@ -598,7 +623,7 @@ test("Firebase span exporter requires the default app storage bucket", async () 
 test("Firebase storage object store writes, reads, and lists JSON objects", async () => {
 	const objects = new Map<string, string>();
 	await withFakeFirebaseProject(objects, async () => {
-		const store = await FirebaseStorageObjectStore.fromCliProject(testProject);
+		const store = await createFirebaseStorageStoreFromCliProject(testProject);
 
 		await store.putJson("project-a/trace/trace-1/event.json", { ok: true });
 		await store.putJson("project-a/trace/trace-2/event.json", { ok: 2 });
@@ -623,8 +648,7 @@ test("Firebase CLI store ignores missing alternate default buckets", async () =>
 	await withFakeFirebaseProject(
 		objects,
 		async () => {
-			const store =
-				await FirebaseStorageObjectStore.fromCliProject(testProject);
+			const store = await createFirebaseStorageStoreFromCliProject(testProject);
 
 			assert.deepEqual(await store.listKeys("project-a/trace/"), [
 				"project-a/trace/trace-1/event.json",
@@ -646,8 +670,7 @@ test("Firebase CLI store reads from the alternate bucket when it has objects", a
 	await withFakeFirebaseProject(
 		new Map(),
 		async () => {
-			const store =
-				await FirebaseStorageObjectStore.fromCliProject(testProject);
+			const store = await createFirebaseStorageStoreFromCliProject(testProject);
 
 			assert.deepEqual(await store.listKeys("project-a/trace/"), [
 				"project-a/trace/trace-1/event.json",
@@ -668,9 +691,9 @@ test("Firebase CLI store reads from the alternate bucket when it has objects", a
 test("Firebase store sink writes under the default agentpond prefix", async () => {
 	const objects = new Map<string, string>();
 	await withFakeFirebaseProject(objects, async () => {
-		const store = await FirebaseStorageObjectStore.fromCliProject(testProject);
+		const store = await createFirebaseStorageStoreFromCliProject(testProject);
 
-		await store.toSink().writeEvents({
+		await store.toSink({ prefix: defaultFirebaseStoragePrefix }).writeEvents({
 			projectId: "project-a",
 			events: [
 				{
@@ -689,14 +712,12 @@ test("Firebase store sink writes under the default agentpond prefix", async () =
 	});
 });
 
-test("Firebase store sink uses programmatic prefix overrides", async () => {
+test("Firebase store sink accepts an external prefix", async () => {
 	const objects = new Map<string, string>();
 	await withFakeFirebaseProject(objects, async () => {
-		const store = FirebaseStorageObjectStore.fromConfig({
-			prefix: "custom",
-		});
+		const store = createFirebaseStorageStoreFromConfig();
 
-		await store.toSink().writeEvents({
+		await store.toSink({ prefix: "custom" }).writeEvents({
 			projectId: "project-a",
 			events: [
 				{
@@ -713,27 +734,39 @@ test("Firebase store sink uses programmatic prefix overrides", async () => {
 	});
 });
 
-test("Firebase store sink ignores sink prefix overrides", async () => {
+test("Firebase ingest applies agentpond only to its default store", async () => {
 	const objects = new Map<string, string>();
 	await withFakeFirebaseProject(objects, async () => {
-		const store = FirebaseStorageObjectStore.fromConfig({
-			prefix: "factory",
-		});
+		const fn = createFirebaseIngestFunction({ auth });
+		const res = createResponse();
 
-		await store.toSink({ prefix: "custom" }).writeEvents({
-			projectId: "project-a",
-			events: [
-				{
-					id: "event-firebase-custom-prefix",
-					timestamp: "2026-06-14T00:00:00.000Z",
-					type: eventTypes.TRACE_CREATE,
-					body: { id: "trace-firebase-custom-prefix" },
+		await fn(
+			{
+				method: "POST",
+				url: "/api/public/ingestion",
+				headers: {
+					authorization: authHeader(),
+					"content-type": "application/json",
 				},
-			],
-		});
+				rawBody: JSON.stringify({
+					batch: [
+						{
+							id: "event-firebase-default-store",
+							timestamp: "2026-06-14T00:00:00.000Z",
+							type: eventTypes.TRACE_CREATE,
+							body: { id: "trace-firebase-default-store" },
+						},
+					],
+				}),
+			},
+			res,
+		);
 
-		assert.equal((await store.listKeys("factory/project-a/")).length > 0, true);
-		assert.equal((await store.listKeys("custom/project-a/")).length, 0);
+		assert.equal(res.statusCode, 207);
+		assert.equal(
+			[...objects.keys()].some((key) => key.startsWith("agentpond/project-a/")),
+			true,
+		);
 	});
 });
 
@@ -961,25 +994,47 @@ test("Firebase emulator env still writes to the configured Firebase store", asyn
 	}
 });
 
-function createBucket(objects: Map<string, string>, missing = false) {
+function createBucket(
+	objects: Map<string, string>,
+	missing = false,
+	name = "default-bucket",
+) {
+	const file = (objectName: string) => ({
+		name: objectName,
+		metadata: {
+			contentType: "application/json",
+			size: String(Buffer.byteLength(objects.get(objectName) ?? "")),
+		},
+		save: async (
+			data: string | Uint8Array,
+			options: { contentType: string },
+		) => {
+			if (missing) throw missingBucketError();
+			assert.equal(options.contentType, "application/json");
+			objects.set(objectName, Buffer.from(data).toString("utf8"));
+		},
+		download: async () => {
+			if (missing) throw missingBucketError();
+			return [Buffer.from(objects.get(objectName) ?? "", "utf8")];
+		},
+		getMetadata: async () => {
+			if (missing) throw missingBucketError();
+			const body = objects.get(objectName) ?? "";
+			return [
+				{
+					contentType: "application/json",
+					size: String(Buffer.byteLength(body)),
+				},
+			];
+		},
+	});
 	return {
-		file: (name: string) => ({
-			save: async (data: string, options: { contentType: string }) => {
-				if (missing) throw missingBucketError();
-				assert.equal(options.contentType, "application/json");
-				objects.set(name, data);
-			},
-			download: async () => {
-				if (missing) throw missingBucketError();
-				return [Buffer.from(objects.get(name) ?? "", "utf8")];
-			},
-		}),
+		name,
+		file,
 		getFiles: async ({ prefix }: { prefix: string }) => {
 			if (missing) throw missingBucketError();
 			return [
-				[...objects.keys()]
-					.filter((key) => key.startsWith(prefix))
-					.map((name) => ({ name })),
+				[...objects.keys()].filter((key) => key.startsWith(prefix)).map(file),
 			];
 		},
 	};
@@ -1073,6 +1128,7 @@ exports.getStorage = () => globalThis.__agentpondFirebaseTest.storage;
 				return createBucket(
 					bucketObjects,
 					name !== undefined && options.missingBuckets?.has(name) === true,
+					name,
 				);
 			},
 		},

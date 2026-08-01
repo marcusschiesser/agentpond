@@ -38,11 +38,11 @@
 		"@opentelemetry/core": "^2.9.0",
 		"@opentelemetry/resources": "^2.9.0",
 		"@opentelemetry/sdk-trace-base": "^2.9.0",
-		"files-sdk": "2.2.1"
+		"files-sdk": "2.2.2"
 	},
 	"peerDependencies": {
 		"@agentpond/otel": "workspace:*",
-		"files-sdk": "^2.2.1"
+		"files-sdk": "^2.2.2"
 	},
 	"peerDependenciesMeta": {
 		"@agentpond/otel": {

@@ -24,8 +24,10 @@
 	},
 	"dependencies": {
 		"@agentpond/core": "workspace:*",
+		"@agentpond/files-sdk": "workspace:*",
 		"@agentpond/ingest": "workspace:*",
 		"@agentpond/otel": "workspace:*",
-		"@vercel/blob": "^2.5.0"
+		"@vercel/blob": "^2.5.0",
+		"files-sdk": "2.2.2"
 	}
 }

@@ -1,20 +1,21 @@
 import { nonEmpty } from "@agentpond/core";
+import type { FilesClientOptions } from "@agentpond/files-sdk";
 import { AgentPondSpanExporter } from "@agentpond/otel";
 import {
-	VercelBlobObjectStore,
+	createVercelBlobStore,
 	vercelBlobConfigFromRuntimeEnv,
 } from "./blob.js";
 
 export const defaultVercelBlobPrefix = "agentpond";
 
-export type VercelSpanExporterOptions = {
+export type VercelSpanExporterOptions = FilesClientOptions & {
 	projectId?: string;
 	environment?: string;
 };
 
 export function createVercelSpanExporter(
 	options: VercelSpanExporterOptions = {},
-): AgentPondSpanExporter {
+) {
 	const projectId = nonEmpty(
 		options.projectId ?? process.env.VERCEL_PROJECT_ID,
 	);
@@ -42,7 +43,10 @@ export function createVercelSpanExporter(
 	}
 
 	return new AgentPondSpanExporter({
-		store: VercelBlobObjectStore.fromConfig(blobConfig),
+		store: createVercelBlobStore(blobConfig, {
+			retries: options.retries,
+			timeout: options.timeout,
+		}),
 		projectId: vercelAgentPondProjectId(projectId, environment),
 		prefix: defaultVercelBlobPrefix,
 	});

@@ -11,7 +11,10 @@ import {
 	resolveIngestionSink,
 } from "@agentpond/ingest";
 import { firebaseProjectIdFromEnv } from "./firebase-runtime-project.js";
-import { FirebaseStorageObjectStore } from "./firebase-storage.js";
+import {
+	createFirebaseStorageStoreFromConfig,
+	defaultFirebaseStoragePrefix,
+} from "./firebase-storage.js";
 
 export type FirebaseIngestFunctionOptions = {
 	auth?: AuthConfig | false;
@@ -50,9 +53,14 @@ export function createFirebaseIngestFunction(
 	options: FirebaseIngestFunctionOptions = {},
 ): FirebaseIngestFunction {
 	const auth = options.auth ?? firebaseAuthFromRuntimeEnv();
-	const sink = resolveIngestionSink(options, () =>
-		FirebaseStorageObjectStore.fromConfig(),
-	);
+	const sink =
+		options.store || options.sink
+			? resolveIngestionSink(options, () =>
+					createFirebaseStorageStoreFromConfig(),
+				)
+			: createFirebaseStorageStoreFromConfig().toSink({
+					prefix: defaultFirebaseStoragePrefix,
+				});
 	const pathPrefix = options.pathPrefix ?? inferFirebasePathPrefix;
 
 	return async (req, res) => {

@@ -33,14 +33,16 @@ minimumReleaseAgeExclude:
   - '@duckdb/node-bindings@1.5.4-r.1'
   - fast-uri@3.1.4
   - find-my-way@9.7.0
-  - files-sdk@2.2.1
+  - files-sdk@2.2.2
+  - minimatch@10.2.6
   - typescript@7.0.2
   - uuid@11.1.1
 
 overrides:
-  'files-sdk@2.2.1>@modelcontextprotocol/sdk': '-'
+  'files-sdk@2.2.2>@modelcontextprotocol/sdk': '-'
   '@opentelemetry/core': ^2.9.0
   fast-uri: 3.1.4
   find-my-way: 9.7.0
+  'minimatch@9.0.9': 10.2.6
   protobufjs: 7.6.5
   uuid@<11.1.1: ^11.1.1
