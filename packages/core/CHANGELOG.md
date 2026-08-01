@@ -1,5 +1,11 @@
 # @agentpond/core
 
+## 0.8.0
+
+### Minor Changes
+
+- 2686ab9: Add Netlify Blobs and Oracle Cloud Object Storage support to Files SDK environments, the CLI, and the ingestion service.
+
 ## 0.7.0
 
 ### Minor Changes

@@ -1,5 +1,20 @@
 # @agentpond/vercel
 
+## 0.6.0
+
+### Minor Changes
+
+- 4e595b6: Consolidate Vercel, Supabase, and Firebase storage on Files SDK adapters, add named `FilesObjectStore.fromFiles` construction, expose retry and timeout settings on platform exporters, and keep optional Firebase Admin loading lazy.
+
+### Patch Changes
+
+- Updated dependencies [2686ab9]
+- Updated dependencies [4e595b6]
+  - @agentpond/core@0.8.0
+  - @agentpond/files-sdk@0.3.0
+  - @agentpond/ingest@0.3.10
+  - @agentpond/otel@0.1.6
+
 ## 0.5.3
 
 ### Patch Changes

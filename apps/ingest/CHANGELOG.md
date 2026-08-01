@@ -1,5 +1,19 @@
 # @agentpond/ingest-service
 
+## 0.4.0
+
+### Minor Changes
+
+- 2686ab9: Add Netlify Blobs and Oracle Cloud Object Storage support to Files SDK environments, the CLI, and the ingestion service.
+
+### Patch Changes
+
+- Updated dependencies [2686ab9]
+- Updated dependencies [4e595b6]
+  - @agentpond/core@0.8.0
+  - @agentpond/files-sdk@0.3.0
+  - @agentpond/fastify-ingest@0.3.10
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,5 +1,26 @@
 # agentpond
 
+## 0.10.0
+
+### Minor Changes
+
+- 2686ab9: Add Netlify Blobs and Oracle Cloud Object Storage support to Files SDK environments, the CLI, and the ingestion service.
+
+### Patch Changes
+
+- a0176e9: Teach the instrumentation skill to use application-owned trace lifecycle boundaries.
+- 731bfce: Harden tracing guidance with exact versions and sensitive trace-data warnings.
+- 4e595b6: Consolidate Vercel, Supabase, and Firebase storage on Files SDK adapters, add named `FilesObjectStore.fromFiles` construction, expose retry and timeout settings on platform exporters, and keep optional Firebase Admin loading lazy.
+- Updated dependencies [2686ab9]
+- Updated dependencies [4e595b6]
+  - @agentpond/core@0.8.0
+  - @agentpond/files-sdk@0.3.0
+  - @agentpond/vercel@0.6.0
+  - @agentpond/supabase@0.7.0
+  - @agentpond/firebase@0.7.0
+  - @agentpond/duckdb@0.3.11
+  - @agentpond/fastify-ingest@0.3.10
+
 ## 0.9.0
 
 ### Minor Changes
