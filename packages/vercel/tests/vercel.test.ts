@@ -109,7 +109,10 @@ test("Vercel span exporter scopes projects by project and target", () => {
 			vercelAgentPondProjectId("prj_demo", "staging"),
 			"prj_demo-staging",
 		);
-		assert.ok(createVercelSpanExporter() instanceof AgentPondSpanExporter);
+		assert.ok(
+			createVercelSpanExporter({ retries: 0, timeout: 1_000 }) instanceof
+				AgentPondSpanExporter,
+		);
 		assert.throws(
 			() => vercelAgentPondProjectId("prj_demo", "feature/unsafe"),
 			/Invalid Vercel environment/,

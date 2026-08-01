@@ -543,7 +543,13 @@ test("Firebase span exporter supports a custom object prefix", async () => {
 	await withFakeFirebaseProject(
 		objects,
 		async () => {
-			await emitTestSpan(createFirebaseSpanExporter({ prefix: "custom" }));
+			await emitTestSpan(
+				createFirebaseSpanExporter({
+					prefix: "custom",
+					retries: 0,
+					timeout: 1_000,
+				}),
+			);
 
 			assert.equal(
 				[...objects.keys()].some((key) =>

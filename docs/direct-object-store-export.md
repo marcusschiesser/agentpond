@@ -106,6 +106,9 @@ platform factories remain the recommended API when the application runs on
 Vercel, Firebase, or Supabase: they preserve each platform's project,
 credentials, bucket checks, and prefix rules.
 
+Platform factories accept Files SDK `retries` and `timeout` options. They
+default to three retries and a 10-second timeout.
+
 The application needs write credentials for the selected object store.
 `AGENTPOND_PROJECT_ID` defaults to `default-project`, and
 `AGENTPOND_PREFIX` defaults to empty. An explicit `projectId` or `prefix` may

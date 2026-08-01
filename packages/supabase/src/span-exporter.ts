@@ -1,3 +1,4 @@
+import type { FilesClientOptions } from "@agentpond/files-sdk";
 import { AgentPondSpanExporter } from "@agentpond/otel";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -14,7 +15,7 @@ import {
 	supabaseStorageConfigFromEnv,
 } from "./supabase-storage.js";
 
-export type SupabaseSpanExporterOptions = {
+export type SupabaseSpanExporterOptions = FilesClientOptions & {
 	bucket?: string;
 	client?: SupabaseClient;
 	env?: SupabaseEnvironment;
@@ -34,6 +35,8 @@ export function createSupabaseSpanExporter(
 		const store = createSupabaseStorageStoreFromClient(options.client, {
 			bucket: options.bucket ?? defaultSupabaseStorageBucket,
 			prefix: options.prefix ?? defaultSupabaseStoragePrefix,
+			retries: options.retries,
+			timeout: options.timeout,
 		});
 		return new AgentPondSpanExporter({
 			store,
@@ -54,6 +57,8 @@ export function createSupabaseSpanExporter(
 		{
 			bucket: options.bucket ?? defaultSupabaseStorageBucket,
 			prefix: options.prefix ?? defaultSupabaseStoragePrefix,
+			retries: options.retries,
+			timeout: options.timeout,
 		},
 	);
 	const projectId = options.projectId

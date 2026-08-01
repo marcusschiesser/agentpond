@@ -7,7 +7,7 @@ import {
 	parseEnvFile,
 	sinkFromStore,
 } from "@agentpond/core";
-import { type Adapter, Files } from "files-sdk";
+import type { Files, OperationOptions } from "files-sdk";
 import { loadFiles } from "files-sdk/loader";
 import {
 	getProvider,
@@ -15,8 +15,6 @@ import {
 	type Provider,
 } from "files-sdk/providers";
 
-const DEFAULT_RETRIES = 3;
-const DEFAULT_TIMEOUT_MS = 10_000;
 const UNSUPPORTED_NODE_PROVIDERS = new Set(["bun-s3"]);
 const NON_PERSISTENT_PROVIDERS = new Set(["memory"]);
 const SUPPORTED_PROVIDER_CONFIG_FIELDS = [
@@ -41,10 +39,15 @@ const PROVIDER_CONFIG_FIELD_OVERRIDES: Record<string, readonly string[]> = {
 
 export type FilesClient = Pick<Files, "download" | "listAll" | "upload">;
 
+export type FilesClientOptions = Pick<OperationOptions, "retries" | "timeout">;
+
+export const defaultFilesClientOptions = {
+	retries: 3,
+	timeout: 10_000,
+} as const satisfies Required<FilesClientOptions>;
+
 export type FilesObjectStoreOptions = {
 	beforeFirstOperation?: () => void | Promise<void>;
-	retries?: number;
-	timeout?: number;
 };
 
 export type FilesSdkObjectStoreConfig = {
@@ -145,23 +148,6 @@ export class FilesObjectStore implements ObjectStore {
 		options: FilesObjectStoreOptions = {},
 	): FilesObjectStore {
 		return new FilesObjectStore(files, options);
-	}
-
-	static fromAdapter(
-		adapter: Adapter | PromiseLike<Adapter>,
-		options: FilesObjectStoreOptions = {},
-	): FilesObjectStore {
-		return FilesObjectStore.fromFiles(
-			Promise.resolve(adapter).then(
-				(resolvedAdapter) =>
-					new Files({
-						adapter: resolvedAdapter,
-						retries: options.retries ?? DEFAULT_RETRIES,
-						timeout: options.timeout ?? DEFAULT_TIMEOUT_MS,
-					}),
-			),
-			options,
-		);
 	}
 
 	private readiness?: Promise<void>;
@@ -374,8 +360,7 @@ async function loadConfiguredFiles(
 		...(config.provider === "oracle-cloud"
 			? { configJson: { namespace: config.namespace } }
 			: {}),
-		retries: DEFAULT_RETRIES,
-		timeout: DEFAULT_TIMEOUT_MS,
+		...defaultFilesClientOptions,
 	});
 	return files;
 }

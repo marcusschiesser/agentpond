@@ -339,6 +339,8 @@ test("Supabase exporter writes to otel/<project-ref> with no bucket prefix", asy
 	const storage = new MockSupabaseStorage();
 	const exporter = createSupabaseSpanExporter({
 		client: mockClient(storage),
+		retries: 0,
+		timeout: 1_000,
 	});
 	const provider = new BasicTracerProvider({
 		spanProcessors: [new SimpleSpanProcessor(exporter)],

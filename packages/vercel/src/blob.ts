@@ -1,5 +1,10 @@
 import { nonEmpty } from "@agentpond/core";
-import { FilesObjectStore } from "@agentpond/files-sdk";
+import {
+	defaultFilesClientOptions,
+	type FilesClientOptions,
+	FilesObjectStore,
+} from "@agentpond/files-sdk";
+import { Files } from "files-sdk";
 import {
 	type VercelBlobAdapterOptions,
 	vercelBlob,
@@ -33,9 +38,14 @@ export function vercelBlobConfigFromRuntimeEnv(): VercelBlobConfig {
 
 export function createVercelBlobStore(
 	config: VercelBlobConfig,
+	options: FilesClientOptions = {},
 ): FilesObjectStore {
-	return FilesObjectStore.fromAdapter(
-		vercelBlob(vercelBlobAdapterOptions(config)),
+	return FilesObjectStore.fromFiles(
+		new Files({
+			adapter: vercelBlob(vercelBlobAdapterOptions(config)),
+			retries: options.retries ?? defaultFilesClientOptions.retries,
+			timeout: options.timeout ?? defaultFilesClientOptions.timeout,
+		}),
 	);
 }
 

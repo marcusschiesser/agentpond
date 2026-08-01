@@ -12,9 +12,10 @@ import {
 	type ReadableSpan,
 	SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { Files, FilesError } from "files-sdk";
+import { Files } from "files-sdk";
 import { memory } from "files-sdk/memory";
 import {
+	defaultFilesClientOptions,
 	FilesObjectStore,
 	filesSdkConfigFromRuntimeEnv,
 	getFilesSdkProvider,
@@ -59,30 +60,16 @@ test("FilesObjectStore implements JSON reads, writes, and sorted prefix lists", 
 	assert.equal((await files.head("traces/a.json")).type, "application/json");
 });
 
-test("FilesObjectStore.fromAdapter applies retries and timeout defaults", async () => {
-	const adapter = memory();
-	const upload = adapter.upload;
-	let attempts = 0;
-	adapter.upload = async (...args) => {
-		attempts += 1;
-		if (attempts < 3) {
-			throw new FilesError("Provider", "temporary failure");
-		}
-		return upload(...args);
-	};
-	const store = FilesObjectStore.fromAdapter(adapter, {
-		retries: 2,
-		timeout: 1_000,
+test("AgentPond Files clients have stable retry and timeout defaults", () => {
+	assert.deepEqual(defaultFilesClientOptions, {
+		retries: 3,
+		timeout: 10_000,
 	});
-
-	await store.putJson("retry.json", { ok: true });
-
-	assert.equal(attempts, 3);
-	assert.deepEqual(await store.getJson("retry.json"), { ok: true });
 });
 
-test("FilesObjectStore.fromAdapter accepts a lazily loaded adapter", async () => {
-	const store = FilesObjectStore.fromAdapter(Promise.resolve(memory()));
+test("FilesObjectStore.fromFiles accepts a lazily loaded client", async () => {
+	const files = new Files({ adapter: memory() });
+	const store = FilesObjectStore.fromFiles(Promise.resolve(files));
 
 	await store.putJson("lazy.json", { ok: true });
 
@@ -91,7 +78,7 @@ test("FilesObjectStore.fromAdapter accepts a lazily loaded adapter", async () =>
 
 test("FilesObjectStore readiness runs once for concurrent operations", async () => {
 	let readinessCalls = 0;
-	const store = FilesObjectStore.fromAdapter(memory(), {
+	const store = FilesObjectStore.fromFiles(new Files({ adapter: memory() }), {
 		beforeFirstOperation: async () => {
 			readinessCalls += 1;
 			await Promise.resolve();
@@ -109,7 +96,7 @@ test("FilesObjectStore readiness runs once for concurrent operations", async () 
 test("FilesObjectStore memoizes readiness failures", async () => {
 	const failure = new Error("bucket is public");
 	let readinessCalls = 0;
-	const store = FilesObjectStore.fromAdapter(memory(), {
+	const store = FilesObjectStore.fromFiles(new Files({ adapter: memory() }), {
 		beforeFirstOperation: () => {
 			readinessCalls += 1;
 			throw failure;

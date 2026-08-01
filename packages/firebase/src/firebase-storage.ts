@@ -1,5 +1,10 @@
 import { normalizePrefix, type ObjectStore } from "@agentpond/core";
-import { FilesObjectStore } from "@agentpond/files-sdk";
+import {
+	defaultFilesClientOptions,
+	type FilesClientOptions,
+	FilesObjectStore,
+} from "@agentpond/files-sdk";
+import { Files } from "files-sdk";
 import type { FirebaseStorageAdapterOptions } from "files-sdk/firebase-storage";
 import {
 	type FirebaseStorage,
@@ -13,7 +18,7 @@ import {
 
 export const defaultFirebaseStoragePrefix = "agentpond";
 
-export type FirebaseStorageObjectStoreConfig = {
+export type FirebaseStorageObjectStoreConfig = FilesClientOptions & {
 	bucket?: string;
 };
 
@@ -22,6 +27,7 @@ export function createFirebaseStorageStoreFromConfig(
 ): FilesObjectStore {
 	return createFirebaseStorageStoreForBucket(
 		firebaseStorageForInitializedApp().bucket(options.bucket),
+		options,
 	);
 }
 
@@ -55,14 +61,20 @@ export async function createFirebaseStorageStoreFromCliProject(
 
 function createFirebaseStorageStoreForBucket(
 	bucket: ReturnType<FirebaseStorage["bucket"]>,
+	options: FilesClientOptions = {},
 ): FilesObjectStore {
-	return FilesObjectStore.fromAdapter(
-		import("files-sdk/firebase-storage").then(({ firebaseStorage }) =>
-			firebaseStorage({
-				app: bucket as unknown as NonNullable<
-					FirebaseStorageAdapterOptions["app"]
-				>,
-			}),
+	return FilesObjectStore.fromFiles(
+		import("files-sdk/firebase-storage").then(
+			({ firebaseStorage }) =>
+				new Files({
+					adapter: firebaseStorage({
+						app: bucket as unknown as NonNullable<
+							FirebaseStorageAdapterOptions["app"]
+						>,
+					}),
+					retries: options.retries ?? defaultFilesClientOptions.retries,
+					timeout: options.timeout ?? defaultFilesClientOptions.timeout,
+				}),
 		),
 	);
 }

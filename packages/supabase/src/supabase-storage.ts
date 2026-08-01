@@ -1,6 +1,11 @@
 import { nonEmpty, type ObjectStore } from "@agentpond/core";
-import { FilesObjectStore } from "@agentpond/files-sdk";
+import {
+	defaultFilesClientOptions,
+	type FilesClientOptions,
+	FilesObjectStore,
+} from "@agentpond/files-sdk";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { Files } from "files-sdk";
 import { supabase } from "files-sdk/supabase";
 import type {
 	SupabaseCliProjectConfig,
@@ -16,20 +21,20 @@ export const defaultSupabaseStoragePrefix = "";
 
 export type SupabaseEnvironment = Record<string, string | undefined>;
 
-export type SupabaseStorageObjectStoreConfig = {
+export type SupabaseStorageObjectStoreConfig = FilesClientOptions & {
 	url: string;
 	secretKey: string;
 	bucket?: string;
 	prefix?: string;
 };
 
-export type SupabaseStorageRuntimeOptions = {
+export type SupabaseStorageRuntimeOptions = FilesClientOptions & {
 	bucket?: string;
 	env?: SupabaseEnvironment;
 	prefix?: string;
 };
 
-export type SupabaseStorageClientOptions = {
+export type SupabaseStorageClientOptions = FilesClientOptions & {
 	bucket?: string;
 	prefix?: string;
 };
@@ -54,7 +59,10 @@ type SupabaseStorageApi = {
 
 export function supabaseStorageConfigFromEnv(
 	env: SupabaseEnvironment,
-	options: Pick<SupabaseStorageObjectStoreConfig, "bucket" | "prefix"> = {},
+	options: Pick<
+		SupabaseStorageObjectStoreConfig,
+		"bucket" | "prefix" | "retries" | "timeout"
+	> = {},
 ): SupabaseStorageObjectStoreConfig {
 	const url = nonEmpty(env.SUPABASE_URL);
 	if (!url) {
@@ -69,6 +77,8 @@ export function supabaseStorageConfigFromEnv(
 		secretKey,
 		bucket: options.bucket ?? defaultSupabaseStorageBucket,
 		prefix: options.prefix ?? defaultSupabaseStoragePrefix,
+		...(options.retries !== undefined ? { retries: options.retries } : {}),
+		...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
 	};
 }
 
@@ -160,10 +170,14 @@ export function createSupabaseStorageStoreFromClient(
 	}
 	validateSupabaseSecretKey(key);
 	const bucket = options.bucket ?? defaultSupabaseStorageBucket;
-	return FilesObjectStore.fromAdapter(
-		supabase({
-			bucket,
-			client,
+	return FilesObjectStore.fromFiles(
+		new Files({
+			adapter: supabase({
+				bucket,
+				client,
+			}),
+			retries: options.retries ?? defaultFilesClientOptions.retries,
+			timeout: options.timeout ?? defaultFilesClientOptions.timeout,
 		}),
 		{
 			beforeFirstOperation: () =>
