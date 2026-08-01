@@ -183,6 +183,30 @@ test("Files SDK instrumentation skill verifies traces with persistent local stor
 	assert.doesNotMatch(content, /FILES_SDK_PROVIDER=memory/);
 });
 
+test("instrumentation skill uses application-owned lifecycle boundaries", () => {
+	const entry = readSkillFiles("agentpond-instrumentation", ["SKILL.md"]);
+	const lifecycle = readSkillFiles("agentpond-instrumentation", [
+		"references/lifecycle.md",
+	]);
+
+	assert.match(entry, /references\/lifecycle\.md/);
+	for (const required of [
+		/try[\s\S]*finally[\s\S]*sdk\.shutdown\(\)/,
+		/framework's existing graceful-shutdown hook/i,
+		/app\.addHook\("onClose"/,
+		/after\(\(\) => processor\.forceFlush\(\)\)/,
+		/context\.waitUntil\(processor\.forceFlush\(\)\)/,
+		/EdgeRuntime\.waitUntil\(processor\.forceFlush\(\)\)/,
+		/do not add a second signal owner/i,
+		/Node cannot await it/i,
+		/normal graceful-stop path/i,
+		/read the new trace back/i,
+	]) {
+		assert.match(lifecycle, required);
+	}
+	assert.doesNotMatch(lifecycle, /registerAgentPondNodeShutdown/);
+});
+
 test("instrumentation skill keeps provider setup details in separate references", () => {
 	const entry = readSkillFiles("agentpond-instrumentation", ["SKILL.md"]);
 	const firebase = readSkillFiles("agentpond-instrumentation", [

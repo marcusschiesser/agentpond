@@ -7,8 +7,10 @@ description: Add OpenInference tracing to trusted Firebase, Supabase, Vercel, or
 
 Instrument trusted server-side AI applications without changing business behavior. Analyze the target service first, reuse existing tracing infrastructure, and keep storage credentials and trace export strictly server-side.
 
-Read only the references relevant to the detected provider:
+Read the lifecycle and OpenInference references for every task, plus only the
+provider reference relevant to the detected deployment:
 
+- Application-owned shutdown and request-lifetime flushing: [references/lifecycle.md](references/lifecycle.md)
 - Firebase exporter and Storage Rules: [references/firebase.md](references/firebase.md)
 - Supabase exporter, Storage bucket, RLS, and Edge lifecycle: [references/supabase.md](references/supabase.md)
 - Vercel exporter, Blob setup, targets, and lifecycle: [references/vercel.md](references/vercel.md)
@@ -30,7 +32,8 @@ Read only the references relevant to the detected provider:
 
 1. Detect Firebase, Supabase, or Vercel project markers. If none exists, use the Files SDK workflow. If multiple exist, ask which platform owns the deployed service; do not persist that choice.
 2. Confirm which trusted Node.js service or Supabase Edge Function is in scope. Files SDK direct export requires trusted Node.js. In a monorepo, do not assume every server package should be instrumented.
-3. Identify the build, typecheck, start, emulator or deployment, and real-request commands needed for verification.
+3. Identify the build, typecheck, start, emulator or deployment, real-request,
+   and application lifecycle commands needed for verification.
 4. Stop if the target is only client, middleware, unsupported Edge, or static code and ask whether the user wants to add a trusted server runtime.
 5. Read the matching platform or Files SDK reference before proposing changes.
 
@@ -56,11 +59,13 @@ Stop after presenting the proposal and ask for explicit confirmation before inst
 6. Register OpenInference instrumentation before AI clients are created.
 7. Add manual CHAIN and TOOL spans only where auto-instrumentation leaves important behavior invisible.
 8. Preserve one `session.id` across all turns in the same conversation.
-9. Apply the storage-specific privacy, target, and flush requirements before declaring completion.
+9. Apply the storage-specific privacy and target requirements, then follow the
+   application-owned lifecycle pattern in
+   [references/lifecycle.md](references/lifecycle.md).
 
 ## Verification
 
-Treat the work as complete only when the project builds or typechecks, the trusted runtime loads without duplicate-provider errors, one real AI request exports OpenInference spans, and the trace appears after the sync workflow in the matching reference.
+Treat the work as complete only when the project builds or typechecks, the trusted runtime loads without duplicate-provider errors, one real AI request exports OpenInference spans, the real lifecycle boundary finishes exporting them, and the trace appears after the sync workflow in the matching reference.
 
 Inspect the trace and confirm applicable model, CHAIN, TOOL, input/output, parent-child, and session attributes. For short-lived processes, force-flush before exit. Do not shut down a reusable module-level provider after every request.
 
