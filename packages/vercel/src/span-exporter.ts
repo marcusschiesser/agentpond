@@ -1,5 +1,5 @@
 import { nonEmpty } from "@agentpond/core";
-import { createFilesSpanExporter } from "@agentpond/files-sdk/otel";
+import { AgentPondSpanExporter } from "@agentpond/otel";
 import {
 	createVercelBlobStore,
 	vercelBlobConfigFromRuntimeEnv,
@@ -41,7 +41,7 @@ export function createVercelSpanExporter(
 		);
 	}
 
-	return createFilesSpanExporter({
+	return new AgentPondSpanExporter({
 		store: createVercelBlobStore(blobConfig),
 		projectId: vercelAgentPondProjectId(projectId, environment),
 		prefix: defaultVercelBlobPrefix,

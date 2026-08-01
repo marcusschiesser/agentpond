@@ -45,7 +45,7 @@ async function readableSpans(): Promise<ReadableSpan[]> {
 
 test("FilesObjectStore implements JSON reads, writes, and sorted prefix lists", async () => {
 	const files = new Files({ adapter: memory() });
-	const store = new FilesObjectStore(files);
+	const store = FilesObjectStore.fromFiles(files);
 
 	await store.putJson("traces/z.json", { id: "z" });
 	await store.putJson("traces/a.json", { id: "a" });
@@ -126,7 +126,7 @@ test("FilesObjectStore memoizes readiness failures", async () => {
 
 test("FilesObjectStore reports invalid JSON with the object key", async () => {
 	const files = new Files({ adapter: memory() });
-	const store = new FilesObjectStore(files);
+	const store = FilesObjectStore.fromFiles(files);
 	await files.upload("broken.json", "{");
 
 	await assert.rejects(
@@ -420,16 +420,16 @@ test("createFilesSpanExporter uses AgentPond runtime project and prefix", async 
 	}
 });
 
-test("createFilesSpanExporter accepts a store without ambient project configuration", async () => {
+test("createFilesSpanExporter accepts lazy Files with an explicit destination", async () => {
 	const adapter = memory();
-	const store = FilesObjectStore.fromAdapter(adapter);
+	const files = new Files({ adapter });
 	const originalProjectId = process.env.AGENTPOND_PROJECT_ID;
 	const originalPrefix = process.env.AGENTPOND_PREFIX;
 	delete process.env.AGENTPOND_PROJECT_ID;
 	delete process.env.AGENTPOND_PREFIX;
 	try {
 		const exporter = createFilesSpanExporter({
-			store,
+			files: Promise.resolve(files),
 			projectId: "explicit-project",
 			prefix: "explicit-prefix",
 		});
@@ -439,7 +439,12 @@ test("createFilesSpanExporter accepts a store without ambient project configurat
 		);
 
 		assert.equal(result.code, ExportResultCode.SUCCESS);
-		const keys = await store.listKeys("explicit-prefix/otel/explicit-project/");
+		const keys: string[] = [];
+		for await (const file of files.listAll({
+			prefix: "explicit-prefix/otel/explicit-project/",
+		})) {
+			keys.push(file.key);
+		}
 		assert.equal(keys.length, 1);
 		await exporter.shutdown();
 	} finally {

@@ -132,7 +132,7 @@ export class FilesObjectStore implements ObjectStore {
 
 	static fromConfig(config: FilesSdkObjectStoreConfig): FilesObjectStore {
 		const definition = validateFilesSdkConfig(config);
-		const store = new FilesObjectStore(loadConfiguredFiles(config));
+		const store = FilesObjectStore.fromFiles(loadConfiguredFiles(config));
 		store.providerHelp = {
 			provider: config.provider,
 			peerDependencies: definition.peerDeps,
@@ -140,11 +140,18 @@ export class FilesObjectStore implements ObjectStore {
 		return store;
 	}
 
+	static fromFiles(
+		files: FilesClient | PromiseLike<FilesClient>,
+		options: FilesObjectStoreOptions = {},
+	): FilesObjectStore {
+		return new FilesObjectStore(files, options);
+	}
+
 	static fromAdapter(
 		adapter: Adapter | PromiseLike<Adapter>,
 		options: FilesObjectStoreOptions = {},
 	): FilesObjectStore {
-		return new FilesObjectStore(
+		return FilesObjectStore.fromFiles(
 			Promise.resolve(adapter).then(
 				(resolvedAdapter) =>
 					new Files({
@@ -159,7 +166,7 @@ export class FilesObjectStore implements ObjectStore {
 
 	private readiness?: Promise<void>;
 
-	constructor(
+	private constructor(
 		files: FilesClient | PromiseLike<FilesClient>,
 		private readonly options: FilesObjectStoreOptions = {},
 	) {

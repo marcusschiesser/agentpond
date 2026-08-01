@@ -7,17 +7,9 @@ type FilesSpanExporterDestinationOptions = {
 	prefix?: string;
 };
 
-export type FilesSpanExporterOptions = FilesSpanExporterDestinationOptions &
-	(
-		| {
-				files: FilesClient;
-				store?: never;
-		  }
-		| {
-				files?: never;
-				store: FilesObjectStore;
-		  }
-	);
+export type FilesSpanExporterOptions = FilesSpanExporterDestinationOptions & {
+	files: FilesClient | PromiseLike<FilesClient>;
+};
 
 export type FilesSpanExporterFromRuntimeEnvOptions = {
 	env?: NodeJS.ProcessEnv;
@@ -28,10 +20,7 @@ export function createFilesSpanExporter(
 ): AgentPondSpanExporter {
 	const destination = spanExporterDestination(options);
 	return new AgentPondSpanExporter({
-		store:
-			"store" in options && options.store
-				? options.store
-				: new FilesObjectStore(options.files),
+		store: FilesObjectStore.fromFiles(options.files),
 		...destination,
 	});
 }

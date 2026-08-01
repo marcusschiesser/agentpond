@@ -1,4 +1,4 @@
-import { createFilesSpanExporter } from "@agentpond/files-sdk/otel";
+import { AgentPondSpanExporter } from "@agentpond/otel";
 import { configForInitializedFirebaseApp } from "./firebase-admin.js";
 import {
 	createFirebaseStorageStoreFromConfig,
@@ -16,7 +16,7 @@ export function createFirebaseSpanExporter(
 	const store = createFirebaseStorageStoreFromConfig({
 		bucket: storageBucket,
 	});
-	return createFilesSpanExporter({
+	return new AgentPondSpanExporter({
 		store,
 		projectId,
 		prefix: options.prefix ?? defaultFirebaseStoragePrefix,

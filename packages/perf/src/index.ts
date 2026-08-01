@@ -27,7 +27,7 @@ import { countTraces, formatDuration, timeSync } from "./sync.js";
 async function main(argv = process.argv.slice(2)): Promise<void> {
 	const args = parseArgs(argv);
 	const config = buildConfig(args);
-	const store = new FilesObjectStore(
+	const store = FilesObjectStore.fromFiles(
 		new Files({
 			adapter: minio(args.minio),
 			retries: 3,
