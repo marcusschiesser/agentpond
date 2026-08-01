@@ -1,5 +1,18 @@
 # @agentpond/files-sdk
 
+## 0.3.0
+
+### Minor Changes
+
+- 2686ab9: Add Netlify Blobs and Oracle Cloud Object Storage support to Files SDK environments, the CLI, and the ingestion service.
+- 4e595b6: Consolidate Vercel, Supabase, and Firebase storage on Files SDK adapters, add named `FilesObjectStore.fromFiles` construction, expose retry and timeout settings on platform exporters, and keep optional Firebase Admin loading lazy.
+
+### Patch Changes
+
+- Updated dependencies [2686ab9]
+  - @agentpond/core@0.8.0
+  - @agentpond/otel@0.1.6
+
 ## 0.2.0
 
 ### Minor Changes
