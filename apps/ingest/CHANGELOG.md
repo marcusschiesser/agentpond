@@ -1,5 +1,14 @@
 # @agentpond/ingest-service
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [ad333ea]
+  - @agentpond/core@0.8.1
+  - @agentpond/fastify-ingest@0.3.11
+  - @agentpond/files-sdk@0.3.1
+
 ## 0.4.0
 
 ### Minor Changes

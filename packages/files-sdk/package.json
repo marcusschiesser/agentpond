@@ -1,6 +1,6 @@
 {
 	"name": "@agentpond/files-sdk",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "Files SDK object storage and OpenTelemetry export adapters for AgentPond",
 	"license": "MIT",
 	"type": "module",
