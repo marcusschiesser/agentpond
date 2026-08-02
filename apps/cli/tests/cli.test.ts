@@ -48,6 +48,7 @@ import {
 import { environmentContextForCommand } from "../src/environment-context.js";
 import { CLI_VERSION, createOtelTraceId, main } from "../src/index.js";
 import { manualTraceResourceSpans } from "../src/otel-trace.js";
+import { providerInitRequirementsForPlatform } from "../src/providers.js";
 import { writeEventsAndSyncCache } from "../src/sync-write.js";
 import {
 	checkForCliUpdate,
@@ -730,7 +731,6 @@ test("CLI init check reports a generic project as supported JSON without mutatio
 			schemaVersion: 1,
 			cliVersion: CLI_VERSION,
 			project: {
-				packageManager: "pnpm",
 				root,
 			},
 			requirements: {
@@ -739,7 +739,6 @@ test("CLI init check reports a generic project as supported JSON without mutatio
 				telemetry: ["opentelemetry", "openinference"],
 			},
 			setup: {
-				credentialsRequired: "production-only",
 				kind: "files-sdk",
 				linkingRequired: false,
 			},
@@ -751,6 +750,32 @@ test("CLI init check reports a generic project as supported JSON without mutatio
 		process.chdir(cwd);
 		process.exitCode = originalExitCode;
 	}
+});
+
+test("CLI provider registry owns managed init requirements", () => {
+	assert.deepEqual(providerInitRequirementsForPlatform("firebase"), {
+		configuration: ["firebase-project", "firebase-admin-app", "storage-rules"],
+		packages: ["@agentpond/firebase"],
+		telemetry: ["opentelemetry", "openinference"],
+	});
+	assert.deepEqual(providerInitRequirementsForPlatform("supabase"), {
+		configuration: [
+			"supabase-project",
+			"private-agentpond-bucket",
+			"server-secret-key",
+		],
+		packages: ["@agentpond/supabase"],
+		telemetry: ["opentelemetry", "openinference"],
+	});
+	assert.deepEqual(providerInitRequirementsForPlatform("vercel"), {
+		configuration: [
+			"vercel-project",
+			"private-blob-store",
+			"system-environment",
+		],
+		packages: ["@agentpond/vercel"],
+		telemetry: ["opentelemetry", "openinference"],
+	});
 });
 
 test("CLI init check reports a linked provider project", async () => {
@@ -781,9 +806,9 @@ test("CLI init check reports a linked provider project", async () => {
 			}),
 		);
 		const result = JSON.parse(output) as {
-			project: { packageManager: string; root: string };
+			project: { root: string };
+			requirements: { packages: string[] };
 			setup: {
-				credentialsRequired: string;
 				kind: string;
 				linkingRequired: boolean;
 				provider: string;
@@ -796,9 +821,8 @@ test("CLI init check reports a linked provider project", async () => {
 		assert.equal(result.supported, true);
 		assert.equal(result.setup.provider, "vercel");
 		assert.equal(result.setup.kind, "provider-managed");
-		assert.equal(result.setup.credentialsRequired, "provider-runtime");
 		assert.equal(result.project.root, root);
-		assert.equal(result.project.packageManager, "npm");
+		assert.deepEqual(result.requirements.packages, ["@agentpond/vercel"]);
 		assert.equal(result.setup.linkingRequired, false);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 		assert.equal(existsSync(join(root, ".agents")), false);
@@ -936,12 +960,13 @@ test("CLI init check has readable output in non-interactive execution", async ()
 			output,
 			new RegExp(`^AgentPond init is supported \\(CLI ${CLI_VERSION}\\)$`, "m"),
 		);
-		assert.match(output, new RegExp(`^Project: ${root} \\(yarn\\)$`, "m"));
+		assert.match(output, new RegExp(`^Project: ${root}$`, "m"));
 		assert.match(output, /^Setup: Files SDK fallback$/m);
 		assert.match(output, /^Next: npx agentpond init$/m);
+		assert.doesNotMatch(output, /package manager/i);
 		assert.doesNotMatch(output, /Required dependencies:/);
 		assert.doesNotMatch(output, /linking required later/i);
-		assert.doesNotMatch(output, /credentials required later/i);
+		assert.doesNotMatch(output, /credentials/i);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 		assert.equal(existsSync(join(root, ".agents")), false);
 	} finally {

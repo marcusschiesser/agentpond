@@ -10,20 +10,74 @@ import { CliError } from "./cli-support.js";
 export const AVAILABLE_PLATFORMS = ["firebase", "supabase", "vercel"] as const;
 export type InitPlatform = (typeof AVAILABLE_PLATFORMS)[number];
 
-const PROVIDERS_BY_PLATFORM = {
-	firebase: firebaseProvider,
-	supabase: supabaseProvider,
-	vercel: vercelProvider,
-} satisfies Record<InitPlatform, AgentPondProvider>;
+export type ProviderInitRequirements = {
+	readonly configuration: readonly string[];
+	readonly packages: readonly string[];
+	readonly telemetry: readonly ("opentelemetry" | "openinference")[];
+};
+
+type ProviderRegistration = {
+	readonly initRequirements: ProviderInitRequirements;
+	readonly provider: AgentPondProvider;
+};
+
+const PROVIDER_REGISTRY = {
+	firebase: {
+		initRequirements: {
+			configuration: [
+				"firebase-project",
+				"firebase-admin-app",
+				"storage-rules",
+			],
+			packages: ["@agentpond/firebase"],
+			telemetry: ["opentelemetry", "openinference"],
+		},
+		provider: firebaseProvider,
+	},
+	supabase: {
+		initRequirements: {
+			configuration: [
+				"supabase-project",
+				"private-agentpond-bucket",
+				"server-secret-key",
+			],
+			packages: ["@agentpond/supabase"],
+			telemetry: ["opentelemetry", "openinference"],
+		},
+		provider: supabaseProvider,
+	},
+	vercel: {
+		initRequirements: {
+			configuration: [
+				"vercel-project",
+				"private-blob-store",
+				"system-environment",
+			],
+			packages: ["@agentpond/vercel"],
+			telemetry: ["opentelemetry", "openinference"],
+		},
+		provider: vercelProvider,
+	},
+} as const satisfies Record<InitPlatform, ProviderRegistration>;
 
 const AVAILABLE_PROVIDERS = AVAILABLE_PLATFORMS.map(
-	(platform) => PROVIDERS_BY_PLATFORM[platform],
+	(platform) => PROVIDER_REGISTRY[platform].provider,
 );
 
 export type ProviderProjectContext = {
 	provider: AgentPondProvider;
 	project: AgentPondProviderProject;
 };
+
+export function providerForPlatform(platform: InitPlatform): AgentPondProvider {
+	return PROVIDER_REGISTRY[platform].provider;
+}
+
+export function providerInitRequirementsForPlatform(
+	platform: InitPlatform,
+): ProviderInitRequirements {
+	return PROVIDER_REGISTRY[platform].initRequirements;
+}
 
 export function initPlatformFromValue(
 	value: string | undefined,
@@ -41,7 +95,7 @@ export function providerForCommand(
 ): ProviderProjectContext | undefined {
 	const platform = initPlatformFromValue(options.platform);
 	if (platform) {
-		const provider = PROVIDERS_BY_PLATFORM[platform];
+		const provider = providerForPlatform(platform);
 		const project = provider.openProject({
 			cwd: options.cwd,
 			allowUnlinked: options.allowUnlinked,

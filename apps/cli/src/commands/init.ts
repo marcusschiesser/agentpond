@@ -1,12 +1,22 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { agentPondWorkspaceRoot } from "@agentpond/core";
+import {
+	type AgentPondProvider,
+	agentPondWorkspaceRoot,
+} from "@agentpond/core";
 import type { Command } from "commander";
 import { CliError, print } from "../cli-support.js";
 import type { GlobalOptions } from "../command-support.js";
-import { providerForCommand } from "../providers.js";
+import {
+	type InitPlatform,
+	initPlatformFromValue,
+	type ProviderInitRequirements,
+	providerForCommand,
+	providerForPlatform,
+	providerInitRequirementsForPlatform,
+} from "../providers.js";
 
 const require = createRequire(import.meta.url);
 
@@ -36,6 +46,12 @@ export const AGENTPOND_INIT_SKILLS = [
 	"agentpond-instrumentation",
 	"agentpond",
 ] as const;
+
+const FILES_SDK_INIT_REQUIREMENTS = {
+	configuration: ["storage-provider", "storage-provider-config"],
+	packages: ["@agentpond/files-sdk", "@agentpond/otel", "files-sdk"],
+	telemetry: ["opentelemetry", "openinference"],
+} as const satisfies ProviderInitRequirements;
 
 export function agentPondCliHeader(): string {
 	return [
@@ -69,30 +85,21 @@ type InitSetup = {
 	instrumentationPrompt: string;
 	projectLabel: string;
 	provider: InitProvider;
+	requirements: ProviderInitRequirements;
 	rootDir: string;
 };
 
-type InitProvider = "files-sdk" | "firebase" | "supabase" | "vercel";
-type PackageManager = "bun" | "npm" | "pnpm" | "yarn";
-type InitManagedProvider = Exclude<InitProvider, "files-sdk">;
-
-type InitCheckRequirements = {
-	configuration: string[];
-	packages: string[];
-	telemetry: Array<"opentelemetry" | "openinference">;
-};
+type InitProvider = "files-sdk" | InitPlatform;
 
 type InitCheckSetup =
 	| {
-			credentialsRequired: "production-only";
 			kind: "files-sdk";
 			linkingRequired: false;
 	  }
 	| {
-			credentialsRequired: "provider-runtime";
 			kind: "provider-managed";
 			linkingRequired: boolean;
-			provider: InitManagedProvider;
+			provider: InitPlatform;
 	  };
 
 export type InitCheckReason = {
@@ -110,11 +117,10 @@ export type InitCheckResult = {
 	schemaVersion: 1;
 	cliVersion: string;
 	project: {
-		packageManager: PackageManager | null;
 		root: string;
 	};
 	reason?: InitCheckReason;
-	requirements?: InitCheckRequirements;
+	requirements?: ProviderInitRequirements;
 	setup?: InitCheckSetup;
 	supported: boolean;
 };
@@ -227,6 +233,9 @@ export function checkInitSupport(options: {
 				instrumentationPrompt: context.provider.instrumentationPrompt,
 				projectLabel: context.project.projectLabel,
 				provider: context.provider.kind,
+				requirements: providerInitRequirementsForPlatform(
+					context.provider.kind,
+				),
 				rootDir: context.project.rootDir,
 			},
 			options.cliVersion,
@@ -235,7 +244,7 @@ export function checkInitSupport(options: {
 		return unsupportedInitCheckResult({
 			cliVersion: options.cliVersion,
 			projectRoot: context.project.rootDir,
-			provider: context.provider.kind,
+			provider: context.provider,
 			reason: initCheckReason(error),
 		});
 	}
@@ -250,10 +259,9 @@ function supportedInitCheckResult(
 		cliVersion,
 		supported: true,
 		project: {
-			packageManager: packageManagerForProject(setup.rootDir),
 			root: setup.rootDir,
 		},
-		requirements: initRequirements(setup.provider),
+		requirements: setup.requirements,
 		setup: initCheckSetup(setup.provider, setup.projectLabel === "unlinked"),
 	};
 }
@@ -261,15 +269,15 @@ function supportedInitCheckResult(
 function unsupportedInitCheckResult(options: {
 	cliVersion: string;
 	projectRoot: string;
-	provider: InitProvider | null;
+	provider: AgentPondProvider | null;
 	reason: InitCheckReason;
 }): InitCheckResult {
 	const requirements = options.provider
-		? initRequirements(options.provider)
+		? providerInitRequirementsForPlatform(options.provider.kind)
 		: undefined;
 	const setup = options.provider
 		? initCheckSetup(
-				options.provider,
+				options.provider.kind,
 				options.reason.code === "provider-not-ready",
 			)
 		: undefined;
@@ -278,7 +286,6 @@ function unsupportedInitCheckResult(options: {
 		cliVersion: options.cliVersion,
 		supported: false,
 		project: {
-			packageManager: packageManagerForProject(options.projectRoot),
 			root: options.projectRoot,
 		},
 		reason: options.reason,
@@ -293,12 +300,10 @@ function initCheckSetup(
 ): InitCheckSetup {
 	return provider === "files-sdk"
 		? {
-				credentialsRequired: "production-only",
 				kind: "files-sdk",
 				linkingRequired: false,
 			}
 		: {
-				credentialsRequired: "provider-runtime",
 				kind: "provider-managed",
 				linkingRequired,
 				provider,
@@ -319,6 +324,9 @@ function initSetup(
 				instrumentationPrompt: context.provider.instrumentationPrompt,
 				projectLabel: context.project.projectLabel,
 				provider: context.provider.kind,
+				requirements: providerInitRequirementsForPlatform(
+					context.provider.kind,
+				),
 				rootDir: context.project.rootDir,
 			}
 		: filesSdkInitSetup(options.cwd);
@@ -331,76 +339,9 @@ function filesSdkInitSetup(cwd = process.cwd()): InitSetup {
 		instrumentationPrompt: FILES_SDK_INSTRUMENTATION_PROMPT,
 		projectLabel: rootDir,
 		provider: "files-sdk",
+		requirements: FILES_SDK_INIT_REQUIREMENTS,
 		rootDir,
 	};
-}
-
-function packageManagerForProject(rootDir: string): PackageManager | null {
-	const packageJsonPath = join(rootDir, "package.json");
-	if (!existsSync(packageJsonPath)) return null;
-	try {
-		const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
-			packageManager?: unknown;
-		};
-		if (typeof parsed.packageManager === "string") {
-			const match = /^(bun|npm|pnpm|yarn)(?:@|$)/.exec(parsed.packageManager);
-			if (match) return match[1] as PackageManager;
-		}
-	} catch {
-		return null;
-	}
-	for (const [packageManager, lockfiles] of [
-		["pnpm", ["pnpm-lock.yaml"]],
-		["yarn", ["yarn.lock"]],
-		["bun", ["bun.lock", "bun.lockb"]],
-		["npm", ["package-lock.json", "npm-shrinkwrap.json"]],
-	] as const) {
-		if (lockfiles.some((lockfile) => existsSync(join(rootDir, lockfile)))) {
-			return packageManager;
-		}
-	}
-	return "npm";
-}
-
-function initRequirements(provider: InitProvider): InitCheckRequirements {
-	switch (provider) {
-		case "files-sdk":
-			return {
-				configuration: ["storage-provider", "storage-provider-config"],
-				packages: ["@agentpond/files-sdk", "@agentpond/otel", "files-sdk"],
-				telemetry: ["opentelemetry", "openinference"],
-			};
-		case "firebase":
-			return {
-				configuration: [
-					"firebase-project",
-					"firebase-admin-app",
-					"storage-rules",
-				],
-				packages: ["@agentpond/firebase"],
-				telemetry: ["opentelemetry", "openinference"],
-			};
-		case "supabase":
-			return {
-				configuration: [
-					"supabase-project",
-					"private-agentpond-bucket",
-					"server-secret-key",
-				],
-				packages: ["@agentpond/supabase"],
-				telemetry: ["opentelemetry", "openinference"],
-			};
-		case "vercel":
-			return {
-				configuration: [
-					"vercel-project",
-					"private-blob-store",
-					"system-environment",
-				],
-				packages: ["@agentpond/vercel"],
-				telemetry: ["opentelemetry", "openinference"],
-			};
-	}
 }
 
 function initCheckReason(error: unknown): InitCheckReason {
@@ -454,33 +395,28 @@ function initCheckReason(error: unknown): InitCheckReason {
 function providerFromFailedCheck(
 	platform: string | undefined,
 	reason: InitCheckReason,
-): InitProvider | null {
+): AgentPondProvider | null {
 	if (
 		reason.code === "invalid-platform" ||
 		reason.code === "multiple-providers"
 	) {
 		return null;
 	}
-	return platform === "firebase" ||
-		platform === "supabase" ||
-		platform === "vercel"
-		? platform
-		: null;
+	const initPlatform = initPlatformFromValue(platform);
+	return initPlatform ? providerForPlatform(initPlatform) : null;
 }
 
 function formatInitCheck(result: InitCheckResult): string {
 	const lines = [
 		`AgentPond init is ${result.supported ? "supported" : "not supported"} (CLI ${result.cliVersion})`,
-		`Project: ${result.project.root}${
-			result.project.packageManager ? ` (${result.project.packageManager})` : ""
-		}`,
+		`Project: ${result.project.root}`,
 	];
 	if (result.setup) {
 		lines.push(
 			`Setup: ${
 				result.setup.kind === "files-sdk"
 					? "Files SDK fallback"
-					: `${providerDisplayName(result.setup.provider)} (provider-managed)`
+					: `${providerForPlatform(result.setup.provider).displayName} (provider-managed)`
 			}`,
 		);
 		if (result.setup.linkingRequired) {
@@ -497,14 +433,6 @@ function formatInitCheck(result: InitCheckResult): string {
 		);
 	}
 	return lines.join("\n");
-}
-
-function providerDisplayName(provider: InitManagedProvider): string {
-	return provider === "firebase"
-		? "Firebase"
-		: provider === "supabase"
-			? "Supabase"
-			: "Vercel";
 }
 
 export async function installSkillsWithBundledCli(

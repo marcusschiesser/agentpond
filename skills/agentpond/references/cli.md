@@ -15,12 +15,10 @@ The default output is a concise verdict with the exact executing CLI version,
 detected project, setup path, and next command. `--json` returns a versioned
 stable result with nested `project`, `setup`, and `requirements` objects.
 `requirements.packages` contains concrete package names, while `telemetry` and
-`configuration` contain stable capability and configuration codes. The setup's
-credential requirement is `production-only` for the Files SDK fallback and
-`provider-runtime` for managed-provider setups. Unsupported results exit with
-status 2 and add one structured `reason` with next steps. The check does not
-install packages or skills, write files, create environments, prompt, or require
-provider credentials.
+`configuration` contain stable capability and configuration codes owned by the
+selected provider. Unsupported results exit with status 2 and add one structured
+`reason` with next steps. The check does not install packages or skills, write
+files, create environments, prompt, or require provider credentials.
 
 ## Select data
 
