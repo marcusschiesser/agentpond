@@ -66,6 +66,9 @@ export function shouldCheckForUpdates(
 	argv: readonly string[],
 	options?: CliUpdateCheckOptions,
 ): boolean {
+	const initIndex = argv.indexOf("init");
+	if (initIndex >= 0 && argv.slice(initIndex + 1).includes("check"))
+		return false;
 	if (options?.force) return true;
 	if (process.env.NODE_ENV === "test") return false;
 	if (process.env.CI) return false;

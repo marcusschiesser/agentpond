@@ -10,8 +10,11 @@ npx agentpond --version
 ## Automatic setup
 
 ```bash
+npx agentpond init check
 npx agentpond init
 ```
+
+`init check` is a non-mutating preflight. Add `--json` for structured output.
 
 `init` detects Firebase, Supabase, or Vercel, installs the
 `agentpond-instrumentation` and `agentpond` project skills, and prints the

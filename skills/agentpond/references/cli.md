@@ -2,6 +2,17 @@
 
 Run AgentPond through `npx` unless it is installed globally.
 
+## Check setup support
+
+Before setup automation changes a project, run:
+
+```bash
+npx agentpond init check --json
+```
+
+`supported` is the verdict; `project`, `setup`, and `requirements` describe the
+detected setup. When unsupported, `reason` explains why and what to do next.
+
 ## Select data
 
 Use the provider-specific reference for Firebase, Supabase, or Vercel. Environment

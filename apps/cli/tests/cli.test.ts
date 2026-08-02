@@ -48,6 +48,7 @@ import {
 import { environmentContextForCommand } from "../src/environment-context.js";
 import { CLI_VERSION, createOtelTraceId, main } from "../src/index.js";
 import { manualTraceResourceSpans } from "../src/otel-trace.js";
+import { providerInitRequirementsForPlatform } from "../src/providers.js";
 import { writeEventsAndSyncCache } from "../src/sync-write.js";
 import {
 	checkForCliUpdate,
@@ -697,6 +698,283 @@ test("CLI init requires an active Firebase project", async () => {
 	}
 });
 
+test("CLI init check reports a generic project as supported JSON without mutation", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-check-files-sdk-")),
+	);
+	const originalExitCode = process.exitCode;
+	let installerCalled = false;
+	process.exitCode = undefined;
+	try {
+		writeFileSync(
+			join(root, "package.json"),
+			JSON.stringify({
+				name: "agentpond-init-check-fixture",
+				packageManager: "pnpm@11.7.0",
+				type: "module",
+			}),
+		);
+		process.chdir(root);
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init", "check", "--json"], {
+				installSkills: async () => {
+					installerCalled = true;
+				},
+			}),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(installerCalled, false);
+		assert.deepEqual(JSON.parse(output), {
+			schemaVersion: 1,
+			cliVersion: CLI_VERSION,
+			project: {
+				root,
+			},
+			requirements: {
+				configuration: ["storage-provider", "storage-provider-config"],
+				packages: ["@agentpond/files-sdk", "@agentpond/otel", "files-sdk"],
+				telemetry: ["opentelemetry", "openinference"],
+			},
+			setup: {
+				kind: "files-sdk",
+				linkingRequired: false,
+			},
+			supported: true,
+		});
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+		assert.equal(existsSync(join(root, ".agents")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI provider registry owns managed init requirements", () => {
+	assert.deepEqual(providerInitRequirementsForPlatform("firebase"), {
+		configuration: ["firebase-project", "firebase-admin-app", "storage-rules"],
+		packages: ["@agentpond/firebase"],
+		telemetry: ["opentelemetry", "openinference"],
+	});
+	assert.deepEqual(providerInitRequirementsForPlatform("supabase"), {
+		configuration: [
+			"supabase-project",
+			"private-agentpond-bucket",
+			"server-secret-key",
+		],
+		packages: ["@agentpond/supabase"],
+		telemetry: ["opentelemetry", "openinference"],
+	});
+	assert.deepEqual(providerInitRequirementsForPlatform("vercel"), {
+		configuration: [
+			"vercel-project",
+			"private-blob-store",
+			"system-environment",
+		],
+		packages: ["@agentpond/vercel"],
+		telemetry: ["opentelemetry", "openinference"],
+	});
+});
+
+test("CLI init check reports a linked provider project", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-check-vercel-")),
+	);
+	const originalExitCode = process.exitCode;
+	let installerCalled = false;
+	process.exitCode = undefined;
+	try {
+		mkdirSync(join(root, ".vercel"), { recursive: true });
+		writeFileSync(
+			join(root, "package.json"),
+			JSON.stringify({ name: "vercel-check-fixture" }),
+		);
+		writeFileSync(
+			join(root, ".vercel", "project.json"),
+			JSON.stringify({ projectId: "prj_check", projectName: "check-web" }),
+		);
+		process.chdir(root);
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init", "check", "--json"], {
+				installSkills: async () => {
+					installerCalled = true;
+				},
+			}),
+		);
+		const result = JSON.parse(output) as {
+			project: { root: string };
+			requirements: { packages: string[] };
+			setup: {
+				kind: string;
+				linkingRequired: boolean;
+				provider: string;
+			};
+			supported: boolean;
+		};
+
+		assert.equal(process.exitCode, undefined);
+		assert.equal(installerCalled, false);
+		assert.equal(result.supported, true);
+		assert.equal(result.setup.provider, "vercel");
+		assert.equal(result.setup.kind, "provider-managed");
+		assert.equal(result.project.root, root);
+		assert.deepEqual(result.requirements.packages, ["@agentpond/vercel"]);
+		assert.equal(result.setup.linkingRequired, false);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+		assert.equal(existsSync(join(root, ".agents")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init check retains an auto-detected provider that is not ready", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-check-firebase-unready-")),
+	);
+	const originalExitCode = process.exitCode;
+	const originalProjectEnv = {
+		FIREBASE_CONFIG: process.env.FIREBASE_CONFIG,
+		GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
+		GCP_PROJECT: process.env.GCP_PROJECT,
+		GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
+	};
+	process.exitCode = undefined;
+	try {
+		delete process.env.FIREBASE_CONFIG;
+		delete process.env.GCLOUD_PROJECT;
+		delete process.env.GCP_PROJECT;
+		delete process.env.GOOGLE_CLOUD_PROJECT;
+		writeFileSync(join(root, "firebase.json"), "{}", "utf8");
+		writeFileSync(
+			join(root, "package.json"),
+			JSON.stringify({ name: "firebase-unready-check-fixture" }),
+		);
+		process.chdir(root);
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init", "check", "--json"]),
+		);
+		const result = JSON.parse(output) as {
+			reason: { code: string };
+			setup: { linkingRequired: boolean; provider: string };
+			supported: boolean;
+		};
+
+		assert.equal(process.exitCode, 2);
+		assert.equal(result.supported, false);
+		assert.equal(result.setup.provider, "firebase");
+		assert.equal(result.setup.linkingRequired, true);
+		assert.equal(result.reason.code, "provider-not-ready");
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+		assert.equal(existsSync(join(root, ".agents")), false);
+	} finally {
+		for (const [key, value] of Object.entries(originalProjectEnv)) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init check returns a structured unsupported result", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-check-unsupported-")),
+	);
+	const originalExitCode = process.exitCode;
+	let installerCalled = false;
+	process.exitCode = undefined;
+	try {
+		writeFileSync(
+			join(root, "package.json"),
+			JSON.stringify({ name: "unsupported-check-fixture" }),
+		);
+		process.chdir(root);
+
+		const output = await captureStdout(() =>
+			main(
+				[
+					"node",
+					"agentpond",
+					"init",
+					"check",
+					"--platform",
+					"firebase",
+					"--json",
+				],
+				{
+					installSkills: async () => {
+						installerCalled = true;
+					},
+				},
+			),
+		);
+		const result = JSON.parse(output) as {
+			reason: { code: string; nextSteps: string[] };
+			setup: { provider: string };
+			supported: boolean;
+		};
+
+		assert.equal(process.exitCode, 2);
+		assert.equal(installerCalled, false);
+		assert.equal(result.supported, false);
+		assert.equal(result.setup.provider, "firebase");
+		assert.equal(result.reason.code, "provider-not-found");
+		assert.ok(result.reason.nextSteps.length > 0);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+		assert.equal(existsSync(join(root, ".agents")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
+test("CLI init check has readable output in non-interactive execution", async () => {
+	const cwd = process.cwd();
+	const root = realpathSync(
+		mkdtempSync(join(tmpdir(), "agentpond-cli-init-check-readable-")),
+	);
+	const originalExitCode = process.exitCode;
+	process.exitCode = undefined;
+	try {
+		writeFileSync(
+			join(root, "package.json"),
+			JSON.stringify({ name: "readable-check-fixture" }),
+		);
+		writeFileSync(join(root, "yarn.lock"), "", "utf8");
+		process.chdir(root);
+
+		const output = await captureStdout(() =>
+			main(["node", "agentpond", "init", "check"]),
+		);
+
+		assert.equal(process.exitCode, undefined);
+		assert.match(
+			output,
+			new RegExp(`^AgentPond init is supported \\(CLI ${CLI_VERSION}\\)$`, "m"),
+		);
+		assert.match(output, new RegExp(`^Project: ${root}$`, "m"));
+		assert.match(output, /^Setup: Files SDK fallback$/m);
+		assert.match(output, /^Next: npx agentpond init$/m);
+		assert.doesNotMatch(output, /package manager/i);
+		assert.doesNotMatch(output, /Required dependencies:/);
+		assert.doesNotMatch(output, /linking required later/i);
+		assert.doesNotMatch(output, /credentials/i);
+		assert.equal(existsSync(join(root, ".agentpond")), false);
+		assert.equal(existsSync(join(root, ".agents")), false);
+	} finally {
+		process.chdir(cwd);
+		process.exitCode = originalExitCode;
+	}
+});
+
 test("CLI init rejects JSON output before installing skills", async () => {
 	const cwd = process.cwd();
 	const root = realpathSync(
@@ -936,6 +1214,12 @@ test("CLI update check compares semver versions", () => {
 test("CLI update check skips automation-friendly modes", () => {
 	assert.equal(shouldCheckForUpdates(["node", "agentpond", "--json"]), false);
 	assert.equal(shouldCheckForUpdates(["node", "agentpond", "--help"]), false);
+	assert.equal(
+		shouldCheckForUpdates(["node", "agentpond", "init", "check"], {
+			force: true,
+		}),
+		false,
+	);
 	assert.equal(
 		shouldCheckForUpdates(["node", "agentpond", "--version"]),
 		false,
