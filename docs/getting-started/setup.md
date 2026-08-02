@@ -27,21 +27,7 @@ object-store write credentials. It does not require an AgentPond HTTP service.
 
 ### Run the guided setup
 
-From the application directory, inspect the setup path without making changes:
-
-```sh
-npx agentpond init check
-npx agentpond init check --json
-```
-
-The check prints a concise verdict with the executing CLI version, detected
-project, setup path, and next command. It does not write files, install
-dependencies or skills, prompt, or require credentials. JSON output is intended
-for automation and groups project detection, setup requirements, and concrete
-package, telemetry, and configuration requirements. Unsupported results add one
-structured reason and actionable next steps.
-
-Then run the guided setup:
+From the application directory, run:
 
 ```sh
 npx agentpond init

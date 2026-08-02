@@ -4,21 +4,14 @@ Run AgentPond through `npx` unless it is installed globally.
 
 ## Check setup support
 
-Use the non-mutating preflight before setup automation changes a project:
+Before setup automation changes a project, run:
 
 ```bash
-npx agentpond init check
 npx agentpond init check --json
 ```
 
-The default output is a concise verdict with the exact executing CLI version,
-detected project, setup path, and next command. `--json` returns a versioned
-stable result with nested `project`, `setup`, and `requirements` objects.
-`requirements.packages` contains concrete package names, while `telemetry` and
-`configuration` contain stable capability and configuration codes owned by the
-selected provider. Unsupported results exit with status 2 and add one structured
-`reason` with next steps. The check does not install packages or skills, write
-files, create environments, prompt, or require provider credentials.
+`supported` is the verdict; `project`, `setup`, and `requirements` describe the
+detected setup. When unsupported, `reason` explains why and what to do next.
 
 ## Select data
 

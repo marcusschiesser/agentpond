@@ -21,11 +21,9 @@ credential access:
 ## Select the data source
 
 Before setup automation changes a project, run
-`npx agentpond init check --json`. Treat its versioned JSON as the authoritative
-preflight for the executing CLI version and nested `project`, `setup`, and
-`requirements` data. Read the optional singular `reason` when `supported` is
-false. The check is non-mutating and does not prompt or require provider
-credentials.
+`npx agentpond init check --json`. `supported` is the verdict; `project`,
+`setup`, and `requirements` describe the detected setup. When unsupported,
+`reason` explains why and what to do next.
 
 Determine the provider before syncing:
 

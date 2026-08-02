@@ -11,19 +11,10 @@ npx agentpond --version
 
 ```bash
 npx agentpond init check
-npx agentpond init check --json
 npx agentpond init
 ```
 
-`init check` is a non-mutating preflight. Its default output gives a concise
-support verdict, exact executing CLI version, detected project and setup path,
-and the next command. `--json` returns a versioned nested result: `project`
-contains the root, `setup` contains the setup kind, any managed provider, and
-whether linking is required, and `requirements` separates concrete packages,
-telemetry capabilities, and configuration codes supplied by the selected
-provider. Unsupported checks exit with status 2 and add one structured `reason`
-with actionable next steps. The command does not install packages or skills,
-write files, create environments, prompt, or require provider credentials.
+`init check` is a non-mutating preflight. Add `--json` for structured output.
 
 `init` detects Firebase, Supabase, or Vercel, installs the
 `agentpond-instrumentation` and `agentpond` project skills, and prints the
@@ -33,7 +24,7 @@ trace verification before choosing production storage. `init` does not edit
 application code, provision storage, link a provider project, initialize an
 environment, or create `.agentpond`.
 
-When multiple platform markers exist, select one explicitly with `--platform firebase`, `--platform supabase`, or `--platform vercel`. The override is stateless and works with setup, environment, sync, and query commands. Forced Supabase or Vercel setup may begin before the project is linked; the coding agent asks for confirmation before linking or provisioning storage. The mutating `init` command is interactive and does not support `--json`; `init check --json` is the automation interface.
+When multiple platform markers exist, select one explicitly with `--platform firebase`, `--platform supabase`, or `--platform vercel`. The override is stateless and works with setup, environment, sync, and query commands. Forced Supabase or Vercel setup may begin before the project is linked; the coding agent asks for confirmation before linking or provisioning storage. `init` is interactive and does not support `--json`.
 
 ## Global options
 
