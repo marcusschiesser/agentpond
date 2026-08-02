@@ -22,9 +22,10 @@ credential access:
 
 Before setup automation changes a project, run
 `npx agentpond init check --json`. Treat its versioned JSON as the authoritative
-preflight for the executing CLI version, project root, package manager, provider,
-setup mode, requirements, and structured unsupported reasons. The check is
-non-mutating and does not prompt or require provider credentials.
+preflight for the executing CLI version and nested `project`, `setup`, and
+`requirements` data. Read the optional singular `reason` when `supported` is
+false. The check is non-mutating and does not prompt or require provider
+credentials.
 
 Determine the provider before syncing:
 

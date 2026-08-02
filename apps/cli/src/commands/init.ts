@@ -70,12 +70,30 @@ type InitSetup = {
 	projectLabel: string;
 	provider: InitProvider;
 	rootDir: string;
-	setupMode: InitSetupMode;
 };
 
 type InitProvider = "files-sdk" | "firebase" | "supabase" | "vercel";
-type InitSetupMode = "files-sdk" | "provider-managed";
 type PackageManager = "bun" | "npm" | "pnpm" | "yarn";
+type InitManagedProvider = Exclude<InitProvider, "files-sdk">;
+
+type InitCheckRequirements = {
+	configuration: string[];
+	packages: string[];
+	telemetry: Array<"opentelemetry" | "openinference">;
+};
+
+type InitCheckSetup =
+	| {
+			credentialsRequired: "production-only";
+			kind: "files-sdk";
+			linkingRequired: false;
+	  }
+	| {
+			credentialsRequired: "provider-runtime";
+			kind: "provider-managed";
+			linkingRequired: boolean;
+			provider: InitManagedProvider;
+	  };
 
 export type InitCheckReason = {
 	code:
@@ -91,16 +109,13 @@ export type InitCheckReason = {
 export type InitCheckResult = {
 	schemaVersion: 1;
 	cliVersion: string;
-	credentialsRequiredLater: boolean;
-	packageManager: PackageManager | null;
-	projectLabel: string | null;
-	projectRoot: string;
-	provider: InitProvider | null;
-	providerLinkingRequired: boolean;
-	reasons: InitCheckReason[];
-	requiredConfiguration: string[];
-	requiredDependencies: string[];
-	setupMode: InitSetupMode | null;
+	project: {
+		packageManager: PackageManager | null;
+		root: string;
+	};
+	reason?: InitCheckReason;
+	requirements?: InitCheckRequirements;
+	setup?: InitCheckSetup;
 	supported: boolean;
 };
 
@@ -213,7 +228,6 @@ export function checkInitSupport(options: {
 				projectLabel: context.project.projectLabel,
 				provider: context.provider.kind,
 				rootDir: context.project.rootDir,
-				setupMode: "provider-managed",
 			},
 			options.cliVersion,
 		);
@@ -231,21 +245,16 @@ function supportedInitCheckResult(
 	setup: InitSetup,
 	cliVersion: string,
 ): InitCheckResult {
-	const requirements = initRequirements(setup.provider);
 	return {
 		schemaVersion: 1,
 		cliVersion,
-		credentialsRequiredLater: true,
-		packageManager: packageManagerForProject(setup.rootDir),
-		projectLabel: setup.projectLabel,
-		projectRoot: setup.rootDir,
-		provider: setup.provider,
-		providerLinkingRequired: setup.projectLabel === "unlinked",
-		reasons: [],
-		requiredConfiguration: requirements.configuration,
-		requiredDependencies: requirements.dependencies,
-		setupMode: setup.setupMode,
 		supported: true,
+		project: {
+			packageManager: packageManagerForProject(setup.rootDir),
+			root: setup.rootDir,
+		},
+		requirements: initRequirements(setup.provider),
+		setup: initCheckSetup(setup.provider, setup.projectLabel === "unlinked"),
 	};
 }
 
@@ -257,27 +266,43 @@ function unsupportedInitCheckResult(options: {
 }): InitCheckResult {
 	const requirements = options.provider
 		? initRequirements(options.provider)
-		: { configuration: [], dependencies: [] };
+		: undefined;
+	const setup = options.provider
+		? initCheckSetup(
+				options.provider,
+				options.reason.code === "provider-not-ready",
+			)
+		: undefined;
 	return {
 		schemaVersion: 1,
 		cliVersion: options.cliVersion,
-		credentialsRequiredLater: options.provider !== null,
-		packageManager: packageManagerForProject(options.projectRoot),
-		projectLabel: null,
-		projectRoot: options.projectRoot,
-		provider: options.provider,
-		providerLinkingRequired: options.reason.code === "provider-not-ready",
-		reasons: [options.reason],
-		requiredConfiguration: requirements.configuration,
-		requiredDependencies: requirements.dependencies,
-		setupMode:
-			options.provider === null
-				? null
-				: options.provider === "files-sdk"
-					? "files-sdk"
-					: "provider-managed",
 		supported: false,
+		project: {
+			packageManager: packageManagerForProject(options.projectRoot),
+			root: options.projectRoot,
+		},
+		reason: options.reason,
+		...(requirements ? { requirements } : {}),
+		...(setup ? { setup } : {}),
 	};
+}
+
+function initCheckSetup(
+	provider: InitProvider,
+	linkingRequired: boolean,
+): InitCheckSetup {
+	return provider === "files-sdk"
+		? {
+				credentialsRequired: "production-only",
+				kind: "files-sdk",
+				linkingRequired: false,
+			}
+		: {
+				credentialsRequired: "provider-runtime",
+				kind: "provider-managed",
+				linkingRequired,
+				provider,
+			};
 }
 
 function initSetup(
@@ -295,7 +320,6 @@ function initSetup(
 				projectLabel: context.project.projectLabel,
 				provider: context.provider.kind,
 				rootDir: context.project.rootDir,
-				setupMode: "provider-managed",
 			}
 		: filesSdkInitSetup(options.cwd);
 }
@@ -308,7 +332,6 @@ function filesSdkInitSetup(cwd = process.cwd()): InitSetup {
 		projectLabel: rootDir,
 		provider: "files-sdk",
 		rootDir,
-		setupMode: "files-sdk",
 	};
 }
 
@@ -339,56 +362,43 @@ function packageManagerForProject(rootDir: string): PackageManager | null {
 	return "npm";
 }
 
-function initRequirements(provider: InitProvider): {
-	configuration: string[];
-	dependencies: string[];
-} {
+function initRequirements(provider: InitProvider): InitCheckRequirements {
 	switch (provider) {
 		case "files-sdk":
 			return {
-				configuration: [
-					"FILES_SDK_PROVIDER and provider-specific storage configuration",
-					"provider credentials in the trusted application and CLI environments",
-				],
-				dependencies: [
-					"@agentpond/files-sdk",
-					"@agentpond/otel",
-					"files-sdk",
-					"compatible OpenTelemetry runtime and OpenInference instrumentation",
-				],
+				configuration: ["storage-provider", "storage-provider-config"],
+				packages: ["@agentpond/files-sdk", "@agentpond/otel", "files-sdk"],
+				telemetry: ["opentelemetry", "openinference"],
 			};
 		case "firebase":
 			return {
 				configuration: [
-					"an active Firebase project and default Firebase Admin app",
-					"Storage Rules that protect agentpond/** from client access",
+					"firebase-project",
+					"firebase-admin-app",
+					"storage-rules",
 				],
-				dependencies: [
-					"@agentpond/firebase",
-					"compatible OpenTelemetry runtime and OpenInference instrumentation",
-				],
+				packages: ["@agentpond/firebase"],
+				telemetry: ["opentelemetry", "openinference"],
 			};
 		case "supabase":
 			return {
 				configuration: [
-					"a linked hosted Supabase project and private agentpond bucket",
-					"a server-only Supabase secret key",
+					"supabase-project",
+					"private-agentpond-bucket",
+					"server-secret-key",
 				],
-				dependencies: [
-					"@agentpond/supabase",
-					"compatible OpenTelemetry runtime and OpenInference instrumentation",
-				],
+				packages: ["@agentpond/supabase"],
+				telemetry: ["opentelemetry", "openinference"],
 			};
 		case "vercel":
 			return {
 				configuration: [
-					"a linked Vercel project and connected private Blob store",
-					"Vercel system environment variables in the trusted runtime",
+					"vercel-project",
+					"private-blob-store",
+					"system-environment",
 				],
-				dependencies: [
-					"@agentpond/vercel",
-					"compatible OpenTelemetry runtime and OpenInference instrumentation",
-				],
+				packages: ["@agentpond/vercel"],
+				telemetry: ["opentelemetry", "openinference"],
 			};
 	}
 }
@@ -460,36 +470,41 @@ function providerFromFailedCheck(
 
 function formatInitCheck(result: InitCheckResult): string {
 	const lines = [
-		"AgentPond init check",
-		`CLI version: ${result.cliVersion}`,
-		`Supported: ${result.supported ? "yes" : "no"}`,
-		`Project root: ${result.projectRoot}`,
-		`Package manager: ${result.packageManager ?? "not detected"}`,
-		`Provider: ${result.provider ?? "not determined"}`,
-		`Setup mode: ${result.setupMode ?? "not determined"}`,
-		`Provider linking required later: ${result.providerLinkingRequired ? "yes" : "no"}`,
-		`Credentials required later: ${result.credentialsRequiredLater ? "yes" : "no"}`,
+		`AgentPond init is ${result.supported ? "supported" : "not supported"} (CLI ${result.cliVersion})`,
+		`Project: ${result.project.root}${
+			result.project.packageManager ? ` (${result.project.packageManager})` : ""
+		}`,
 	];
-	if (result.requiredDependencies.length > 0) {
+	if (result.setup) {
 		lines.push(
-			"Required dependencies:",
-			...result.requiredDependencies.map((dependency) => `- ${dependency}`),
+			`Setup: ${
+				result.setup.kind === "files-sdk"
+					? "Files SDK fallback"
+					: `${providerDisplayName(result.setup.provider)} (provider-managed)`
+			}`,
 		);
+		if (result.setup.linkingRequired) {
+			lines.push("Provider linking is required during setup.");
+		}
 	}
-	if (result.requiredConfiguration.length > 0) {
+	if (result.supported) {
+		lines.push("Next: npx agentpond init");
+	} else if (result.reason) {
 		lines.push(
-			"Required configuration:",
-			...result.requiredConfiguration.map((item) => `- ${item}`),
-		);
-	}
-	for (const reason of result.reasons) {
-		lines.push(
-			`Reason (${reason.code}): ${reason.message}`,
+			`Reason (${result.reason.code}): ${result.reason.message}`,
 			"Next steps:",
-			...reason.nextSteps.map((nextStep) => `- ${nextStep}`),
+			...result.reason.nextSteps.map((nextStep) => `- ${nextStep}`),
 		);
 	}
 	return lines.join("\n");
+}
+
+function providerDisplayName(provider: InitManagedProvider): string {
+	return provider === "firebase"
+		? "Firebase"
+		: provider === "supabase"
+			? "Supabase"
+			: "Vercel";
 }
 
 export async function installSkillsWithBundledCli(

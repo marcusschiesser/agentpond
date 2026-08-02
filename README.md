@@ -29,10 +29,10 @@ npx agentpond init check
 npx agentpond init
 ```
 
-`init check` reports the detected project root, package manager, provider, setup
-mode, and later requirements without installing packages, writing files,
-prompting, or requiring credentials. Add `--json` for a stable machine-readable
-result.
+`init check` prints a concise support verdict, detected project, setup path, and
+next command without installing packages, writing files, prompting, or requiring
+credentials. Add `--json` for a stable nested result with setup and integration
+requirements.
 
 Run `init` from your application directory. It installs AgentPond's
 instrumentation and analytics skills, and prints a setup prompt for your coding

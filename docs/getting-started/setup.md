@@ -34,12 +34,12 @@ npx agentpond init check
 npx agentpond init check --json
 ```
 
-The check reports the executing CLI version, project and package-manager
-detection, provider or Files SDK fallback, setup requirements, and whether
-linking or credentials will be needed later. It does not write files, install
+The check prints a concise verdict with the executing CLI version, detected
+project, setup path, and next command. It does not write files, install
 dependencies or skills, prompt, or require credentials. JSON output is intended
-for automation and returns structured reasons and next steps when setup is not
-currently supported.
+for automation and groups project detection, setup requirements, and concrete
+package, telemetry, and configuration requirements. Unsupported results add one
+structured reason and actionable next steps.
 
 Then run the guided setup:
 

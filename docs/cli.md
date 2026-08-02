@@ -15,14 +15,17 @@ npx agentpond init check --json
 npx agentpond init
 ```
 
-`init check` is a non-mutating preflight. It reports the exact executing CLI
-version, project root, package manager, detected provider or Files SDK fallback,
-selected setup mode, dependencies, configuration, and whether provider linking
-or credentials will be needed later. Human-readable output is the default;
-`--json` returns a versioned machine-readable result. Unsupported checks exit
-with status 2 and include structured reason codes and next steps. The command
-does not install packages or skills, write files, create environments, prompt,
-or require provider credentials.
+`init check` is a non-mutating preflight. Its default output gives a concise
+support verdict, exact executing CLI version, detected project and setup path,
+and the next command. `--json` returns a versioned nested result: `project`
+contains the root and package manager, `setup` contains the setup kind and any
+managed provider, and `requirements` separates concrete packages, telemetry
+capabilities, and configuration codes. `setup.credentialsRequired` is
+`production-only` for the Files SDK fallback because local filesystem
+verification needs no credentials, and `provider-runtime` for managed-provider
+setups. Unsupported checks exit with status 2 and add one structured `reason`
+with actionable next steps. The command does not install packages or skills,
+write files, create environments, prompt, or require provider credentials.
 
 `init` detects Firebase, Supabase, or Vercel, installs the
 `agentpond-instrumentation` and `agentpond` project skills, and prints the

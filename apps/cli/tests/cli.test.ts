@@ -729,24 +729,20 @@ test("CLI init check reports a generic project as supported JSON without mutatio
 		assert.deepEqual(JSON.parse(output), {
 			schemaVersion: 1,
 			cliVersion: CLI_VERSION,
-			credentialsRequiredLater: true,
-			packageManager: "pnpm",
-			projectLabel: root,
-			projectRoot: root,
-			provider: "files-sdk",
-			providerLinkingRequired: false,
-			reasons: [],
-			requiredConfiguration: [
-				"FILES_SDK_PROVIDER and provider-specific storage configuration",
-				"provider credentials in the trusted application and CLI environments",
-			],
-			requiredDependencies: [
-				"@agentpond/files-sdk",
-				"@agentpond/otel",
-				"files-sdk",
-				"compatible OpenTelemetry runtime and OpenInference instrumentation",
-			],
-			setupMode: "files-sdk",
+			project: {
+				packageManager: "pnpm",
+				root,
+			},
+			requirements: {
+				configuration: ["storage-provider", "storage-provider-config"],
+				packages: ["@agentpond/files-sdk", "@agentpond/otel", "files-sdk"],
+				telemetry: ["opentelemetry", "openinference"],
+			},
+			setup: {
+				credentialsRequired: "production-only",
+				kind: "files-sdk",
+				linkingRequired: false,
+			},
 			supported: true,
 		});
 		assert.equal(existsSync(join(root, ".agentpond")), false);
@@ -785,22 +781,25 @@ test("CLI init check reports a linked provider project", async () => {
 			}),
 		);
 		const result = JSON.parse(output) as {
-			packageManager: string;
-			projectLabel: string;
-			provider: string;
-			providerLinkingRequired: boolean;
-			setupMode: string;
+			project: { packageManager: string; root: string };
+			setup: {
+				credentialsRequired: string;
+				kind: string;
+				linkingRequired: boolean;
+				provider: string;
+			};
 			supported: boolean;
 		};
 
 		assert.equal(process.exitCode, undefined);
 		assert.equal(installerCalled, false);
 		assert.equal(result.supported, true);
-		assert.equal(result.provider, "vercel");
-		assert.equal(result.setupMode, "provider-managed");
-		assert.equal(result.projectLabel, "check-web");
-		assert.equal(result.packageManager, "npm");
-		assert.equal(result.providerLinkingRequired, false);
+		assert.equal(result.setup.provider, "vercel");
+		assert.equal(result.setup.kind, "provider-managed");
+		assert.equal(result.setup.credentialsRequired, "provider-runtime");
+		assert.equal(result.project.root, root);
+		assert.equal(result.project.packageManager, "npm");
+		assert.equal(result.setup.linkingRequired, false);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 		assert.equal(existsSync(join(root, ".agents")), false);
 	} finally {
@@ -838,17 +837,16 @@ test("CLI init check retains an auto-detected provider that is not ready", async
 			main(["node", "agentpond", "init", "check", "--json"]),
 		);
 		const result = JSON.parse(output) as {
-			provider: string;
-			providerLinkingRequired: boolean;
-			reasons: Array<{ code: string }>;
+			reason: { code: string };
+			setup: { linkingRequired: boolean; provider: string };
 			supported: boolean;
 		};
 
 		assert.equal(process.exitCode, 2);
 		assert.equal(result.supported, false);
-		assert.equal(result.provider, "firebase");
-		assert.equal(result.providerLinkingRequired, true);
-		assert.equal(result.reasons[0]?.code, "provider-not-ready");
+		assert.equal(result.setup.provider, "firebase");
+		assert.equal(result.setup.linkingRequired, true);
+		assert.equal(result.reason.code, "provider-not-ready");
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 		assert.equal(existsSync(join(root, ".agents")), false);
 	} finally {
@@ -895,17 +893,17 @@ test("CLI init check returns a structured unsupported result", async () => {
 			),
 		);
 		const result = JSON.parse(output) as {
-			provider: string;
-			reasons: Array<{ code: string; nextSteps: string[] }>;
+			reason: { code: string; nextSteps: string[] };
+			setup: { provider: string };
 			supported: boolean;
 		};
 
 		assert.equal(process.exitCode, 2);
 		assert.equal(installerCalled, false);
 		assert.equal(result.supported, false);
-		assert.equal(result.provider, "firebase");
-		assert.equal(result.reasons[0]?.code, "provider-not-found");
-		assert.ok((result.reasons[0]?.nextSteps.length ?? 0) > 0);
+		assert.equal(result.setup.provider, "firebase");
+		assert.equal(result.reason.code, "provider-not-found");
+		assert.ok(result.reason.nextSteps.length > 0);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 		assert.equal(existsSync(join(root, ".agents")), false);
 	} finally {
@@ -934,12 +932,16 @@ test("CLI init check has readable output in non-interactive execution", async ()
 		);
 
 		assert.equal(process.exitCode, undefined);
-		assert.match(output, /^AgentPond init check/m);
-		assert.match(output, new RegExp(`CLI version: ${CLI_VERSION}`));
-		assert.match(output, /Supported: yes/);
-		assert.match(output, /Package manager: yarn/);
-		assert.match(output, /Provider: files-sdk/);
-		assert.match(output, /Provider linking required later: no/);
+		assert.match(
+			output,
+			new RegExp(`^AgentPond init is supported \\(CLI ${CLI_VERSION}\\)$`, "m"),
+		);
+		assert.match(output, new RegExp(`^Project: ${root} \\(yarn\\)$`, "m"));
+		assert.match(output, /^Setup: Files SDK fallback$/m);
+		assert.match(output, /^Next: npx agentpond init$/m);
+		assert.doesNotMatch(output, /Required dependencies:/);
+		assert.doesNotMatch(output, /linking required later/i);
+		assert.doesNotMatch(output, /credentials required later/i);
 		assert.equal(existsSync(join(root, ".agentpond")), false);
 		assert.equal(existsSync(join(root, ".agents")), false);
 	} finally {

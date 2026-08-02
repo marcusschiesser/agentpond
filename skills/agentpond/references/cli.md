@@ -11,13 +11,16 @@ npx agentpond init check
 npx agentpond init check --json
 ```
 
-The default output is readable by a person. `--json` returns a versioned stable
-result containing the exact executing CLI version, project root, package
-manager, provider or Files SDK fallback, setup mode, dependencies,
-configuration, later linking and credential requirements, and structured
-reasons and next steps when unsupported. Unsupported results exit with status
-2. The check does not install packages or skills, write files, create
-environments, prompt, or require provider credentials.
+The default output is a concise verdict with the exact executing CLI version,
+detected project, setup path, and next command. `--json` returns a versioned
+stable result with nested `project`, `setup`, and `requirements` objects.
+`requirements.packages` contains concrete package names, while `telemetry` and
+`configuration` contain stable capability and configuration codes. The setup's
+credential requirement is `production-only` for the Files SDK fallback and
+`provider-runtime` for managed-provider setups. Unsupported results exit with
+status 2 and add one structured `reason` with next steps. The check does not
+install packages or skills, write files, create environments, prompt, or require
+provider credentials.
 
 ## Select data
 
