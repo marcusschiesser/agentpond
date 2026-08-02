@@ -1,4 +1,5 @@
 import { eventTypes } from "../schemas.js";
+import { genAiObservationTypeMapper } from "./gen-ai.js";
 import { langfuseObservationTypeMapper } from "./langfuse.js";
 import { openInferenceObservationTypeMapper } from "./openinference.js";
 import type {
@@ -10,6 +11,7 @@ import { vercelAiObservationTypeMapper } from "./vercel-ai.js";
 const observationTypeMappers: ObservationTypeMapper[] = [
 	langfuseObservationTypeMapper,
 	openInferenceObservationTypeMapper,
+	genAiObservationTypeMapper,
 	vercelAiObservationTypeMapper,
 ];
 

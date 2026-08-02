@@ -591,7 +591,7 @@ test("otel maps OpenInference span kinds to supported observation event types", 
 	}
 });
 
-test("otel trusts Langfuse observation type over OpenInference and Vercel AI mappers", async () => {
+test("otel trusts Langfuse observation type over other OTEL mappers", async () => {
 	const events = await convertOtelJson(
 		otelPayload([
 			{
@@ -602,6 +602,7 @@ test("otel trusts Langfuse observation type over OpenInference and Vercel AI map
 				attributes: [
 					attr("langfuse.observation.type", "tool"),
 					attr("openinference.span.kind", "LLM"),
+					attr("gen_ai.operation.name", "chat"),
 					attr("operation.name", "ai.generateText.doGenerate"),
 					attr("gen_ai.response.model", "gpt-4"),
 				],
@@ -610,6 +611,103 @@ test("otel trusts Langfuse observation type over OpenInference and Vercel AI map
 	);
 
 	assert.equal(observationEvent(events).type, "tool-create");
+});
+
+test("otel maps LobeHub GenAI spans end-to-end into DuckDB", async () => {
+	const store = new MemoryObjectStore();
+	const response = await postOtelJson(
+		store,
+		otelPayload([
+			{
+				traceId: "trace-lobehub-genai",
+				spanId: "span-agent",
+				name: "invoke_agent Support Agent",
+				startTimeUnixNano: "1781395200000000000",
+				endTimeUnixNano: "1781395203000000000",
+				attributes: [
+					attr("gen_ai.operation.name", "invoke_agent"),
+					attr("gen_ai.provider.name", "lobehub"),
+					attr("gen_ai.agent.id", "support-agent"),
+					attr("gen_ai.agent.name", "Support Agent"),
+					attr("gen_ai.conversation.id", "conversation-1"),
+				],
+			},
+			{
+				traceId: "trace-lobehub-genai",
+				spanId: "span-chat",
+				parentSpanId: "span-agent",
+				name: "chat gpt-5-mini",
+				startTimeUnixNano: "1781395201000000000",
+				endTimeUnixNano: "1781395202000000000",
+				attributes: [
+					attr("gen_ai.operation.name", "chat"),
+					attr("gen_ai.provider.name", "openai"),
+					attr("gen_ai.request.model", "gpt-5-mini"),
+					attr("gen_ai.response.model", "gpt-5-mini-2026-07-01"),
+					attr("gen_ai.usage.input_tokens", 24),
+					attr("gen_ai.usage.output_tokens", 12),
+				],
+			},
+			{
+				traceId: "trace-lobehub-genai",
+				spanId: "span-tool",
+				parentSpanId: "span-agent",
+				name: "execute_tool get_weather",
+				startTimeUnixNano: "1781395202000000000",
+				endTimeUnixNano: "1781395202500000000",
+				attributes: [
+					attr("gen_ai.operation.name", "execute_tool"),
+					attr("gen_ai.tool.name", "get_weather"),
+					attr("gen_ai.tool.call.id", "call-weather-1"),
+				],
+			},
+		]),
+	);
+
+	assert.equal(response.statusCode, 200);
+	const db = new AgentPondCache(
+		join(mkdtempSync(join(tmpdir(), "agentpond-ingest-")), "cache.duckdb"),
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+	const observations = await db.query<{
+		id: string;
+		metadata_json: string;
+		parent_observation_id: string | null;
+		type: string;
+	}>(
+		"select id, type, parent_observation_id, metadata_json from observations where trace_id = 'trace-lobehub-genai' order by id asc",
+	);
+	await db.close();
+
+	assert.deepEqual(
+		observations.map(({ id, parent_observation_id, type }) => ({
+			id,
+			parent_observation_id,
+			type,
+		})),
+		[
+			{
+				id: "span-agent",
+				parent_observation_id: null,
+				type: "agent-create",
+			},
+			{
+				id: "span-chat",
+				parent_observation_id: "span-agent",
+				type: "generation-create",
+			},
+			{
+				id: "span-tool",
+				parent_observation_id: "span-agent",
+				type: "tool-create",
+			},
+		],
+	);
+	const chatMetadata = JSON.parse(
+		observations.find(({ id }) => id === "span-chat")?.metadata_json ?? "{}",
+	) as Record<string, unknown>;
+	assert.equal(chatMetadata["gen_ai.request.model"], "gpt-5-mini");
+	assert.equal(chatMetadata["gen_ai.usage.input_tokens"], 24);
 });
 
 test("otel maps Vercel AI SDK tool calls to tool observations", async () => {
@@ -1379,8 +1477,41 @@ test("otel endpoint rejects unsupported ingestion versions", async () => {
 	await server.close();
 });
 
+test("otel protobuf applies the GenAI operation mapper", async () => {
+	const store = new MemoryObjectStore();
+	const server = buildServer({
+		auth: config.auth,
+		sink: sinkFromStore(store),
+	});
+	const response = await server.inject({
+		method: "POST",
+		url: "/api/public/otel/v1/traces",
+		headers: {
+			authorization: authHeader(),
+			"content-type": "application/x-protobuf",
+		},
+		payload: makeOtlpTraceProtobuf({ operationName: "chat" }),
+	});
+	await server.close();
+
+	assert.equal(response.statusCode, 200);
+	const db = new AgentPondCache(
+		join(mkdtempSync(join(tmpdir(), "agentpond-ingest-")), "cache.duckdb"),
+	);
+	await db.syncFromStore({ store, projectId: "project-a", prefix: "" });
+	const observations = await db.query<{ type: string }>(
+		"select type from observations",
+	);
+	await db.close();
+	assert.deepEqual(observations, [{ type: "generation-create" }]);
+});
+
 function makeOtlpTraceProtobuf(
-	options: { parentSpanId?: Buffer; endTimeUnixNano?: string } = {},
+	options: {
+		parentSpanId?: Buffer;
+		endTimeUnixNano?: string;
+		operationName?: string;
+	} = {},
 ): Buffer {
 	const root = protobuf.parse(`
 syntax = "proto3";
@@ -1416,6 +1547,14 @@ message AnyValue { string string_value = 1; }
 								endTimeUnixNano: options.endTimeUnixNano,
 								attributes: [
 									{ key: "service.name", value: { stringValue: "demo" } },
+									...(options.operationName
+										? [
+												{
+													key: "gen_ai.operation.name",
+													value: { stringValue: options.operationName },
+												},
+											]
+										: []),
 								],
 							},
 						],
