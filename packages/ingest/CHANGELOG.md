@@ -1,5 +1,12 @@
 # @agentpond/ingest
 
+## 0.3.11
+
+### Patch Changes
+
+- Updated dependencies [ad333ea]
+  - @agentpond/core@0.8.1
+
 ## 0.3.10
 
 ### Patch Changes

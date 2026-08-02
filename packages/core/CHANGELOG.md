@@ -1,5 +1,11 @@
 # @agentpond/core
 
+## 0.8.1
+
+### Patch Changes
+
+- ad333ea: Classify standard OpenTelemetry GenAI operations as AgentPond generations, agents, tools, embeddings, workflows, and retrievers.
+
 ## 0.8.0
 
 ### Minor Changes

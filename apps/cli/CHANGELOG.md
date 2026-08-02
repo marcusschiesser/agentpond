@@ -1,5 +1,22 @@
 # agentpond
 
+## 0.11.0
+
+### Minor Changes
+
+- 1f90e19: Add a non-mutating `agentpond init check` preflight with concise human output and provider-owned structured JSON.
+
+### Patch Changes
+
+- Updated dependencies [ad333ea]
+  - @agentpond/core@0.8.1
+  - @agentpond/duckdb@0.3.12
+  - @agentpond/fastify-ingest@0.3.11
+  - @agentpond/files-sdk@0.3.1
+  - @agentpond/firebase@0.7.1
+  - @agentpond/supabase@0.7.1
+  - @agentpond/vercel@0.6.1
+
 ## 0.10.0
 
 ### Minor Changes

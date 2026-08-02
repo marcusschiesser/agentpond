@@ -1,5 +1,13 @@
 # @agentpond/files-sdk
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [ad333ea]
+  - @agentpond/core@0.8.1
+  - @agentpond/otel@0.1.7
+
 ## 0.3.0
 
 ### Minor Changes

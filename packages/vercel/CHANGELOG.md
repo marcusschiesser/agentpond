@@ -1,5 +1,15 @@
 # @agentpond/vercel
 
+## 0.6.1
+
+### Patch Changes
+
+- Updated dependencies [ad333ea]
+  - @agentpond/core@0.8.1
+  - @agentpond/files-sdk@0.3.1
+  - @agentpond/ingest@0.3.11
+  - @agentpond/otel@0.1.7
+
 ## 0.6.0
 
 ### Minor Changes
