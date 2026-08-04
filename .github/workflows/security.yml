@@ -70,6 +70,7 @@ jobs:
           allow-dependencies-licenses: >-
             pkg:npm/@netlify/blobs@10.7.9,
             pkg:npm/jackspeak@3.4.3,
+            pkg:npm/json-schema@0.4.0,
             pkg:npm/lodash.includes@4.3.0,
             pkg:npm/lodash.isinteger@4.0.4,
             pkg:npm/lodash.isplainobject@4.0.6,
