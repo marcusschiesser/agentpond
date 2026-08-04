@@ -89,6 +89,49 @@ await sdk.shutdown();
 
 NodeSDK wraps `traceExporter` in a `BatchSpanProcessor`. AgentPond preserves each exporter invocation as one immutable object-store object, so a batch of spans is written as one object. If you configure span processors directly, prefer `BatchSpanProcessor` for production and force-flush at the application's real lifecycle boundary.
 
+## AI SDK 7
+
+Install `ai` and `@ai-sdk/otel`, then register the standard AI SDK telemetry
+integration after starting the OpenTelemetry provider. Registration is
+process-global, so perform it once in application instrumentation setup:
+
+```ts
+import { OpenTelemetry } from "@ai-sdk/otel";
+import { registerTelemetry, ToolLoopAgent } from "ai";
+import { Files } from "files-sdk";
+import { fs } from "files-sdk/fs";
+import { createFilesSpanExporter } from "@agentpond/files-sdk/otel";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+
+const sdk = new NodeSDK({
+  traceExporter: createFilesSpanExporter({
+    files: new Files({ adapter: fs({ root: ".agentpond-data" }) }),
+  }),
+});
+
+sdk.start();
+registerTelemetry(new OpenTelemetry());
+
+const agent = new ToolLoopAgent({
+  model,
+  telemetry: {
+    functionId: "weather-agent",
+    recordInputs: true,
+    recordOutputs: true,
+  },
+  tools,
+});
+
+await agent.generate({ prompt: "What is the weather in Berlin?" });
+await sdk.shutdown(); // Flush at the application's real lifecycle boundary.
+```
+
+`recordInputs` and `recordOutputs` determine whether prompt and response content
+is attached to spans. AgentPond retains all emitted raw attributes in metadata,
+so disable recording where application privacy requirements prohibit storing
+that content. AgentPond normalizes supported messages, tool data, model names,
+and token usage, but does not calculate model cost.
+
 ## Storage adapters
 
 Use the matching adapter for the deployment:

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import protobuf from "protobufjs";
+import { normalizeGenAiObservationFields } from "./otel-mappers/gen-ai.js";
 import { mapOtelObservationEventType } from "./otel-mappers/registry.js";
 import {
 	arrayValue,
@@ -188,6 +189,7 @@ export function otelResourceSpansToEvents(
 					getArray(span, "attributes") ?? [],
 				);
 				const langfuse = langfuseAttributes(attributes);
+				const normalizedGenAi = normalizeGenAiObservationFields(attributes);
 				const name = stringField(span, "name") ?? "otel-span";
 				const level = stringValue(attributes["langfuse.observation.level"]);
 				const observationEvent = {
@@ -203,15 +205,26 @@ export function otelResourceSpansToEvents(
 						startTime: timestamp,
 						endTime,
 						metadata: attributes,
-						input: parseJsonString(attributes["langfuse.observation.input"]),
-						output: parseJsonString(attributes["langfuse.observation.output"]),
-						usageDetails: parseJsonRecordString(
-							attributes["langfuse.observation.usage_details"],
-						),
+						input: hasOwn(attributes, "langfuse.observation.input")
+							? parseJsonString(attributes["langfuse.observation.input"])
+							: normalizedGenAi?.input,
+						output: hasOwn(attributes, "langfuse.observation.output")
+							? parseJsonString(attributes["langfuse.observation.output"])
+							: normalizedGenAi?.output,
+						usageDetails: hasOwn(
+							attributes,
+							"langfuse.observation.usage_details",
+						)
+							? parseJsonRecordString(
+									attributes["langfuse.observation.usage_details"],
+								)
+							: normalizedGenAi?.usageDetails,
 						costDetails: parseJsonRecordString(
 							attributes["langfuse.observation.cost_details"],
 						),
-						model: stringValue(attributes["langfuse.observation.model.name"]),
+						model: hasOwn(attributes, "langfuse.observation.model.name")
+							? stringValue(attributes["langfuse.observation.model.name"])
+							: normalizedGenAi?.model,
 						modelParameters: parseJsonRecordString(
 							attributes["langfuse.observation.model.parameters"],
 						),
@@ -244,6 +257,7 @@ export function otelResourceSpansToEvents(
 							attributes,
 							langfuse,
 							name,
+							normalizedGenAi,
 							isRootSpan,
 							hasTraceUpdates,
 						}),
@@ -264,6 +278,7 @@ function createTraceEvent(params: {
 	name: string;
 	isRootSpan: boolean;
 	hasTraceUpdates: boolean;
+	normalizedGenAi?: ReturnType<typeof normalizeGenAiObservationFields>;
 }): IngestionEvent {
 	const {
 		traceId,
@@ -273,6 +288,7 @@ function createTraceEvent(params: {
 		name,
 		isRootSpan,
 		hasTraceUpdates,
+		normalizedGenAi,
 	} = params;
 	let body: TraceCreateBody = {
 		id: traceId,
@@ -283,17 +299,21 @@ function createTraceEvent(params: {
 	if (isRootSpan) {
 		body = {
 			...body,
-			name: langfuse.traceName ?? name,
+			name: langfuse.traceName ?? normalizedGenAi?.agentName ?? name,
 			userId: langfuse.userId,
 			sessionId: langfuse.sessionId,
 			startTime: timestamp,
 			metadata: langfuse.traceMetadata ?? attributes,
-			input:
-				langfuse.traceInput ??
-				parseJsonString(attributes["langfuse.observation.input"]),
-			output:
-				langfuse.traceOutput ??
-				parseJsonString(attributes["langfuse.observation.output"]),
+			input: hasOwn(attributes, "langfuse.trace.input")
+				? langfuse.traceInput
+				: hasOwn(attributes, "langfuse.observation.input")
+					? parseJsonString(attributes["langfuse.observation.input"])
+					: normalizedGenAi?.input,
+			output: hasOwn(attributes, "langfuse.trace.output")
+				? langfuse.traceOutput
+				: hasOwn(attributes, "langfuse.observation.output")
+					? parseJsonString(attributes["langfuse.observation.output"])
+					: normalizedGenAi?.output,
 			tags: langfuse.traceTags,
 			public: langfuse.tracePublic,
 			version: stringValue(attributes["langfuse.version"]),
@@ -323,6 +343,10 @@ function createTraceEvent(params: {
 		metadata: { source: "otel" },
 		body,
 	};
+}
+
+function hasOwn(attributes: Record<string, unknown>, key: string): boolean {
+	return Object.hasOwn(attributes, key);
 }
 
 function getArray(value: unknown, key: string): unknown[] | undefined {

@@ -28,6 +28,24 @@ export function parseJsonString(value: unknown): unknown {
 	}
 }
 
+/** Parse JSON attributes while preserving values already unwrapped from OTLP. */
+export function parseJsonAttribute(value: unknown): unknown {
+	if (typeof value !== "string") return value;
+	try {
+		return JSON.parse(value) as unknown;
+	} catch {
+		return value;
+	}
+}
+
+/** Accept direct-export numbers and OTLP JSON integers encoded as strings. */
+export function nonNegativeNumberValue(value: unknown): number | undefined {
+	if (typeof value !== "number" && typeof value !== "string") return undefined;
+	if (typeof value === "string" && value.trim() === "") return undefined;
+	const number = typeof value === "number" ? value : Number(value);
+	return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
+
 export function parseJsonRecordString(
 	value: unknown,
 ): Record<string, unknown> | undefined {
