@@ -95,6 +95,10 @@ Install `ai` and `@ai-sdk/otel`, then register the standard AI SDK telemetry
 integration after starting the OpenTelemetry provider. Registration is
 process-global, so perform it once in application instrumentation setup:
 
+```sh
+npm install ai @ai-sdk/otel
+```
+
 ```ts
 import { OpenTelemetry } from "@ai-sdk/otel";
 import { registerTelemetry, ToolLoopAgent } from "ai";
