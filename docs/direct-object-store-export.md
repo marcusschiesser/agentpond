@@ -89,6 +89,53 @@ await sdk.shutdown();
 
 NodeSDK wraps `traceExporter` in a `BatchSpanProcessor`. AgentPond preserves each exporter invocation as one immutable object-store object, so a batch of spans is written as one object. If you configure span processors directly, prefer `BatchSpanProcessor` for production and force-flush at the application's real lifecycle boundary.
 
+## AI SDK 7
+
+Install `ai` and `@ai-sdk/otel`, then register the standard AI SDK telemetry
+integration after starting the OpenTelemetry provider. Registration is
+process-global, so perform it once in application instrumentation setup:
+
+```sh
+npm install ai @ai-sdk/otel
+```
+
+```ts
+import { OpenTelemetry } from "@ai-sdk/otel";
+import { registerTelemetry, ToolLoopAgent } from "ai";
+import { createFilesSpanExporterFromRuntimeEnv } from "@agentpond/files-sdk/otel";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+
+const sdk = new NodeSDK({
+  traceExporter: createFilesSpanExporterFromRuntimeEnv(),
+});
+
+sdk.start();
+registerTelemetry(new OpenTelemetry());
+
+const agent = new ToolLoopAgent({
+  model,
+  telemetry: {
+    functionId: "weather-agent",
+    recordInputs: true,
+    recordOutputs: true,
+  },
+  tools,
+});
+
+await agent.generate({ prompt: "What is the weather in Berlin?" });
+await sdk.shutdown(); // Flush at the application's real lifecycle boundary.
+```
+
+Load the AgentPond CLI environment into the application process before starting
+it, for example with `eval "$(npx agentpond env get local)"`. This keeps the
+application exporter and `npx agentpond sync` on the same storage configuration.
+
+With `recordInputs: false`, input content is not emitted in the telemetry spans,
+so AgentPond does not receive or store it through this integration. Likewise,
+`recordOutputs: false` prevents response content from being emitted and stored.
+Non-content telemetry such as operation names, model names, and token usage is
+still emitted. AgentPond does not calculate model cost.
+
 ## Storage adapters
 
 Use the matching adapter for the deployment:

@@ -634,8 +634,17 @@ test("otel maps LobeHub GenAI spans end-to-end into DuckDB", async () => {
 			},
 			{
 				traceId: "trace-lobehub-genai",
-				spanId: "span-chat",
+				spanId: "span-step",
 				parentSpanId: "span-agent",
+				name: "agent_step 1",
+				startTimeUnixNano: "1781395200500000000",
+				endTimeUnixNano: "1781395202900000000",
+				attributes: [attr("gen_ai.operation.name", "agent_step")],
+			},
+			{
+				traceId: "trace-lobehub-genai",
+				spanId: "span-chat",
+				parentSpanId: "span-step",
 				name: "chat gpt-5-mini",
 				startTimeUnixNano: "1781395201000000000",
 				endTimeUnixNano: "1781395202000000000",
@@ -644,6 +653,11 @@ test("otel maps LobeHub GenAI spans end-to-end into DuckDB", async () => {
 					attr("gen_ai.provider.name", "openai"),
 					attr("gen_ai.request.model", "gpt-5-mini"),
 					attr("gen_ai.response.model", "gpt-5-mini-2026-07-01"),
+					attr("gen_ai.input.messages", '[{"role":"user","content":"Help"}]'),
+					attr(
+						"gen_ai.output.messages",
+						'[{"role":"assistant","content":"Calling a tool"}]',
+					),
 					attr("gen_ai.usage.input_tokens", 24),
 					attr("gen_ai.usage.output_tokens", 12),
 				],
@@ -651,7 +665,7 @@ test("otel maps LobeHub GenAI spans end-to-end into DuckDB", async () => {
 			{
 				traceId: "trace-lobehub-genai",
 				spanId: "span-tool",
-				parentSpanId: "span-agent",
+				parentSpanId: "span-step",
 				name: "execute_tool get_weather",
 				startTimeUnixNano: "1781395202000000000",
 				endTimeUnixNano: "1781395202500000000",
@@ -659,6 +673,8 @@ test("otel maps LobeHub GenAI spans end-to-end into DuckDB", async () => {
 					attr("gen_ai.operation.name", "execute_tool"),
 					attr("gen_ai.tool.name", "get_weather"),
 					attr("gen_ai.tool.call.id", "call-weather-1"),
+					attr("gen_ai.tool.call.arguments", '{"city":"Berlin"}'),
+					attr("gen_ai.tool.call.result", '{"temperature":21}'),
 				],
 			},
 		]),
@@ -672,10 +688,13 @@ test("otel maps LobeHub GenAI spans end-to-end into DuckDB", async () => {
 	const observations = await db.query<{
 		id: string;
 		metadata_json: string;
+		input_json: string | null;
+		output_json: string | null;
+		usage_details_json: string | null;
 		parent_observation_id: string | null;
 		type: string;
 	}>(
-		"select id, type, parent_observation_id, metadata_json from observations where trace_id = 'trace-lobehub-genai' order by id asc",
+		"select id, type, parent_observation_id, metadata_json, input_json, output_json, usage_details_json from observations where trace_id = 'trace-lobehub-genai' order by id asc",
 	);
 	await db.close();
 
@@ -693,12 +712,17 @@ test("otel maps LobeHub GenAI spans end-to-end into DuckDB", async () => {
 			},
 			{
 				id: "span-chat",
-				parent_observation_id: "span-agent",
+				parent_observation_id: "span-step",
 				type: "generation-create",
 			},
 			{
-				id: "span-tool",
+				id: "span-step",
 				parent_observation_id: "span-agent",
+				type: "chain-create",
+			},
+			{
+				id: "span-tool",
+				parent_observation_id: "span-step",
 				type: "tool-create",
 			},
 		],
@@ -708,6 +732,23 @@ test("otel maps LobeHub GenAI spans end-to-end into DuckDB", async () => {
 	) as Record<string, unknown>;
 	assert.equal(chatMetadata["gen_ai.request.model"], "gpt-5-mini");
 	assert.equal(chatMetadata["gen_ai.usage.input_tokens"], 24);
+	const chat = observations.find(({ id }) => id === "span-chat");
+	assert.deepEqual(JSON.parse(chat?.input_json ?? "null"), [
+		{ role: "user", content: "Help" },
+	]);
+	assert.deepEqual(JSON.parse(chat?.output_json ?? "null"), [
+		{ role: "assistant", content: "Calling a tool" },
+	]);
+	assert.deepEqual(JSON.parse(chat?.usage_details_json ?? "null"), {
+		input: 24,
+		output: 12,
+		total: 36,
+	});
+	const tool = observations.find(({ id }) => id === "span-tool");
+	assert.deepEqual(JSON.parse(tool?.input_json ?? "null"), { city: "Berlin" });
+	assert.deepEqual(JSON.parse(tool?.output_json ?? "null"), {
+		temperature: 21,
+	});
 });
 
 test("otel maps Vercel AI SDK tool calls to tool observations", async () => {

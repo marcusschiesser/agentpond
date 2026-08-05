@@ -10,6 +10,7 @@ test("maps OpenTelemetry GenAI operations to observation event types", () => {
 		["embeddings", "embedding-create"],
 		["create_agent", "agent-create"],
 		["invoke_agent", "agent-create"],
+		["agent_step", "chain-create"],
 		["execute_tool", "tool-create"],
 		["invoke_workflow", "chain-create"],
 		["retrieval", "retriever-create"],
@@ -28,7 +29,8 @@ test("maps OpenTelemetry GenAI operations to observation event types", () => {
 });
 
 test("keeps unknown or missing GenAI operations as spans", () => {
-	for (const operationName of [undefined, "", "custom_operation"]) {
+	// A reranker is not a retriever; keep it plain until AgentPond has a native type.
+	for (const operationName of [undefined, "", "custom_operation", "rerank"]) {
 		assert.equal(
 			mapOtelObservationEventType({
 				"gen_ai.operation.name": operationName,
