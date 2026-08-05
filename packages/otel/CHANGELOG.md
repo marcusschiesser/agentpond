@@ -1,5 +1,13 @@
 # @agentpond/otel
 
+## 0.1.8
+
+### Patch Changes
+
+- 3248cf3: Add AI SDK 7 integration coverage for the OpenTelemetry exporter and its GenAI trace path.
+- Updated dependencies [df67ad9]
+  - @agentpond/core@0.8.2
+
 ## 0.1.7
 
 ### Patch Changes

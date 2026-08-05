@@ -1,5 +1,15 @@
 # @agentpond/supabase
 
+## 0.7.2
+
+### Patch Changes
+
+- Updated dependencies [3248cf3]
+- Updated dependencies [df67ad9]
+  - @agentpond/otel@0.1.8
+  - @agentpond/core@0.8.2
+  - @agentpond/files-sdk@0.3.2
+
 ## 0.7.1
 
 ### Patch Changes
