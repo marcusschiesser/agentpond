@@ -88,7 +88,7 @@ function observationFields(
 	if (Object.hasOwn(attributes, "langfuse.observation.model.parameters")) {
 		observation.modelParameters = parseJsonRecordString(
 			attributes["langfuse.observation.model.parameters"],
-		);
+		) as NormalizedObservationFields["modelParameters"];
 	}
 	if (Object.hasOwn(attributes, "langfuse.observation.level")) {
 		const level = stringValue(attributes["langfuse.observation.level"]);

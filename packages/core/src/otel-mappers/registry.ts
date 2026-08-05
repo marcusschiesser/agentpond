@@ -3,8 +3,8 @@ import { genAiObservationTypeMapper } from "./gen-ai.js";
 import { langfuseObservationTypeMapper } from "./langfuse.js";
 import { openInferenceObservationTypeMapper } from "./openinference.js";
 import type {
-	NormalizedOtelObservation,
 	NormalizedObservationFields,
+	NormalizedOtelObservation,
 	NormalizedTraceFields,
 	ObservationMapperResult,
 	ObservationTypeMapper,
