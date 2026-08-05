@@ -17,6 +17,7 @@ export const openInferenceObservationTypeMapper: ObservationTypeMapper = {
 	map: ({ attributes }) => {
 		const spanKind = stringValue(attributes["openinference.span.kind"]);
 		if (!spanKind) return undefined;
-		return openInferenceSpanKinds.get(spanKind.toUpperCase());
+		const observationType = openInferenceSpanKinds.get(spanKind.toUpperCase());
+		return observationType ? { observationType } : undefined;
 	},
 };

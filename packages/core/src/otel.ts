@@ -1,17 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import protobuf from "protobufjs";
-import { normalizeGenAiObservationFields } from "./otel-mappers/gen-ai.js";
-import { mapOtelObservationEventType } from "./otel-mappers/registry.js";
-import {
-	arrayValue,
-	booleanValue,
-	isObservationLevel,
-	parseJsonRecordString,
-	parseJsonString,
-	stringValue,
-	unwrapOtelValue,
-} from "./otel-parsers.js";
+import { mapOtelObservation } from "./otel-mappers/registry.js";
+import type { NormalizedOtelObservation } from "./otel-mappers/types.js";
+import { booleanValue, stringValue, unwrapOtelValue } from "./otel-parsers.js";
 import { eventTypes, type IngestionEvent } from "./schemas.js";
 
 type RawOtelRequest = {
@@ -188,14 +180,12 @@ export function otelResourceSpansToEvents(
 				const attributes = attributesToRecord(
 					getArray(span, "attributes") ?? [],
 				);
-				const langfuse = langfuseAttributes(attributes);
-				const normalizedGenAi = normalizeGenAiObservationFields(attributes);
+				const mapped = mapOtelObservation(attributes);
 				const name = stringField(span, "name") ?? "otel-span";
-				const level = stringValue(attributes["langfuse.observation.level"]);
 				const observationEvent = {
 					id: randomUUID(),
 					timestamp,
-					type: mapOtelObservationEventType(attributes),
+					type: mapped.observationType,
 					metadata: { source: "otel" },
 					body: {
 						id: spanId,
@@ -205,36 +195,8 @@ export function otelResourceSpansToEvents(
 						startTime: timestamp,
 						endTime,
 						metadata: attributes,
-						input: hasOwn(attributes, "langfuse.observation.input")
-							? parseJsonString(attributes["langfuse.observation.input"])
-							: normalizedGenAi?.input,
-						output: hasOwn(attributes, "langfuse.observation.output")
-							? parseJsonString(attributes["langfuse.observation.output"])
-							: normalizedGenAi?.output,
-						usageDetails: hasOwn(
-							attributes,
-							"langfuse.observation.usage_details",
-						)
-							? parseJsonRecordString(
-									attributes["langfuse.observation.usage_details"],
-								)
-							: normalizedGenAi?.usageDetails,
-						costDetails: parseJsonRecordString(
-							attributes["langfuse.observation.cost_details"],
-						),
-						model: hasOwn(attributes, "langfuse.observation.model.name")
-							? stringValue(attributes["langfuse.observation.model.name"])
-							: normalizedGenAi?.model,
-						modelParameters: parseJsonRecordString(
-							attributes["langfuse.observation.model.parameters"],
-						),
-						level: isObservationLevel(level) ? level : undefined,
-						statusMessage: stringValue(
-							attributes["langfuse.observation.status_message"],
-						),
-						version: stringValue(attributes["langfuse.version"]),
-						environment:
-							stringValue(attributes["langfuse.environment"]) ?? "default",
+						...mapped.observation,
+						environment: mapped.observation.environment ?? "default",
 					},
 				} as IngestionEvent;
 				events.push(observationEvent);
@@ -247,19 +209,16 @@ export function otelResourceSpansToEvents(
 					// Langfuse uses is_app_root in its raw OTEL event path. AgentPond
 					// bridges it here because DuckDB projection consumes trace-create events.
 					isAppRoot;
-				const hasTraceUpdates = hasTraceUpdatesFromAttributes(attributes);
-				if (isRootSpan || hasTraceUpdates || !seenTraces.has(traceId)) {
+				if (isRootSpan || mapped.hasTraceUpdates || !seenTraces.has(traceId)) {
 					seenTraces.add(traceId);
 					events.push(
 						createTraceEvent({
 							traceId,
 							timestamp,
 							attributes,
-							langfuse,
+							mapped,
 							name,
-							normalizedGenAi,
 							isRootSpan,
-							hasTraceUpdates,
 						}),
 					);
 				}
@@ -274,65 +233,46 @@ function createTraceEvent(params: {
 	traceId: string;
 	timestamp: string;
 	attributes: Record<string, unknown>;
-	langfuse: LangfuseTraceAttributes;
+	mapped: NormalizedOtelObservation;
 	name: string;
 	isRootSpan: boolean;
-	hasTraceUpdates: boolean;
-	normalizedGenAi?: ReturnType<typeof normalizeGenAiObservationFields>;
 }): IngestionEvent {
-	const {
-		traceId,
-		timestamp,
-		attributes,
-		langfuse,
-		name,
-		isRootSpan,
-		hasTraceUpdates,
-		normalizedGenAi,
-	} = params;
+	const { traceId, timestamp, attributes, mapped, name, isRootSpan } = params;
 	let body: TraceCreateBody = {
 		id: traceId,
 		timestamp,
-		environment: stringValue(attributes["langfuse.environment"]) ?? "default",
+		environment: mapped.rootTrace.environment ?? "default",
 	};
 
 	if (isRootSpan) {
 		body = {
 			...body,
-			name: langfuse.traceName ?? normalizedGenAi?.agentName ?? name,
-			userId: langfuse.userId,
-			sessionId: langfuse.sessionId,
+			name: mapped.rootTrace.name ?? name,
+			userId: mapped.rootTrace.userId,
+			sessionId: mapped.rootTrace.sessionId,
 			startTime: timestamp,
-			metadata: langfuse.traceMetadata ?? attributes,
-			input: hasOwn(attributes, "langfuse.trace.input")
-				? langfuse.traceInput
-				: hasOwn(attributes, "langfuse.observation.input")
-					? parseJsonString(attributes["langfuse.observation.input"])
-					: normalizedGenAi?.input,
-			output: hasOwn(attributes, "langfuse.trace.output")
-				? langfuse.traceOutput
-				: hasOwn(attributes, "langfuse.observation.output")
-					? parseJsonString(attributes["langfuse.observation.output"])
-					: normalizedGenAi?.output,
-			tags: langfuse.traceTags,
-			public: langfuse.tracePublic,
-			version: stringValue(attributes["langfuse.version"]),
+			metadata: mapped.rootTrace.metadata ?? attributes,
+			input: mapped.rootTrace.input,
+			output: mapped.rootTrace.output,
+			tags: mapped.rootTrace.tags,
+			public: mapped.rootTrace.public,
+			version: mapped.rootTrace.version,
 		};
 	}
 
-	if (hasTraceUpdates && !isRootSpan) {
+	if (mapped.hasTraceUpdates && !isRootSpan) {
 		body = {
 			...body,
-			name: langfuse.traceName,
-			userId: langfuse.userId,
-			sessionId: langfuse.sessionId,
+			name: mapped.traceUpdate.name,
+			userId: mapped.traceUpdate.userId,
+			sessionId: mapped.traceUpdate.sessionId,
 			startTime: timestamp,
-			metadata: langfuse.traceMetadata,
-			input: langfuse.traceInput,
-			output: langfuse.traceOutput,
-			tags: langfuse.traceTags,
-			public: langfuse.tracePublic,
-			version: stringValue(attributes["langfuse.version"]),
+			metadata: mapped.traceUpdate.metadata,
+			input: mapped.traceUpdate.input,
+			output: mapped.traceUpdate.output,
+			tags: mapped.traceUpdate.tags,
+			public: mapped.traceUpdate.public,
+			version: mapped.traceUpdate.version,
 		};
 	}
 
@@ -344,11 +284,6 @@ function createTraceEvent(params: {
 		body,
 	};
 }
-
-function hasOwn(attributes: Record<string, unknown>, key: string): boolean {
-	return Object.hasOwn(attributes, key);
-}
-
 function getArray(value: unknown, key: string): unknown[] | undefined {
 	if (!value || typeof value !== "object") return undefined;
 	const maybe = (value as Record<string, unknown>)[key];
@@ -410,117 +345,6 @@ function attributesToRecord(attributes: unknown[]): Record<string, unknown> {
 	return record;
 }
 
-function langfuseAttributes(attributes: Record<string, unknown>): {
-	traceName?: string;
-	userId?: string;
-	sessionId?: string;
-	traceMetadata?: Record<string, unknown>;
-	traceInput?: unknown;
-	traceOutput?: unknown;
-	traceTags?: string[];
-	tracePublic?: boolean;
-} {
-	const traceMetadata =
-		parseJsonRecordString(attributes["langfuse.trace.metadata"]) ?? {};
-	for (const [key, value] of Object.entries(attributes)) {
-		if (key.startsWith("langfuse.trace.metadata.")) {
-			traceMetadata[key.slice("langfuse.trace.metadata.".length)] =
-				parseJsonMetadataValue(value);
-		}
-	}
-
-	return {
-		traceName: stringValue(attributes["langfuse.trace.name"]),
-		userId: firstStringValue(attributes, [
-			"langfuse.user.id",
-			"user.id",
-			"langfuse.observation.metadata.langfuse_user_id",
-			"langfuse.trace.metadata.langfuse_user_id",
-			"ai.telemetry.metadata.userId",
-		]),
-		sessionId: firstStringValue(attributes, [
-			"langfuse.session.id",
-			"session.id",
-			"gen_ai.conversation.id",
-			"langfuse.observation.metadata.langfuse_session_id",
-			"langfuse.trace.metadata.langfuse_session_id",
-			"ai.telemetry.metadata.sessionId",
-		]),
-		traceMetadata:
-			Object.keys(traceMetadata).length > 0 ? traceMetadata : undefined,
-		traceInput: parseJsonString(attributes["langfuse.trace.input"]),
-		traceOutput: parseJsonString(attributes["langfuse.trace.output"]),
-		traceTags: traceTagsFromAttributes(attributes),
-		tracePublic: booleanValue(attributes["langfuse.trace.public"]),
-	};
-}
-
-function firstStringValue(
-	attributes: Record<string, unknown>,
-	keys: string[],
-): string | undefined {
-	for (const key of keys) {
-		const value = stringValue(attributes[key]);
-		if (value) return value;
-	}
-	return undefined;
-}
-
-function traceTagsFromAttributes(
-	attributes: Record<string, unknown>,
-): string[] | undefined {
-	const raw =
-		attributes["langfuse.trace.tags"] ??
-		attributes["langfuse.tags"] ??
-		attributes["langfuse.observation.metadata.langfuse_tags"] ??
-		attributes["langfuse.trace.metadata.langfuse_tags"] ??
-		attributes["ai.telemetry.metadata.tags"] ??
-		attributes["tag.tags"];
-	if (raw === undefined || raw === null) return undefined;
-	const array = arrayValue(raw);
-	if (array) return array.map((tag) => String(tag));
-	if (typeof raw !== "string") return [String(raw)];
-	const parsed = parseJsonString(raw);
-	if (Array.isArray(parsed)) return parsed.map((tag) => String(tag));
-	if (raw.includes(",")) return raw.split(",").map((tag) => tag.trim());
-	return raw ? [raw] : undefined;
-}
-
-type LangfuseTraceAttributes = ReturnType<typeof langfuseAttributes>;
-
-function hasTraceUpdatesFromAttributes(
-	attributes: Record<string, unknown>,
-): boolean {
-	const traceAttributeKeys = [
-		"langfuse.trace.name",
-		"langfuse.trace.input",
-		"langfuse.trace.output",
-		"langfuse.trace.metadata",
-		"user.id",
-		"session.id",
-		"langfuse.trace.public",
-		"langfuse.trace.tags",
-		"langfuse.user.id",
-		"langfuse.session.id",
-		"langfuse.observation.metadata.langfuse_user_id",
-		"langfuse.observation.metadata.langfuse_session_id",
-		"langfuse.observation.metadata.langfuse_tags",
-		"langfuse.trace.metadata.langfuse_session_id",
-		"langfuse.trace.metadata.langfuse_user_id",
-		"langfuse.trace.metadata.langfuse_tags",
-		"ai.telemetry.metadata.sessionId",
-		"ai.telemetry.metadata.userId",
-		"ai.telemetry.metadata.tags",
-		"tag.tags",
-	];
-	return (
-		traceAttributeKeys.some((key) => Boolean(attributes[key])) ||
-		Object.keys(attributes).some((key) =>
-			key.startsWith("langfuse.trace.metadata"),
-		)
-	);
-}
-
 function filterRedundantShallowTraceEvents(
 	events: IngestionEvent[],
 ): IngestionEvent[] {
@@ -566,8 +390,4 @@ function hasMeaningfulValue(value: unknown): boolean {
 	if (Array.isArray(value)) return value.length > 0;
 	if (typeof value === "object") return Object.keys(value).length > 0;
 	return true;
-}
-
-function parseJsonMetadataValue(value: unknown): unknown {
-	return typeof value === "string" ? parseJsonString(value) : value;
 }

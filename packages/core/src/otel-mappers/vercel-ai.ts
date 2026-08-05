@@ -22,7 +22,7 @@ export const vercelAiObservationTypeMapper: ObservationTypeMapper = {
 	name: "vercel-ai",
 	map: ({ attributes }) => {
 		if (matchesOperation(attributes, ["ai.toolCall"])) {
-			return eventTypes.TOOL_CREATE;
+			return { observationType: eventTypes.TOOL_CREATE };
 		}
 
 		if (!hasAnyMeaningfulValue(attributes, modelKeys)) {
@@ -30,10 +30,10 @@ export const vercelAiObservationTypeMapper: ObservationTypeMapper = {
 		}
 
 		if (matchesOperation(attributes, generationPrefixes)) {
-			return eventTypes.GENERATION_CREATE;
+			return { observationType: eventTypes.GENERATION_CREATE };
 		}
 		if (matchesOperation(attributes, embeddingPrefixes)) {
-			return eventTypes.EMBEDDING_CREATE;
+			return { observationType: eventTypes.EMBEDDING_CREATE };
 		}
 		return undefined;
 	},

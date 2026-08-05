@@ -5,7 +5,12 @@ import {
 	stringValue,
 } from "../otel-parsers.js";
 import { eventTypes } from "../schemas.js";
-import type { ObservationTypeMapper } from "./types.js";
+import type {
+	NormalizedObservationFields,
+	NormalizedTraceFields,
+	ObservationMapperResult,
+	ObservationTypeMapper,
+} from "./types.js";
 
 const genAiOperations = new Map([
 	["chat", eventTypes.GENERATION_CREATE],
@@ -23,79 +28,96 @@ const genAiOperations = new Map([
 	["generate", eventTypes.GENERATION_CREATE],
 ]);
 
-export type NormalizedGenAiFields = {
-	agentName?: string;
-	input?: unknown;
-	output?: unknown;
-	model?: string;
-	usageDetails?: Record<string, number>;
-};
-
 function parsePluralAttribute(value: unknown): unknown[] | undefined {
 	const values = arrayValue(parseJsonAttribute(value));
 	return values?.map(parseJsonAttribute);
 }
 
-export function normalizeGenAiObservationFields(
+function mapGenAiObservation(
 	attributes: Record<string, unknown>,
-): NormalizedGenAiFields | undefined {
+): ObservationMapperResult | undefined {
 	const operationName = stringValue(attributes["gen_ai.operation.name"]);
-	if (!operationName || !genAiOperations.has(operationName)) return undefined;
+	if (!operationName) return undefined;
+	const observationType = genAiOperations.get(operationName);
+	if (!observationType) return undefined;
 
-	let input = parseJsonAttribute(attributes["gen_ai.input.messages"]);
-	let output = parseJsonAttribute(attributes["gen_ai.output.messages"]);
+	const observation: NormalizedObservationFields = {};
+	if (Object.hasOwn(attributes, "gen_ai.input.messages")) {
+		observation.input = parseJsonAttribute(attributes["gen_ai.input.messages"]);
+	}
+	if (Object.hasOwn(attributes, "gen_ai.output.messages")) {
+		observation.output = parseJsonAttribute(
+			attributes["gen_ai.output.messages"],
+		);
+	}
 	if (operationName === "execute_tool") {
-		if ("gen_ai.tool.call.arguments" in attributes) {
-			input = parseJsonAttribute(attributes["gen_ai.tool.call.arguments"]);
+		if (Object.hasOwn(attributes, "gen_ai.tool.call.arguments")) {
+			observation.input = parseJsonAttribute(
+				attributes["gen_ai.tool.call.arguments"],
+			);
 		}
-		if ("gen_ai.tool.call.result" in attributes) {
-			output = parseJsonAttribute(attributes["gen_ai.tool.call.result"]);
+		if (Object.hasOwn(attributes, "gen_ai.tool.call.result")) {
+			observation.output = parseJsonAttribute(
+				attributes["gen_ai.tool.call.result"],
+			);
 		}
 	}
 	if (operationName === "embeddings") {
-		if ("ai.values" in attributes) {
-			input = parsePluralAttribute(attributes["ai.values"]);
-		} else if ("ai.value" in attributes) {
-			input = parseJsonAttribute(attributes["ai.value"]);
+		if (Object.hasOwn(attributes, "ai.values")) {
+			observation.input = parsePluralAttribute(attributes["ai.values"]);
+		} else if (Object.hasOwn(attributes, "ai.value")) {
+			observation.input = parseJsonAttribute(attributes["ai.value"]);
 		}
-		if ("ai.embeddings" in attributes) {
-			output = parsePluralAttribute(attributes["ai.embeddings"]);
-		} else if ("ai.embedding" in attributes) {
-			output = parseJsonAttribute(attributes["ai.embedding"]);
+		if (Object.hasOwn(attributes, "ai.embeddings")) {
+			observation.output = parsePluralAttribute(attributes["ai.embeddings"]);
+		} else if (Object.hasOwn(attributes, "ai.embedding")) {
+			observation.output = parseJsonAttribute(attributes["ai.embedding"]);
 		}
 	}
 
-	const usageInput = nonNegativeNumberValue(
-		attributes["gen_ai.usage.input_tokens"],
-	);
-	const usageOutput = nonNegativeNumberValue(
-		attributes["gen_ai.usage.output_tokens"],
-	);
-	const usageDetails =
-		usageInput === undefined && usageOutput === undefined
-			? undefined
-			: {
-					...(usageInput === undefined ? {} : { input: usageInput }),
-					...(usageOutput === undefined ? {} : { output: usageOutput }),
-					total: (usageInput ?? 0) + (usageOutput ?? 0),
-				};
+	if (
+		Object.hasOwn(attributes, "gen_ai.usage.input_tokens") ||
+		Object.hasOwn(attributes, "gen_ai.usage.output_tokens")
+	) {
+		const usageInput = nonNegativeNumberValue(
+			attributes["gen_ai.usage.input_tokens"],
+		);
+		const usageOutput = nonNegativeNumberValue(
+			attributes["gen_ai.usage.output_tokens"],
+		);
+		observation.usageDetails =
+			usageInput === undefined && usageOutput === undefined
+				? undefined
+				: {
+						...(usageInput === undefined ? {} : { input: usageInput }),
+						...(usageOutput === undefined ? {} : { output: usageOutput }),
+						total: (usageInput ?? 0) + (usageOutput ?? 0),
+					};
+	}
+
+	const model =
+		stringValue(attributes["gen_ai.response.model"]) ??
+		stringValue(attributes["gen_ai.request.model"]);
+	if (model !== undefined) observation.model = model;
+
+	const rootTrace: NormalizedTraceFields = {};
+	const agentName = stringValue(attributes["gen_ai.agent.name"]);
+	if (agentName !== undefined) rootTrace.name = agentName;
+	if (Object.hasOwn(observation, "input")) {
+		rootTrace.input = observation.input;
+	}
+	if (Object.hasOwn(observation, "output")) {
+		rootTrace.output = observation.output;
+	}
 
 	return {
-		agentName: stringValue(attributes["gen_ai.agent.name"]),
-		input,
-		output,
-		model:
-			stringValue(attributes["gen_ai.response.model"]) ??
-			stringValue(attributes["gen_ai.request.model"]),
-		usageDetails,
+		observationType,
+		observation,
+		rootTrace,
 	};
 }
 
 export const genAiObservationTypeMapper: ObservationTypeMapper = {
 	name: "otel-gen-ai",
-	map: ({ attributes }) => {
-		const operationName = stringValue(attributes["gen_ai.operation.name"]);
-		if (!operationName) return undefined;
-		return genAiOperations.get(operationName);
-	},
+	map: ({ attributes }) => mapGenAiObservation(attributes),
 };
