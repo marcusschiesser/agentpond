@@ -1,5 +1,11 @@
 # @agentpond/core
 
+## 0.8.2
+
+### Patch Changes
+
+- df67ad9: Normalize AI SDK 7 GenAI agent steps, messages, tool data, models, and token usage when ingesting OpenTelemetry traces.
+
 ## 0.8.1
 
 ### Patch Changes
