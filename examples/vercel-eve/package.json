@@ -1,0 +1,34 @@
+{
+	"name": "agentpond-vercel-eve-example",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"build": "cd parts/03-fixed-agent && eve build",
+		"eval:failed": "cd parts/02-eval-from-trace && eve eval",
+		"eval:fixed": "cd parts/03-fixed-agent && eve eval",
+		"eval:generated:failed": "cd generated/02-eval-from-trace && eve eval",
+		"eval:generated:fixed": "cd generated/03-fixed-agent && eve eval",
+		"trace:failed": "cd parts/01-failed-trace && eve dev",
+		"typecheck": "tsc --noEmit --pretty false"
+	},
+	"dependencies": {
+		"@agentpond/files-sdk": "workspace:*",
+		"@agentpond/otel": "workspace:*",
+		"@ai-sdk/openai": "^4.0.20",
+		"@opentelemetry/api": "^1.9.0",
+		"@opentelemetry/sdk-trace-base": "^2.9.0",
+		"@vercel/otel": "^2.1.3",
+		"ai": "^7.0.38",
+		"eve": "^0.29.3",
+		"files-sdk": "2.2.2",
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@types/node": "^24.10.1",
+		"typescript": "^7.0.2"
+	}
+}

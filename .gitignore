@@ -9,3 +9,4 @@ apps/cli/README.md
 *.tsbuildinfo
 .env
 .agentpond
+examples/vercel-eve/generated/
