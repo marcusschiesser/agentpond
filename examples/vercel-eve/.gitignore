@@ -1,0 +1,4 @@
+.agentpond/
+.env.local
+.eve/
+.output/

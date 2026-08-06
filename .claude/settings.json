@@ -1,0 +1,30 @@
+{
+	"$schema": "https://json.schemastore.org/claude-code-settings.json",
+	"permissions": {
+		"deny": [
+			"Read(/examples/vercel-eve/parts/02-eval-from-trace/**)",
+			"Read(/examples/vercel-eve/parts/03-fixed-agent/**)",
+			"Edit(/examples/vercel-eve/parts/02-eval-from-trace/**)",
+			"Edit(/examples/vercel-eve/parts/03-fixed-agent/**)"
+		],
+		"disableBypassPermissionsMode": "disable"
+	},
+	"sandbox": {
+		"enabled": true,
+		"failIfUnavailable": true,
+		"allowUnsandboxedCommands": false,
+		"filesystem": {
+			"denyRead": [
+				"./examples/vercel-eve/parts/02-eval-from-trace",
+				"./examples/vercel-eve/parts/03-fixed-agent"
+			],
+			"denyWrite": [
+				"./examples/vercel-eve/parts/02-eval-from-trace",
+				"./examples/vercel-eve/parts/03-fixed-agent"
+			]
+		},
+		"network": {
+			"allowedDomains": ["api.openai.com"]
+		}
+	}
+}

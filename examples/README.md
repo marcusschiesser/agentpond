@@ -8,3 +8,4 @@ Unless a scenario says otherwise, run example commands from the repository root.
 - [Hugging Face Space](./huggingface-space/README.md): Docker Space deployment that stores AgentPond ingestion data in a Hugging Face Storage Bucket.
 - [LLM compliance workflow](./llm-compliance/README.md): a Python `uv` example that calls OpenAI, parses a structured compliance score, and records the workflow in Langfuse.
 - [OpenInference OpenAI traces](./openinference-openai/README.md): minimal Python and TypeScript examples that call OpenAI once and export OpenInference traces to AgentPond.
+- [Vercel Eve](./vercel-eve/README.md): Eve's tiny weather agent extended with AgentPond tracing through the Files SDK filesystem adapter.

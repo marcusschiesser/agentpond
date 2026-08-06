@@ -1,0 +1,15 @@
+default_permissions = "agentpond"
+
+[permissions.agentpond]
+description = "Edit AgentPond while keeping committed eval goldens unavailable to coding agents."
+extends = ":workspace"
+
+[permissions.agentpond.filesystem.":workspace_roots"]
+"examples/vercel-eve/parts/02-eval-from-trace" = "deny"
+"examples/vercel-eve/parts/03-fixed-agent" = "deny"
+
+[permissions.agentpond.network]
+enabled = true
+
+[permissions.agentpond.network.domains]
+"api.openai.com" = "allow"
