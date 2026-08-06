@@ -28,6 +28,15 @@ Eve -> OpenTelemetry -> AgentPond exporter -> Files SDK -> local filesystem
 
 Only the Files SDK client construction is storage-specific. The same `createFilesSpanExporter({ files })` calls work with any [Files SDK storage adapter](https://files-sdk.dev/docs/providers).
 
+## Eve tracing alternatives
+
+Eve already provides two tracing options:
+
+- [Zero-config local traces](https://eve.dev/docs/guides/instrumentation#zero-config-local-traces). They are convenient for local debugging, but they are created only by `eve dev` and do not capture deployed production runs.
+- [Vercel Agent Runs](https://vercel.com/changelog/eve-agent-observability) provide a managed view of production agent traces. 
+
+AgentPond is useful when production traces should remain independent of the hosting platform: You can use Vercel, another cloud, or self-hosted infrastructure. This is usually cheaper than operating or buying a full observability platform.
+
 Run all commands below from the AgentPond repository root.
 
 ## Prerequisites
