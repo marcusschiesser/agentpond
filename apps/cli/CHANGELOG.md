@@ -1,5 +1,11 @@
 # agentpond
 
+## 0.11.3
+
+### Patch Changes
+
+- 4ed17d9: Update the Vercel Eve example to Eve 0.31.0 and keep Vercel OpenTelemetry external during bundling.
+
 ## 0.11.2
 
 ### Patch Changes
