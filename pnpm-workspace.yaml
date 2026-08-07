@@ -44,7 +44,7 @@ minimumReleaseAgeExclude:
   - find-my-way@9.7.0
   - files-sdk@2.2.2
   - ai@7.0.38
-  - eve@0.29.3
+  - eve@0.31.0
   - minimatch@10.2.6
   - typescript@7.0.2
   - undici@6.28.0

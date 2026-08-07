@@ -268,8 +268,8 @@ importers:
         specifier: ^7.0.38
         version: 7.0.41(zod@4.4.3)
       eve:
-        specifier: ^0.29.3
-        version: 0.29.3(@azure/storage-blob@12.33.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(aws4fetch@1.0.20)(chokidar@4.0.3)(lru-cache@11.5.1)(rollup@4.62.0)
+        specifier: ^0.31.0
+        version: 0.31.0(@azure/storage-blob@12.33.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(aws4fetch@1.0.20)(chokidar@4.0.3)(lru-cache@11.5.1)(rollup@4.62.0)
       files-sdk:
         specifier: 2.2.2
         version: 2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
@@ -2714,8 +2714,8 @@ packages:
     engines: {node: '>=4'}
     hasBin: true
 
-  eve@0.29.3:
-    resolution: {integrity: sha512-rqOlLQ9H/K1mXFwL3KLB4BedWxv81NuVZ+bnMKgHySvwPaDfr/M3Ct1fu7K4TZosnw6uFFET4BsKPleJIhOQQg==}
+  eve@0.31.0:
+    resolution: {integrity: sha512-9zFS0JH/uTKQe9if/PQKhfv7vGmIv/RWqcVAbTLQR9G6+Gh6b/vzYfqPFNmNdjwWc2mK0YiLkwls0BH9Bo0BFA==}
     engines: {node: '>=24'}
     hasBin: true
     peerDependencies:
@@ -6407,7 +6407,7 @@ snapshots:
 
   esprima@4.0.1: {}
 
-  eve@0.29.3(@azure/storage-blob@12.33.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(aws4fetch@1.0.20)(chokidar@4.0.3)(lru-cache@11.5.1)(rollup@4.62.0):
+  eve@0.31.0(@azure/storage-blob@12.33.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(aws4fetch@1.0.20)(chokidar@4.0.3)(lru-cache@11.5.1)(rollup@4.62.0):
     dependencies:
       ai: 7.0.41(zod@4.4.3)
       nitro: 3.0.260610-beta(@azure/storage-blob@12.33.0)(@netlify/blobs@10.7.9)(@vercel/blob@2.5.0)(aws4fetch@1.0.20)(chokidar@4.0.3)(lru-cache@11.5.1)(rollup@4.62.0)

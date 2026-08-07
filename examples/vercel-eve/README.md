@@ -37,14 +37,14 @@ Eve already provides two tracing options:
 
 AgentPond is useful when production traces should remain independent of the hosting platform: You can use Vercel, another cloud, or self-hosted infrastructure. This is usually cheaper than operating or buying a full observability platform.
 
-Run all commands below from the AgentPond repository root.
-
 ## Prerequisites
 
 - Node.js 24 or newer
 - An `OPENAI_API_KEY`
 
-Install the workspace dependencies and set the model credential:
+Run all commands below from the AgentPond repository root.
+
+First, install the workspace dependencies and set the model credential:
 
 ```sh
 pnpm install
@@ -63,7 +63,7 @@ npx agentpond env use eve-eval-loop
 eval "$(npx agentpond env get eve-eval-loop)"
 ```
 
-The exported values include `FILES_SDK_ROOT` and `AGENTPOND_PROJECT_ID`. Keep them server-side; never expose storage credentials, Files SDK clients, or the exporter to browser code.
+The exported values include `FILES_SDK_ROOT` and `AGENTPOND_PROJECT_ID` which will be used by the Eve agent in the following steps.
 
 ## Part 1: generate the failed trace
 
@@ -79,33 +79,24 @@ Ask exactly:
 What is the weather in Berlin?
 ```
 
-The fixture tool returns `Rainy` and `12°C`, but the bad instructions force the assistant to answer `Sunny` and `72°F`. The request completes successfully at the protocol level, so "failed trace" here means a semantic failure: the trace proves that the final answer contradicts the tool result.
+The fixture tool returns `Rainy` and `12°C`, but an intentionally bad instruction prompt forces the assistant to answer `Sunny` and `72°F`. The request completes successfully at the protocol level, so we're dealing with a semantic failure of the agent.
 
-Stop Eve, sync the Files SDK objects, and inspect the evidence:
+Stop Eve, sync and show the recorded trace:
 
 ```sh
 npx agentpond sync
-npx agentpond traces list --limit 5
-npx agentpond traces get <trace-id>
+npx agentpond traces list --limit 1
 npx agentpond observations list --traceId <trace-id>
 ```
 
-The trace contains the user message, the `get_weather` call and result, and the model output. You can optionally attach a human label to make the known failure queryable:
-
-```sh
-npx agentpond scores create \
-  --name weather-correctness \
-  --value 0 \
-  --source ANNOTATION \
-  --traceId <trace-id>
-```
+Analyzing traces by hand is now fun, so let our coding agent do the job!
 
 ## Transform Part 1 into Part 2: ask a coding agent to generate the eval
 
-Give your coding agent the failed trace id with this prompt:
+Tell your coding agent to inspect the failed trace and to generate an eval:
 
 ```text
-Read and follow skills/agentpond/SKILL.md. Inspect AgentPond trace <trace-id>,
+Read and follow skills/agentpond/SKILL.md. Inspect AgentPond traces in eve-eval-loop environment
 then turn its observable weather failure into the smallest deterministic Eve
 regression eval.
 
@@ -117,34 +108,35 @@ temperature returned by the tool. Run it and confirm that it reproduces the
 trace failure.
 ```
 
-The generated eval should exit with code `1`: the run and `get_weather` call succeed, while the `Rainy` and `12°C` assertions fail. 
+> Note: For your own projects, you don't need to add the skill to your prompt. Just install the AgentPond skill by calling `npx agentpond init`.
 
-> Note: For your own repo you can install the AgentPond skill by calling `npx agentpond init` - then you don't need to add it to your prompt.
+You can run the eval again with:
+
+```sh
+pnpm --dir examples/vercel-eve eval:generated:failed
+```
+
+The generated eval should exit two assertions failing: the run and `get_weather` call succeed, while the `Rainy` and `12°C` assertions fail.
 
 ## Transform Part 2 into Part 3: ask a coding agent to fix the agent
 
 Now give the coding agent a second prompt. This time the failing eval is the acceptance contract:
 
 ```text
-Read and follow skills/agentpond/SKILL.md. Use the failing eval in
-examples/vercel-eve/generated/02-eval-from-trace as the regression contract.
+Use the failing eval in examples/vercel-eve/generated/02-eval-from-trace as the regression contract.
 
 Copy that snapshot to examples/vercel-eve/generated/03-fixed-agent and make the
 smallest agent-only fix that passes the unchanged eval. Do not weaken or
 special-case the eval. Run the fixed snapshot's eval and confirm that it passes.
 ```
 
-The fixed eval should exit with code `0` and pass all four assertions. 
-
-Sync AgentPond again to inspect the corrected trace:
+You can run the eval again and check that all four assertions pass:
 
 ```sh
-npx agentpond sync
-npx agentpond traces list --limit 5
-npx agentpond observations list --traceId <fixed-trace-id>
+pnpm --dir examples/vercel-eve eval:generated:fixed
 ```
 
-This closes the loop: a production-like trace becomes a executable regression, and that regression remains in the codebase after the repair.
+This closes the loop: a production-like trace becomes a executable regression.
 
 ## Use another Files SDK adapter
 
