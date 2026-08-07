@@ -89,7 +89,7 @@ npx agentpond traces list --limit 1
 npx agentpond observations list --traceId <trace-id>
 ```
 
-Analyzing traces by hand is now fun, so let our coding agent do the job!
+Analyzing traces by hand is no fun, so let our coding agent do the job!
 
 ## Transform Part 1 into Part 2: ask a coding agent to generate the eval
 
