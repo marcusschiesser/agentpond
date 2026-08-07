@@ -1,5 +1,11 @@
 # @agentpond/duckdb
 
+## 0.3.14
+
+### Patch Changes
+
+- c26ce1a: Keep the earliest trace start time when separately exported OTLP spans are projected. Recreate object-storage-backed local caches after upgrading to reproject existing traces.
+
 ## 0.3.13
 
 ### Patch Changes
