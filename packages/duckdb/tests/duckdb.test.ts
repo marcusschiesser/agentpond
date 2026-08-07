@@ -20,6 +20,26 @@ function createTempDb(): AgentPondCache {
 	return new AgentPondCache(createTempDbPath());
 }
 
+function otelResourceSpans(
+	traceId: string,
+	span: {
+		spanId: string;
+		parentSpanId?: string;
+		name: string;
+		startTimeUnixNano: string;
+	},
+): unknown[] {
+	return [
+		{
+			scopeSpans: [
+				{
+					spans: [{ traceId, ...span }],
+				},
+			],
+		},
+	];
+}
+
 async function writeAndSync(
 	events: IngestionEvent[],
 ): Promise<{ store: MemoryObjectStore; db: AgentPondCache }> {
@@ -286,6 +306,74 @@ test("direct DuckDB writes skip duplicate event ids", async () => {
 
 	assert.deepEqual(second, { eventsProcessed: 0, eventsSkipped: 1 });
 	assert.deepEqual(rows, [{ id: "trace-direct", name: "Direct Trace" }]);
+});
+
+test("DuckDB trace projection keeps the earliest start across OTLP segments", async () => {
+	const traceId = "trace-segmented";
+	const root = {
+		spanId: "span-root",
+		name: "root span",
+		startTimeUnixNano: "1781395200000000000",
+	};
+	const child = {
+		spanId: "span-child",
+		parentSpanId: root.spanId,
+		name: "child span",
+		startTimeUnixNano: "1781395202000000000",
+	};
+
+	for (const spans of [
+		[root, child],
+		[child, root],
+	]) {
+		const db = createTempDb();
+		await db.ensureSchema();
+		for (const span of spans) {
+			await db.directIngestion().writeOtelResourceSpans({
+				projectId: "project-a",
+				resourceSpans: otelResourceSpans(traceId, span),
+				source: "test-segmented-otel",
+			});
+		}
+		const traces = await db.query<{ name: string; start_time: string }>(`
+			SELECT
+				name,
+				strftime(start_time, '%Y-%m-%dT%H:%M:%S.%gZ') AS start_time
+			FROM traces
+			WHERE id = '${traceId}'
+		`);
+		await db.close();
+
+		assert.deepEqual(traces, [
+			{
+				name: root.name,
+				start_time: "2026-06-14T00:00:00.000Z",
+			},
+		]);
+	}
+});
+
+test("DuckDB trace projection honors the trace body timestamp", async () => {
+	const { db } = await writeAndSync([
+		{
+			id: "trace-body-timestamp-event",
+			timestamp: "2026-06-14T00:00:05.000Z",
+			type: eventTypes.TRACE_CREATE,
+			body: {
+				id: "trace-body-timestamp",
+				name: "body timestamp trace",
+				timestamp: "2026-06-14T00:00:00.000Z",
+			},
+		},
+	]);
+	const traces = await db.query<{ start_time: string }>(`
+		SELECT strftime(start_time, '%Y-%m-%dT%H:%M:%S.%gZ') AS start_time
+		FROM traces
+		WHERE id = 'trace-body-timestamp'
+	`);
+	await db.close();
+
+	assert.deepEqual(traces, [{ start_time: "2026-06-14T00:00:00.000Z" }]);
 });
 
 test("DuckDB ingestion sink serializes concurrent writes to the same cache", async () => {
