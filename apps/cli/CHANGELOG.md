@@ -1,5 +1,14 @@
 # agentpond
 
+## 0.11.2
+
+### Patch Changes
+
+- Updated dependencies [c26ce1a]
+  - @agentpond/duckdb@0.3.14
+  - @agentpond/fastify-ingest@0.3.12
+  - @agentpond/firebase@0.7.2
+
 ## 0.11.1
 
 ### Patch Changes
