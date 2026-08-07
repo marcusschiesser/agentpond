@@ -507,11 +507,23 @@ function buildMergedTraceAppendRow(
 		totalCost: undefined,
 		updatedAt: undefined,
 	};
+	let earliestStartTime: string | undefined;
 	for (const row of rows) {
 		const appendRow = buildTraceAppendRow(projectId, row.event);
 		if (!appendRow) continue;
-		mergeDefinedFields(merged, appendRow, ["id", "projectId", "totalCost"]);
+		const body = row.event.body as Record<string, unknown>;
+		earliestStartTime = minTimestamp(
+			earliestStartTime,
+			timestampValue(body.timestamp) ?? appendRow.startTime,
+		);
+		mergeDefinedFields(merged, appendRow, [
+			"id",
+			"projectId",
+			"startTime",
+			"totalCost",
+		]);
 	}
+	merged.startTime = earliestStartTime;
 	return merged;
 }
 
@@ -767,6 +779,15 @@ function timestampValue(value: unknown): string | undefined {
 	const date = new Date(raw);
 	if (Number.isNaN(date.getTime())) return undefined;
 	return date.toISOString();
+}
+
+function minTimestamp(
+	left: string | undefined,
+	right: string | undefined,
+): string | undefined {
+	if (!left) return right;
+	if (!right) return left;
+	return left <= right ? left : right;
 }
 
 function jsonString(value: unknown): string | undefined {

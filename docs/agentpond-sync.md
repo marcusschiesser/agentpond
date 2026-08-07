@@ -47,6 +47,32 @@ DuckDB tracks imported OTEL objects and non-OTEL event objects in `processed_obj
 
 DuckDB also stores per-source UTC bucket watermarks. The first sync scans all current-layout source keys; later syncs rescan recent buckets for late writes and skip already processed object or manifest keys.
 
+### Recreate the cache after projection changes
+
+Projected rows are not recalculated for objects that the local cache has already
+marked as processed. After upgrading to a release that changes projection
+semantics, including the trace start-time fix, users must recreate each
+object-storage-backed analytical cache before syncing again.
+
+First stop any AgentPond process using the selected environment, then inspect the
+cache path:
+
+```bash
+npx agentpond env current --json
+```
+
+Delete only the reported `dbPath` (normally
+`.agentpond/envs/<name>/cache.duckdb`) and rebuild it from durable object storage:
+
+```bash
+rm .agentpond/envs/<name>/cache.duckdb
+npx agentpond sync
+```
+
+Do not delete the environment configuration or any object-storage data. The
+`dev` environment has no object-storage source of truth, so deleting its cache
+discards its local-only traces instead of rebuilding them.
+
 ## Query Model
 
 Users can query both raw and projected data with local SQL. The raw table keeps the full event payload, while projected tables provide convenient trace, observation, score, and session views for analysis.
