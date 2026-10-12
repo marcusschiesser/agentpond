@@ -1,5 +1,11 @@
 # @agentpond/ingest-service
 
+## 0.5.1
+
+### Patch Changes
+
+- bc5e8bc: Build the ingestion container from the service and its dependencies so unrelated example builds cannot block image releases.
+
 ## 0.5.0
 
 ### Minor Changes
