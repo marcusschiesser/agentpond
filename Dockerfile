@@ -4,7 +4,8 @@ RUN corepack enable
 ENV CI=true
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm build
+# Build only the service and its TypeScript project references, not CLI/examples.
+RUN pnpm exec tsc -b apps/ingest && pnpm --filter @agentpond/ingest-service build
 # pnpm deploy needs legacy mode because this workspace does not use injected workspace packages.
 RUN pnpm --filter @agentpond/ingest-service deploy --legacy --prod /prod
 
