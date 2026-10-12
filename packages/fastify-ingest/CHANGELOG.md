@@ -1,5 +1,11 @@
 # @agentpond/fastify-ingest
 
+## 0.3.13
+
+### Patch Changes
+
+- c64bdbf: Update Fastify and vulnerable storage-related transitive dependencies to patched releases.
+
 ## 0.3.12
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @agentpond/supabase
 
+## 0.8.0
+
+### Minor Changes
+
+- c64bdbf: Upgrade shared storage to Files SDK 3.1 and support Google Cloud Storage 8 without a peer dependency allowance. Storage integrations now require Node.js 22 or later; applications supplying their own Files client must upgrade to Files SDK 3.1 or later in the 3.x line. Existing AgentPond storage configuration and stored traces remain compatible.
+
+### Patch Changes
+
+- Updated dependencies [c64bdbf]
+  - @agentpond/files-sdk@0.4.0
+
 ## 0.7.2
 
 ### Patch Changes

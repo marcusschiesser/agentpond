@@ -1,5 +1,20 @@
 # agentpond
 
+## 0.11.3
+
+### Patch Changes
+
+- 4ed17d9: Update the Vercel Eve example to Eve 0.31.0 and keep Vercel OpenTelemetry external during bundling.
+- c64bdbf: Upgrade shared storage to Files SDK 3.1 and support Google Cloud Storage 8 without a peer dependency allowance. Storage integrations now require Node.js 22 or later; applications supplying their own Files client must upgrade to Files SDK 3.1 or later in the 3.x line. Existing AgentPond storage configuration and stored traces remain compatible.
+- c64bdbf: Update Fastify and vulnerable storage-related transitive dependencies to patched releases.
+- Updated dependencies [c64bdbf]
+- Updated dependencies [c64bdbf]
+  - @agentpond/files-sdk@0.4.0
+  - @agentpond/firebase@0.8.0
+  - @agentpond/supabase@0.8.0
+  - @agentpond/vercel@0.7.0
+  - @agentpond/fastify-ingest@0.3.13
+
 ## 0.11.2
 
 ### Patch Changes
