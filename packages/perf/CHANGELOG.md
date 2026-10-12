@@ -1,5 +1,14 @@
 # @agentpond/perf
 
+## 0.1.18
+
+### Patch Changes
+
+- Updated dependencies [c64bdbf]
+- Updated dependencies [c64bdbf]
+  - @agentpond/files-sdk@0.4.0
+  - @agentpond/fastify-ingest@0.3.13
+
 ## 0.1.17
 
 ### Patch Changes
