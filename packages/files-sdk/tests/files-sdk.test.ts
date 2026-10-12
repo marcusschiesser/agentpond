@@ -57,7 +57,10 @@ test("FilesObjectStore implements JSON reads, writes, and sorted prefix lists", 
 		"traces/a.json",
 		"traces/z.json",
 	]);
-	assert.equal((await files.head("traces/a.json")).type, "application/json");
+	assert.equal(
+		(await files.head("traces/a.json")).contentType,
+		"application/json",
+	);
 });
 
 test("AgentPond Files clients have stable retry and timeout defaults", () => {

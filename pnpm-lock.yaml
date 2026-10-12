@@ -5,14 +5,18 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  files-sdk@2.2.2>@modelcontextprotocol/sdk: '-'
+  files-sdk@3.1.0>@modelcontextprotocol/sdk: '-'
   '@opentelemetry/core': ^2.9.0
-  brace-expansion@>=4.0.0 <5.0.9: 5.0.9
-  fast-uri: 3.1.5
+  brace-expansion@>=4.0.0 <5.0.12: 5.0.12
+  fast-uri: 3.1.8
   find-my-way: 9.7.0
   minimatch@9.0.9: 10.2.6
+  image-size@>=1.2.0 <2.0.3: 2.0.3
+  '@grpc/grpc-js@>=1.14.0 <1.14.5': 1.14.5
+  '@fastify/busboy@>=3.0.0 <3.2.2': 3.2.2
+  undici@>=8.0.0 <8.10.2: 8.10.2
   protobufjs: 7.6.5
-  undici@>=6.0.0 <6.28.0: 6.28.0
+  undici@>=6.0.0 <6.28.1: 6.28.1
   uuid@<11.1.1: ^11.1.1
 
 importers:
@@ -53,8 +57,8 @@ importers:
         specifier: ^24.10.1
         version: 24.13.2
       files-sdk:
-        specifier: 2.2.2
-        version: 2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        specifier: 3.1.0
+        version: 3.1.0(@aws-sdk/client-s3@3.1079.0)(@aws-sdk/s3-presigned-post@3.1079.0)(@aws-sdk/s3-request-presigner@3.1079.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@8.2.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.12.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -95,14 +99,14 @@ importers:
         specifier: workspace:*
         version: link:../../packages/vercel
       '@aws-sdk/client-s3':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@aws-sdk/s3-presigned-post':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@aws-sdk/s3-request-presigner':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@azure/storage-blob':
         specifier: ^12.26.0
         version: 12.33.0
@@ -110,8 +114,8 @@ importers:
         specifier: ^1.5.4-r.1
         version: 1.5.4-r.1
       '@google-cloud/storage':
-        specifier: ^7.21.0
-        version: 7.21.0
+        specifier: ^8.0.0
+        version: 8.2.0
       '@inquirer/prompts':
         specifier: 8.5.2
         version: 8.5.2(@types/node@24.13.2)
@@ -128,11 +132,11 @@ importers:
         specifier: ^0.8.18
         version: 0.8.21
       fastify:
-        specifier: ^5.6.2
-        version: 5.8.5
+        specifier: ^5.12.5
+        version: 5.12.5
       files-sdk:
-        specifier: 2.2.2
-        version: 2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        specifier: 3.1.0
+        version: 3.1.0(@aws-sdk/client-s3@3.1079.0)(@aws-sdk/s3-presigned-post@3.1079.0)(@aws-sdk/s3-request-presigner@3.1079.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@8.2.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.12.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
       node-appwrite:
         specifier: ^26.0.0
         version: 26.2.0
@@ -158,20 +162,20 @@ importers:
         specifier: workspace:*
         version: link:../../packages/files-sdk
       '@aws-sdk/client-s3':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@aws-sdk/s3-presigned-post':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@aws-sdk/s3-request-presigner':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@azure/storage-blob':
         specifier: ^12.26.0
         version: 12.33.0
       '@google-cloud/storage':
-        specifier: ^7.21.0
-        version: 7.21.0
+        specifier: ^8.0.0
+        version: 8.2.0
       '@netlify/blobs':
         specifier: ^10.7.4
         version: 10.7.9
@@ -182,8 +186,8 @@ importers:
         specifier: ^0.8.18
         version: 0.8.21
       files-sdk:
-        specifier: 2.2.2
-        version: 2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        specifier: 3.1.0
+        version: 3.1.0(@aws-sdk/client-s3@3.1079.0)(@aws-sdk/s3-presigned-post@3.1079.0)(@aws-sdk/s3-request-presigner@3.1079.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@8.2.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.12.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
       node-appwrite:
         specifier: ^26.0.0
         version: 26.2.0
@@ -271,8 +275,8 @@ importers:
         specifier: ^0.31.0
         version: 0.31.0(@azure/storage-blob@12.33.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(aws4fetch@1.0.20)(chokidar@4.0.3)(lru-cache@11.5.1)(rollup@4.62.0)
       files-sdk:
-        specifier: 2.2.2
-        version: 2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        specifier: 3.1.0
+        version: 3.1.0(@aws-sdk/client-s3@3.1079.0)(@aws-sdk/s3-presigned-post@3.1079.0)(@aws-sdk/s3-request-presigner@3.1079.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@8.2.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.12.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -311,8 +315,8 @@ importers:
         specifier: workspace:*
         version: link:../ingest
       fastify:
-        specifier: ^5.6.2
-        version: 5.8.5
+        specifier: ^5.12.5
+        version: 5.12.5
     devDependencies:
       '@agentpond/duckdb':
         specifier: workspace:*
@@ -331,14 +335,14 @@ importers:
         specifier: workspace:*
         version: link:../otel
       '@aws-sdk/client-s3':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@aws-sdk/s3-presigned-post':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@aws-sdk/s3-request-presigner':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@azure/storage-blob':
         specifier: ^12.26.0
         version: 12.33.0
@@ -352,8 +356,8 @@ importers:
         specifier: ^2.9.0
         version: 2.9.0(@opentelemetry/api@1.9.1)
       files-sdk:
-        specifier: 2.2.2
-        version: 2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        specifier: 3.1.0
+        version: 3.1.0(@aws-sdk/client-s3@3.1079.0)(@aws-sdk/s3-presigned-post@3.1079.0)(@aws-sdk/s3-request-presigner@3.1079.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@8.2.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.12.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
 
   packages/firebase:
     dependencies:
@@ -370,8 +374,8 @@ importers:
         specifier: workspace:*
         version: link:../otel
       files-sdk:
-        specifier: 2.2.2
-        version: 2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        specifier: 3.1.0
+        version: 3.1.0(@aws-sdk/client-s3@3.1079.0)(@aws-sdk/s3-presigned-post@3.1079.0)(@aws-sdk/s3-request-presigner@3.1079.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@8.2.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.12.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
     devDependencies:
       '@agentpond/duckdb':
         specifier: workspace:*
@@ -456,14 +460,14 @@ importers:
         specifier: workspace:*
         version: link:../ingest
       '@aws-sdk/client-s3':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@aws-sdk/s3-presigned-post':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@aws-sdk/s3-request-presigner':
-        specifier: 3.1068.0
-        version: 3.1068.0
+        specifier: 3.1079.0
+        version: 3.1079.0
       '@langfuse/otel':
         specifier: ^5.4.1
         version: 5.4.1(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.220.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.9.0(@opentelemetry/api@1.9.1))
@@ -474,8 +478,8 @@ importers:
         specifier: ^0.220.0
         version: 0.220.0(@opentelemetry/api@1.9.1)
       files-sdk:
-        specifier: 2.2.2
-        version: 2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        specifier: 3.1.0
+        version: 3.1.0(@aws-sdk/client-s3@3.1079.0)(@aws-sdk/s3-presigned-post@3.1079.0)(@aws-sdk/s3-request-presigner@3.1079.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@8.2.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.12.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
     devDependencies:
       '@types/node':
         specifier: ^24.10.1
@@ -505,8 +509,8 @@ importers:
         specifier: ^2.110.6
         version: 2.110.6
       files-sdk:
-        specifier: 2.2.2
-        version: 2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        specifier: 3.1.0
+        version: 3.1.0(@aws-sdk/client-s3@3.1079.0)(@aws-sdk/s3-presigned-post@3.1079.0)(@aws-sdk/s3-request-presigner@3.1079.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@8.2.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.12.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
     devDependencies:
       '@opentelemetry/sdk-trace-base':
         specifier: ^2.9.0
@@ -530,8 +534,8 @@ importers:
         specifier: ^2.5.0
         version: 2.5.0
       files-sdk:
-        specifier: 2.2.2
-        version: 2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
+        specifier: 3.1.0
+        version: 3.1.0(@aws-sdk/client-s3@3.1079.0)(@aws-sdk/s3-presigned-post@3.1079.0)(@aws-sdk/s3-request-presigner@3.1079.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@8.2.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.12.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3)
 
 packages:
 
@@ -573,28 +577,12 @@ packages:
   '@arizeai/openinference-semantic-conventions@2.5.0':
     resolution: {integrity: sha512-4ZeSwiFX3YxB0WSE6x568wM4PVHiYmz3yiOxic6WGKVrE/KIGggMFP/eqUNQhikBKP68IDV0qiILlZAIYnheAQ==}
 
-  '@aws-crypto/sha1-browser@5.2.0':
-    resolution: {integrity: sha512-OH6lveCFfcDjX4dbAvCFSYUjJZjDr/3XJ3xHtjn3Oj5b9RjojQo8npoLeA/bNwkOkrSQ0wgrHzXk4tDRxGKJeg==}
-
-  '@aws-crypto/sha256-browser@5.2.0':
-    resolution: {integrity: sha512-AXfN/lGotSQwu6HNcEsIASo7kWXZ5HYWvfOmSNKDsEqC4OashTp8alTmaz+F7TC2L083SFv5RdB+qU3Vs1kZqw==}
-
-  '@aws-crypto/sha256-js@5.2.0':
-    resolution: {integrity: sha512-FFQQyu7edu4ufvIZ+OadFpHHOt+eSTBaYaki44c+akjg7qZg9oOQeLlk77F6tSYqjDAFClrHJk9tMf0HdVyOvA==}
-    engines: {node: '>=16.0.0'}
-
-  '@aws-crypto/supports-web-crypto@5.2.0':
-    resolution: {integrity: sha512-iAvUotm021kM33eCdNfwIN//F77/IADDSs58i+MDaOqFrVjZo9bAal0NK7HurRuWLLpF1iLX7gbWrjHjeo+YFg==}
-
-  '@aws-crypto/util@5.2.0':
-    resolution: {integrity: sha512-4RkU9EsI6ZpBve5fseQlGNUWKMa1RLPQ1dnjnQoe07ldfIzcsGb5hC5W0Dm7u423KWzawlrpbjXBrXCEv9zazQ==}
-
   '@aws-sdk/checksums@3.1000.18':
     resolution: {integrity: sha512-IImkbEyXdV6/uaF5r6Wkk+8718mQw1ll83j0a4a30R3JM/rHVFdWAiT4jtJpFjJiIwM/oJ6SxIxr0z2TaQUGqw==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/client-s3@3.1068.0':
-    resolution: {integrity: sha512-lFgaIpxZvloNbJvQ337YPdMXhzI2zJdDw13nATVGnkAGNoNPx4ksD84AQAcuW75hsaaMaIuNmXU9sSx6+FTirA==}
+  '@aws-sdk/client-s3@3.1079.0':
+    resolution: {integrity: sha512-di9U/7Po7qlVYb2dq58ULsbBAE1pBIk53rux+50LQCvH1X+/l1Ys+BIk/QLBtdaK1nADk0xRNEBbA1QWVnMccw==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/core@3.975.3':
@@ -633,10 +621,6 @@ packages:
     resolution: {integrity: sha512-gHQb/Kt0chjk/JQDa/GJDqmAvEuVn8n7z10wK2h0LFM9TUDRkohgOO4aEF+s2sBLM0br7Cl5W6P7phgjrrJvLQ==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/middleware-flexible-checksums@3.974.30':
-    resolution: {integrity: sha512-OaIhub+3yTgfFWPzKO8OzOZFIMUoJaiS5v67y3spQg7SoULGoMx4jKVBbE+uhnzkiZXQ+rEDS0RqrK4/aD1yJw==}
-    engines: {node: '>=20.0.0'}
-
   '@aws-sdk/middleware-sdk-s3@3.972.64':
     resolution: {integrity: sha512-RBi43anhDBUv+HCfxCOXwGOE7GmT4n7ChV04Mwr22RhXTNcamW/iWnJlOotDPCZSrJ4dEvhZSiWWQMwLX+ZhFA==}
     engines: {node: '>=20.0.0'}
@@ -645,12 +629,12 @@ packages:
     resolution: {integrity: sha512-dVZOroI/r3/ENvqNGgjMPul+jjlz9GddfVusgTXlVjfZj5isibOxecLkGQbRPp8XOuX+RAfjXLFgPkD1JS5xrw==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/s3-presigned-post@3.1068.0':
-    resolution: {integrity: sha512-c6lXKsClR1/h8jEtKgkw12O7RXWMxtQ0fasBTV2pPalkHLZfk/VSbQuKbLz3a6iXLZMq8RKhTxf/EM0mmAdA3w==}
+  '@aws-sdk/s3-presigned-post@3.1079.0':
+    resolution: {integrity: sha512-7eDBUSFF7iJMCaTRZhWiklEJ2ODhX0zqRrlX5ABTolm/RsLaabLH2tKU+tPXWr9susAVpCtOC0QQsIQFQwuAaQ==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/s3-request-presigner@3.1068.0':
-    resolution: {integrity: sha512-XTUoaBQH3pUlegqdoo7vkrOvlcRhSz/EO0/JYy9qKz4jdsOnPUlPY0p+rKTl27F91Gjgip8OXopiOFxVeN3Yvg==}
+  '@aws-sdk/s3-request-presigner@3.1079.0':
+    resolution: {integrity: sha512-NfHUaND7WyLUPkO7HCF3MFg4bdscY34A4tm4dPWa31qYzhGNZarRPr/CcRgllxzPoOSD/EHfZ4fQtZnMl2xWFg==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/signature-v4-multi-region@3.996.41':
@@ -663,10 +647,6 @@ packages:
 
   '@aws-sdk/types@3.974.2':
     resolution: {integrity: sha512-3W6IUtSxFbH6X7Wb7DzGCV5QiFQsd0g8bOfntpmDxQlzBoKWUMBu/JPQR0DwkE+Hpnxd6db1tXbOwdeHddG6cA==}
-    engines: {node: '>=20.0.0'}
-
-  '@aws-sdk/util-locate-window@3.965.7':
-    resolution: {integrity: sha512-M0D6oIpohdNHjc7udzTHEQyot0+0iuA36jc2I9Hps+f/GtKi2HO/pyijQnCnNcwZqLB5+rtn81z3eZK/GyjAmA==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/xml-builder@3.972.36':
@@ -1226,8 +1206,8 @@ packages:
   '@fastify/ajv-compiler@4.0.5':
     resolution: {integrity: sha512-KoWKW+MhvfTRWL4qrhUwAAZoaChluo0m0vbiJlGMt2GXvL4LVPQEjt8kSpHI3IBq5Rez8fg+XeH3cneztq+C7A==}
 
-  '@fastify/busboy@3.2.0':
-    resolution: {integrity: sha512-m9FVDXU3GT2ITSe0UaMA5rU3QkfC/UXtCU8y0gSN/GugTqtVldOBWIB5V6V3sbmenVZUIpU6f+mPEO2+m5iTaA==}
+  '@fastify/busboy@3.2.2':
+    resolution: {integrity: sha512-yXSS27qPExaXeuLvMRMXOLtpipzfQYNjG3FkunDWKGfMYjKuhFXko9CVzqxm8jcF+lmtS9Fd89QNdh9XDjnbNg==}
 
   '@fastify/error@4.2.0':
     resolution: {integrity: sha512-RSo3sVDXfHskiBZKBPRgnQTtIqpi/7zhJOEmAxCiBcM7d0uwdGdxLlsCaLzGs8v8NnxIRlfG0N51p5yFaOentQ==}
@@ -1284,20 +1264,36 @@ packages:
     resolution: {integrity: sha512-DJS3s0OVH4zFDB1PzjxAsHqJT6sKVbRwwML0ZBP9PbU7Yebtu/7SWMRzvO2J3nUi9pRNITCfu4LJeooM2w4pjg==}
     engines: {node: '>=14.0.0'}
 
+  '@google-cloud/paginator@7.1.0':
+    resolution: {integrity: sha512-PNCXdAQgNoQODZuqyhmkN2nUpB2q9UFzawZ1oyCDyEyhcheRoCKJJhSKhEIeKpM/NCLnC6Q4We4HEkGCwNDnCA==}
+    engines: {node: '>=22'}
+
   '@google-cloud/projectify@4.0.0':
     resolution: {integrity: sha512-MmaX6HeSvyPbWGwFq7mXdo0uQZLGBYCwziiLIGq5JVX+/bdI3SAq6bP98trV5eTWfLuvsMcIC1YJOF2vfteLFA==}
     engines: {node: '>=14.0.0'}
+
+  '@google-cloud/projectify@6.1.0':
+    resolution: {integrity: sha512-tKAx9q6vTtbgZcqCojKWK8k6Dy2XBsE7BkNrrBsblxNXrKImYnljqeGfYh9qnTrlTjC9F19pTyCkGcl3pFMW/w==}
+    engines: {node: '>=22'}
 
   '@google-cloud/promisify@4.0.0':
     resolution: {integrity: sha512-Orxzlfb9c67A15cq2JQEyVc7wEsmFBmHjZWZYQMUyJ1qivXyMwdyNOs9odi79hze+2zqdTtu1E19IM/FtqZ10g==}
     engines: {node: '>=14'}
 
+  '@google-cloud/promisify@6.1.0':
+    resolution: {integrity: sha512-H+Rytzi5zYMyoAmU/zgYLgq7fJ9FY4QQEg4k6gfFx/RY1COJ2xxyIfe8bZ62lqEbWM1DJH7IYETqTFmqNtuUhQ==}
+    engines: {node: '>=22'}
+
   '@google-cloud/storage@7.21.0':
     resolution: {integrity: sha512-l+IFTkd+6Y5LoAuXyYCKNAKtw/Ci+rAMqgdTB1jv4iZiLhw0rtq+0qjIRbBizXkNzEFmXiXUW0H7sZQQvk1ffA==}
     engines: {node: '>=14'}
 
-  '@grpc/grpc-js@1.14.4':
-    resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
+  '@google-cloud/storage@8.2.0':
+    resolution: {integrity: sha512-7ckgSjeEprV92VrlLjpYFA3PFerflvFtF7Ea86oQXGNCprGZq5rtpAVK0zgWnCy+44mLjms42M7MiWa433gz2A==}
+    engines: {node: '>=22'}
+
+  '@grpc/grpc-js@1.14.5':
+    resolution: {integrity: sha512-7VZM+SVdEcUUqSQeNI3zM8Qs/BhQKZndPo2h5VkYkAM8Iz0wJIa8mKV5ekQGqG8UUsnkQ0NMxIxwkIHYvj0qOw==}
     engines: {node: '>=12.10.0'}
 
   '@grpc/proto-loader@0.8.1':
@@ -2039,10 +2035,6 @@ packages:
     resolution: {integrity: sha512-3zpg8yqqyXzoK2TsRDdkqVOj2RDBFfLXwCczOZ5c7TWB4eiaebfSCsbMjDPYB3PJ9ihV62QaeadZ+wLadZtNGA==}
     engines: {node: '>=18.0.0'}
 
-  '@smithy/is-array-buffer@2.2.0':
-    resolution: {integrity: sha512-GGP3O9QFD24uGeAXYUjwSTXARoqpZykHadOmA8G5vfJPK0/DC67qa//0qvqrJzL1xc8WQWX7/yc7fwudjPHPhA==}
-    engines: {node: '>=14.0.0'}
-
   '@smithy/node-http-handler@4.9.7':
     resolution: {integrity: sha512-wCU8HCLjAtAVqxxe0j2xff9LcEPw3yjBbg5IdQDIYFnxnPxbxcSLc7rgex7kqm9L/WYOnJEgaWQlfDkZleozMA==}
     engines: {node: '>=18.0.0'}
@@ -2054,14 +2046,6 @@ packages:
   '@smithy/types@4.16.1':
     resolution: {integrity: sha512-0JFs3V2y2M9tKW5na/qxe69Zv+uxLMO7QBbhxF/FHu/Gp2NFZAAL9tWl9PU02xxo07pb3G9FTyjNc6D5uZrJIg==}
     engines: {node: '>=18.0.0'}
-
-  '@smithy/util-buffer-from@2.2.0':
-    resolution: {integrity: sha512-IJdWBbTcMQ6DA0gdNhh/BwrLkDR+ADW5Kr1aZmd4k3DIF6ezMV4R2NIAmT08wQJ3yUK82thHWmC/TnK/wpMMIA==}
-    engines: {node: '>=14.0.0'}
-
-  '@smithy/util-utf8@2.3.0':
-    resolution: {integrity: sha512-R8Rdn8Hy72KKcebgLiv8jQcQkXoLMOGGv5uI1/k0l+snqkOzQ1R0ChUBCxWMlBsFMekWjq0wRudIweFs7sKT5A==}
-    engines: {node: '>=14.0.0'}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -2428,8 +2412,8 @@ packages:
   bowser@2.14.1:
     resolution: {integrity: sha512-tzPjzCxygAKWFOJP011oxFHs57HzIhOEracIgAePE4pqB3LikALKnSzUyU4MGs9/iCEUuHlAJTjTc5M+u7YEGg==}
 
-  brace-expansion@5.0.9:
-    resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
+  brace-expansion@5.0.12:
+    resolution: {integrity: sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==}
     engines: {node: 20 || >=22}
 
   braces@3.0.3:
@@ -2772,6 +2756,9 @@ packages:
   fast-json-stringify@6.4.0:
     resolution: {integrity: sha512-ibRCQ0GZKJIQ+P3Et1h0LhPgp3PMTYk0MH8O+kW3lNYsvmaQww5Nn3f1jf73Q0jR1Yz3a1CDP4/NZD3vOajWJQ==}
 
+  fast-json-stringify@7.0.1:
+    resolution: {integrity: sha512-eRSayARSbbwlBjpP4vnTTIRD5QPcIrmihPxDeN1DtKnHPg66UuJLx+8hlK1kaFdjvzyQ/dzALoi4vwAQ+T+iZA==}
+
   fast-querystring@1.1.2:
     resolution: {integrity: sha512-g6KuKWmFXc0fID8WWH0jit4g0AGBoJhCkJMb1RmbsSEUNvQ+ZC8D6CUZ+GtF8nMzSPXnhiePyyqqipzNNEnHjg==}
 
@@ -2781,8 +2768,8 @@ packages:
   fast-string-width@3.0.2:
     resolution: {integrity: sha512-gX8LrtNEI5hq8DVUfRQMbr5lpaS4nMIWV+7XEbXk2b8kiQIizgnlr12B4dA3ZEx3308ze0O4Q1R+cHts8kyUJg==}
 
-  fast-uri@3.1.5:
-    resolution: {integrity: sha512-gHwA1O9LDIcKunMKhObS/HimwtehO1nPUECKAu5TpKgaO19fcWEl4bliWe1jWxVFvIXztJjjQ4L8XQ1EU9f7Jw==}
+  fast-uri@3.1.8:
+    resolution: {integrity: sha512-GZMtZUTNRpOVIECoXwLNZS5xUGE+mVNbTB8h/7Rwh2TFWcBQiPzTgyZi05BF9UMZKkLJv8XBRJTlU7zg8+ZfMg==}
 
   fast-wrap-ansi@0.2.2:
     resolution: {integrity: sha512-7F2Fl+TjRSenLqlU3UjSH0iyqopqoZIu7eZVpEirP2g1GtWa2G/ecEmBdgz31+Mxr+ELclgg6sokpSFIQiZ02Q==}
@@ -2794,8 +2781,8 @@ packages:
     resolution: {integrity: sha512-C0AaNuC+mscy6vrAQKAc/rMq+zAPHodfHGZu4sGVehvAQt/JLG1O5zEcYcXSY5zSqr4YVgxsB+pHXTq0i7eDlg==}
     hasBin: true
 
-  fastify@5.8.5:
-    resolution: {integrity: sha512-Yqptv59pQzPgQUSIm87hMqHJmdkb1+GPxdE6vW6FRyVE9G86mt7rOghitiU4JHRaTyDUk9pfeKmDeu70lAwM4Q==}
+  fastify@5.12.5:
+    resolution: {integrity: sha512-OB2k1dlxs5/NAABqeKV2FUHkSD2BbENsCak8yULVcymn3fHIPDVa9TI3SDnJSWYSllZmSYuZXy2gTnsT+Sut1A==}
 
   fastq@1.20.1:
     resolution: {integrity: sha512-GGToxJ/w1x32s/D2EKND7kTil4n8OVk/9mycTc4VDza13lOvpUZTGX3mFSCtV9ksdGBVzvsyAVLM6mHFThxXxw==}
@@ -2817,12 +2804,16 @@ packages:
     resolution: {integrity: sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ==}
     engines: {node: ^12.20 || >= 14.13}
 
-  files-sdk@2.2.2:
-    resolution: {integrity: sha512-KB9UaBfju7ZwPGZwJzEXXzNaZ7GdntQ81ki0ZZhZmrFelMoKyXhA9yyOL8e86adnNBklP5QSQFikVWJfXHll2g==}
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
+
+  files-sdk@3.1.0:
+    resolution: {integrity: sha512-VbXXUA0DMOI1ohR9CkdfMMoMSXl0tF4M8Pf8M3UbqrtzQ69yl3gwasnB+pCZXjk+I59wHnR+BH3mQeJGdsjVdg==}
+    engines: {node: '>=22'}
     hasBin: true
     peerDependencies:
       '@anthropic-ai/claude-agent-sdk': ^0.3.0
-      '@aws-sdk/client-s3': ^3.700.0
+      '@aws-sdk/client-s3': ^3.1079.0
       '@aws-sdk/lib-storage': ^3.700.0
       '@aws-sdk/s3-presigned-post': ^3.700.0
       '@aws-sdk/s3-request-presigner': ^3.700.0
@@ -2830,35 +2821,36 @@ packages:
       '@azure/identity': ^4.5.0
       '@azure/storage-blob': ^12.26.0
       '@bunny.net/storage-sdk': ^0.3.1
-      '@google-cloud/storage': ^7.19.0
-      '@googleapis/drive': ^20.0.0
+      '@google-cloud/storage': ^7.19.0 || ^8.0.0
+      '@googleapis/drive': ^20.0.0 || ^21.0.0 || ^22.0.0 || ^25.0.0 || ^26.0.0
       '@microsoft/microsoft-graph-client': ^3.0.7
-      '@nestjs/common': ^10.0.0 || ^11.0.0
-      '@netlify/blobs': ^10.7.4
-      '@openai/agents': ^0.11.0
+      '@nestjs/common': ^10.0.0 || ^11.0.0 || ^12.0.0
+      '@netlify/blobs': ^10.7.4 || ^11.0.0
+      '@openai/agents': '>=0.11.0 <1.0.0'
       '@opentelemetry/api': ^1.9.0
       '@supabase/storage-js': ^2.105.4
-      '@sveltejs/kit': ^2.0.0
+      '@sveltejs/kit': ^2.0.0 || ^3.0.0
       '@tanstack/react-start': ^1.0.0
       '@vercel/blob': ^2.4.0
-      ai: ^6.0.0
-      astro: ^4.0.0 || ^5.0.0 || ^6.0.0
+      ai: ^6.0.0 || ^7.0.0
+      astro: ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
       basic-ftp: ^6.0.1
       box-typescript-sdk-gen: ^1.19.1
       cloudinary: ^2.10.0
       convex: ^1.16.0
-      disk: ^0.8.18
+      disk: ^0.8.18 || ^1.0.0
       dropbox: ^10.34.0
+      effect: ^4.0.0
       fastify: ^4.0.0 || ^5.0.0
       firebase-admin: ^14.1.0
-      google-auth-library: ^10.0.0
-      h3: ^1.0.0
+      google-auth-library: ^10.0.0 || ^11.0.0
+      h3: ^1.0.0 || ^2.0.0
       hono: ^4.0.0
       koa: ^2.0.0 || ^3.0.0
       next: ^14.0.0 || ^15.0.0 || ^16.0.0
-      node-appwrite: ^26.0.0
-      openai: ^6.0.0
-      pocketbase: ^0.27.0
+      node-appwrite: ^26.0.0 || ^27.0.0 || ^28.0.0 || ^29.0.0
+      openai: ^6.0.0 || ^7.0.0
+      pocketbase: ^0.27.0 || ^0.28.0
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
       ssh2-sftp-client: ^12.1.1
@@ -2923,6 +2915,8 @@ packages:
       disk:
         optional: true
       dropbox:
+        optional: true
+      effect:
         optional: true
       fastify:
         optional: true
@@ -3178,9 +3172,9 @@ packages:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
     engines: {node: '>= 4'}
 
-  image-size@2.0.2:
-    resolution: {integrity: sha512-IRqXKlaXwgSMAMtpNzZa1ZAe8m+Sa1770Dhk8VkSsP9LS+iHD62Zd8FQKs8fbPiagBE7BzoFX23cxFnwshpV6w==}
-    engines: {node: '>=16.x'}
+  image-size@2.0.3:
+    resolution: {integrity: sha512-9BJAtVCBth+76NwqnEfWr3PiRnYhbquk6K/USuQ1GQajz5NgLzO7tNsnoNjHfO7LuftgkBf+CCH6j28hjMbIYQ==}
+    engines: {node: '>=18'}
     hasBin: true
 
   import-in-the-middle@1.7.1:
@@ -3395,6 +3389,11 @@ packages:
     engines: {node: '>=10.0.0'}
     hasBin: true
 
+  mime@4.1.0:
+    resolution: {integrity: sha512-X5ju04+cAzsojXKes0B/S4tcYtFAJ6tTMuSPBEn9CPGlrWr8Fiw7qYeLT0XyH80HSoAoqWCaz+MWKh22P7G1cw==}
+    engines: {node: '>=16'}
+    hasBin: true
+
   mimic-fn@2.1.0:
     resolution: {integrity: sha512-OqbOk5oEQeAZ8WXWydlu9HJjz9WVdEIvamMCcXmuqUYjTknH/sqsWvhQ3vgwKFRR1HpjvNBKQ37nbJgYzGqGcg==}
     engines: {node: '>=6'}
@@ -3571,6 +3570,10 @@ packages:
     resolution: {integrity: sha512-y3b8Kpd8OAN444hxfBbFfj1FY/RjtTd8tzYwhUqNYXx0fXx2iX4maP4Qr6qhIKbQXI02wTLAda4fYUbDagTUFw==}
     engines: {node: '>=6'}
 
+  p-map@7.0.8:
+    resolution: {integrity: sha512-MitaVsCuCFIvOLLPIU7NnfrZvS9H9h7kwMUkDo+T2pEISaJD48IV9S8iIdXB7PsvvdxyYcsSTTrr90XKsbulNw==}
+    engines: {node: '>=18'}
+
   p-try@2.2.0:
     resolution: {integrity: sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ==}
     engines: {node: '>=6'}
@@ -3622,6 +3625,10 @@ packages:
     resolution: {integrity: sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==}
     engines: {node: '>=12'}
 
+  picomatch@4.0.7:
+    resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
+    engines: {node: '>=12'}
+
   pify@4.0.1:
     resolution: {integrity: sha512-uB80kBFb/tfd68bVleG9T5GGsGPjJrLAUpR5PZIrhBnIaRTQRjqdJSsIKkOP6OAIFbj7GOrcudc5pNjZ+geV2g==}
     engines: {node: '>=6'}
@@ -3669,8 +3676,8 @@ packages:
   process-warning@4.0.1:
     resolution: {integrity: sha512-3c2LzQ3rY9d0hc1emcsHhfT9Jwz0cChib/QN89oME2R451w5fy3f0afAhERFZAwrbDU43wk12d0ORBpDVME50Q==}
 
-  process-warning@5.0.0:
-    resolution: {integrity: sha512-a39t9ApHNx2L4+HBnQKqxxHNs1r7KF+Intd8Q/g1bUh6q0WIp9voPXJ/x0j+ZL45KF1pJd9+q2jLIRMfvEshkA==}
+  process-warning@5.1.0:
+    resolution: {integrity: sha512-jQSaVHsPgtyw60e1rQ/A+/ArPEj/S8pS/vFnyGa/gYFXrKk/6RuDkoqVDQ5NI5MmS01698ltlAk0NoDBNLujRw==}
 
   proto3-json-serializer@3.0.4:
     resolution: {integrity: sha512-E1sbAYg3aEbXrq0n1ojJkRHQJGE1kaE/O6GLA94y8rnJBfgvOPTOd1b9hOceQK1FFZI9qMh1vBERCyO2ifubcw==}
@@ -3744,6 +3751,10 @@ packages:
   retry-request@8.0.3:
     resolution: {integrity: sha512-qqoc4kkGgP9cmQDWELlOpAmfgJOg0Yi7MT82ZjiPWu451ayju4itwomjM4/dBEliify8C1b3tSaeCOldugtwPQ==}
     engines: {node: '>=18'}
+
+  retry-request@9.0.1:
+    resolution: {integrity: sha512-4kGHEBl0ME6gR+8QB1sPMyg58jUxLUcCZNeqLDrfqzk0eWQN8XJFmeu7fmZCjlZCRW0S2u64Ik1HkO/0sWgCYQ==}
+    engines: {node: '>=22'}
 
   retry@0.13.1:
     resolution: {integrity: sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==}
@@ -3908,6 +3919,10 @@ packages:
     resolution: {integrity: sha512-5yDliI1uWkYPo7W+Zvrxg6YmoWuj5iC5EydewqrRTvc68nyMTZhlPPlLg6cptUGfbQAb+N9XDPDPzF6N081lug==}
     engines: {node: '>=18'}
 
+  teeny-request@11.0.1:
+    resolution: {integrity: sha512-bNr5j2YjSdajgCVsp+8JVjRf1uHIbpNISLeKp/7V1NnVMX3Gh6H/kECNGlm2Q3I68ACODQ0iv6aZ3Rvm8WgLGA==}
+    engines: {node: '>=22'}
+
   teeny-request@9.0.0:
     resolution: {integrity: sha512-resvxdc6Mgb7YEThw6G6bExlXKkv6+YbuzGg9xuXxSgxJF7Ozs+o8Y9+2R3sArdWdW8nOokoQb1yrpFB0pQK2g==}
     engines: {node: '>=14'}
@@ -4005,12 +4020,12 @@ packages:
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
-  undici@6.28.0:
-    resolution: {integrity: sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA==}
+  undici@6.28.1:
+    resolution: {integrity: sha512-zWpdTVD54H48CIybL0rWQ3ukpb9d23wM7eH5RtfdmeP70cWHNjtfo7P4vZX+5CoDcO53J4Pu5uXp7lNfjc6DRA==}
     engines: {node: '>=18.17'}
 
-  undici@8.9.0:
-    resolution: {integrity: sha512-aWZpUj7XoGonMClx4gdDRfgBjqeA+F473aDmROQQbM9n6PRfK/u1q/a0X4wMTgcHfT8H6fpbt98PFuDUwFg2YA==}
+  undici@8.10.2:
+    resolution: {integrity: sha512-/y4/bH9YNU5hi9NIrpOuvGXFcxrj3CMrV+/AYpowAYTpHn8gX/XPFjNy766FPoYY0miQhdW977JFWKGNhBdwyQ==}
     engines: {node: '>=22.19.0'}
 
   unenv@2.0.0-rc.24:
@@ -4235,41 +4250,6 @@ snapshots:
 
   '@arizeai/openinference-semantic-conventions@2.5.0': {}
 
-  '@aws-crypto/sha1-browser@5.2.0':
-    dependencies:
-      '@aws-crypto/supports-web-crypto': 5.2.0
-      '@aws-crypto/util': 5.2.0
-      '@aws-sdk/types': 3.974.2
-      '@aws-sdk/util-locate-window': 3.965.7
-      '@smithy/util-utf8': 2.3.0
-      tslib: 2.8.1
-
-  '@aws-crypto/sha256-browser@5.2.0':
-    dependencies:
-      '@aws-crypto/sha256-js': 5.2.0
-      '@aws-crypto/supports-web-crypto': 5.2.0
-      '@aws-crypto/util': 5.2.0
-      '@aws-sdk/types': 3.974.2
-      '@aws-sdk/util-locate-window': 3.965.7
-      '@smithy/util-utf8': 2.3.0
-      tslib: 2.8.1
-
-  '@aws-crypto/sha256-js@5.2.0':
-    dependencies:
-      '@aws-crypto/util': 5.2.0
-      '@aws-sdk/types': 3.974.2
-      tslib: 2.8.1
-
-  '@aws-crypto/supports-web-crypto@5.2.0':
-    dependencies:
-      tslib: 2.8.1
-
-  '@aws-crypto/util@5.2.0':
-    dependencies:
-      '@aws-sdk/types': 3.974.2
-      '@smithy/util-utf8': 2.3.0
-      tslib: 2.8.1
-
   '@aws-sdk/checksums@3.1000.18':
     dependencies:
       '@aws-sdk/core': 3.975.3
@@ -4278,14 +4258,11 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
-  '@aws-sdk/client-s3@3.1068.0':
+  '@aws-sdk/client-s3@3.1079.0':
     dependencies:
-      '@aws-crypto/sha1-browser': 5.2.0
-      '@aws-crypto/sha256-browser': 5.2.0
-      '@aws-crypto/sha256-js': 5.2.0
+      '@aws-sdk/checksums': 3.1000.18
       '@aws-sdk/core': 3.975.3
       '@aws-sdk/credential-provider-node': 3.972.70
-      '@aws-sdk/middleware-flexible-checksums': 3.974.30
       '@aws-sdk/middleware-sdk-s3': 3.972.64
       '@aws-sdk/signature-v4-multi-region': 3.996.41
       '@aws-sdk/types': 3.974.2
@@ -4390,11 +4367,6 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
-  '@aws-sdk/middleware-flexible-checksums@3.974.30':
-    dependencies:
-      '@aws-sdk/checksums': 3.1000.18
-      tslib: 2.8.1
-
   '@aws-sdk/middleware-sdk-s3@3.972.64':
     dependencies:
       '@aws-sdk/core': 3.975.3
@@ -4415,9 +4387,9 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
-  '@aws-sdk/s3-presigned-post@3.1068.0':
+  '@aws-sdk/s3-presigned-post@3.1079.0':
     dependencies:
-      '@aws-sdk/client-s3': 3.1068.0
+      '@aws-sdk/client-s3': 3.1079.0
       '@aws-sdk/core': 3.975.3
       '@aws-sdk/types': 3.974.2
       '@smithy/core': 3.29.5
@@ -4425,7 +4397,7 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
-  '@aws-sdk/s3-request-presigner@3.1068.0':
+  '@aws-sdk/s3-request-presigner@3.1079.0':
     dependencies:
       '@aws-sdk/core': 3.975.3
       '@aws-sdk/signature-v4-multi-region': 3.996.41
@@ -4453,10 +4425,6 @@ snapshots:
   '@aws-sdk/types@3.974.2':
     dependencies:
       '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
-  '@aws-sdk/util-locate-window@3.965.7':
-    dependencies:
       tslib: 2.8.1
 
   '@aws-sdk/xml-builder@3.972.36':
@@ -4981,9 +4949,9 @@ snapshots:
     dependencies:
       ajv: 8.20.0
       ajv-formats: 3.0.1
-      fast-uri: 3.1.5
+      fast-uri: 3.1.8
 
-  '@fastify/busboy@3.2.0': {}
+  '@fastify/busboy@3.2.2': {}
 
   '@fastify/error@4.2.0': {}
 
@@ -5062,10 +5030,21 @@ snapshots:
     dependencies:
       arrify: 2.0.1
       extend: 3.0.2
+    optional: true
 
-  '@google-cloud/projectify@4.0.0': {}
+  '@google-cloud/paginator@7.1.0':
+    dependencies:
+      extend: 3.0.2
 
-  '@google-cloud/promisify@4.0.0': {}
+  '@google-cloud/projectify@4.0.0':
+    optional: true
+
+  '@google-cloud/projectify@6.1.0': {}
+
+  '@google-cloud/promisify@4.0.0':
+    optional: true
+
+  '@google-cloud/promisify@6.1.0': {}
 
   '@google-cloud/storage@7.21.0':
     dependencies:
@@ -5086,8 +5065,29 @@ snapshots:
     transitivePeerDependencies:
       - encoding
       - supports-color
+    optional: true
 
-  '@grpc/grpc-js@1.14.4':
+  '@google-cloud/storage@8.2.0':
+    dependencies:
+      '@google-cloud/paginator': 7.1.0
+      '@google-cloud/projectify': 6.1.0
+      '@google-cloud/promisify': 6.1.0
+      abort-controller: 3.0.0
+      async-retry: 1.3.3
+      duplexify: 4.1.3
+      fast-xml-parser: 5.7.3
+      gaxios: 6.7.1
+      google-auth-library: 9.15.1
+      html-entities: 2.6.0
+      mime: 3.0.0
+      p-limit: 3.1.0
+      retry-request: 9.0.1
+      teeny-request: 11.0.1
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
+
+  '@grpc/grpc-js@1.14.5':
     dependencies:
       '@grpc/proto-loader': 0.8.1
       '@js-sdsl/ordered-map': 4.4.2
@@ -5317,7 +5317,7 @@ snapshots:
       dot-prop: 9.0.0
       empathic: 2.0.1
       env-paths: 3.0.0
-      image-size: 2.0.2
+      image-size: 2.0.3
       js-image-generator: 1.0.4
       parse-gitignore: 2.0.0
       semver: 7.8.4
@@ -5387,7 +5387,7 @@ snapshots:
 
   '@opentelemetry/exporter-logs-otlp-grpc@0.220.0(@opentelemetry/api@1.9.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.9.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/otlp-exporter-base': 0.220.0(@opentelemetry/api@1.9.1)
@@ -5413,7 +5413,7 @@ snapshots:
 
   '@opentelemetry/exporter-metrics-otlp-grpc@0.220.0(@opentelemetry/api@1.9.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.9.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/exporter-metrics-otlp-http': 0.220.0(@opentelemetry/api@1.9.1)
@@ -5452,7 +5452,7 @@ snapshots:
 
   '@opentelemetry/exporter-trace-otlp-grpc@0.220.0(@opentelemetry/api@1.9.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/otlp-exporter-base': 0.220.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/otlp-grpc-exporter-base': 0.220.0(@opentelemetry/api@1.9.1)
@@ -5522,7 +5522,7 @@ snapshots:
 
   '@opentelemetry/otlp-grpc-exporter-base@0.220.0(@opentelemetry/api@1.9.1)':
     dependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.9.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/otlp-exporter-base': 0.220.0(@opentelemetry/api@1.9.1)
@@ -5815,10 +5815,6 @@ snapshots:
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
-  '@smithy/is-array-buffer@2.2.0':
-    dependencies:
-      tslib: 2.8.1
-
   '@smithy/node-http-handler@4.9.7':
     dependencies:
       '@smithy/core': 3.29.5
@@ -5833,16 +5829,6 @@ snapshots:
 
   '@smithy/types@4.16.1':
     dependencies:
-      tslib: 2.8.1
-
-  '@smithy/util-buffer-from@2.2.0':
-    dependencies:
-      '@smithy/is-array-buffer': 2.2.0
-      tslib: 2.8.1
-
-  '@smithy/util-utf8@2.3.0':
-    dependencies:
-      '@smithy/util-buffer-from': 2.2.0
       tslib: 2.8.1
 
   '@standard-schema/spec@1.1.0': {}
@@ -5879,14 +5865,16 @@ snapshots:
       '@supabase/realtime-js': 2.110.6
       '@supabase/storage-js': 2.110.6
 
-  '@tootallnate/once@2.0.1': {}
+  '@tootallnate/once@2.0.1':
+    optional: true
 
   '@tybys/wasm-util@0.10.3':
     dependencies:
       tslib: 2.8.1
     optional: true
 
-  '@types/caseless@0.12.5': {}
+  '@types/caseless@0.12.5':
+    optional: true
 
   '@types/estree@1.0.9': {}
 
@@ -5909,10 +5897,12 @@ snapshots:
       '@types/node': 24.13.2
       '@types/tough-cookie': 4.0.5
       form-data: 2.5.6
+    optional: true
 
   '@types/shimmer@1.2.0': {}
 
-  '@types/tough-cookie@4.0.5': {}
+  '@types/tough-cookie@4.0.5':
+    optional: true
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true
@@ -5989,7 +5979,7 @@ snapshots:
       is-buffer: 2.0.5
       is-node-process: 1.2.0
       throttleit: 2.1.0
-      undici: 6.28.0
+      undici: 6.28.1
 
   '@vercel/cli-config@0.2.0':
     dependencies:
@@ -6030,7 +6020,7 @@ snapshots:
 
   '@whatwg-node/node-fetch@0.8.6':
     dependencies:
-      '@fastify/busboy': 3.2.0
+      '@fastify/busboy': 3.2.2
       '@whatwg-node/disposablestack': 0.0.6
       '@whatwg-node/promise-helpers': 1.3.2
       tslib: 2.8.1
@@ -6070,6 +6060,7 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   agent-base@7.1.4: {}
 
@@ -6087,7 +6078,7 @@ snapshots:
   ajv@8.20.0:
     dependencies:
       fast-deep-equal: 3.1.3
-      fast-uri: 3.1.5
+      fast-uri: 3.1.8
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
@@ -6119,13 +6110,15 @@ snapshots:
 
   array-union@2.1.0: {}
 
-  arrify@2.0.1: {}
+  arrify@2.0.1:
+    optional: true
 
   async-retry@1.3.3:
     dependencies:
       retry: 0.13.1
 
-  asynckit@0.4.0: {}
+  asynckit@0.4.0:
+    optional: true
 
   atomic-sleep@1.0.0: {}
 
@@ -6154,7 +6147,7 @@ snapshots:
 
   bowser@2.14.1: {}
 
-  brace-expansion@5.0.9:
+  brace-expansion@5.0.12:
     dependencies:
       balanced-match: 4.0.4
     optional: true
@@ -6176,6 +6169,7 @@ snapshots:
     dependencies:
       es-errors: 1.3.0
       function-bind: 1.1.2
+    optional: true
 
   callsite@1.0.0: {}
 
@@ -6206,6 +6200,7 @@ snapshots:
   combined-stream@1.0.8:
     dependencies:
       delayed-stream: 1.0.0
+    optional: true
 
   commander@14.0.3: {}
 
@@ -6259,7 +6254,8 @@ snapshots:
     dependencies:
       callsite: 1.0.0
 
-  delayed-stream@1.0.0: {}
+  delayed-stream@1.0.0:
+    optional: true
 
   dequal@2.0.3: {}
 
@@ -6290,6 +6286,7 @@ snapshots:
       call-bind-apply-helpers: 1.0.2
       es-errors: 1.3.0
       gopd: 1.2.0
+    optional: true
 
   duplexify@4.1.3:
     dependencies:
@@ -6330,13 +6327,15 @@ snapshots:
       httpxy: 0.5.5
       srvx: 0.11.22
 
-  es-define-property@1.0.1: {}
+  es-define-property@1.0.1:
+    optional: true
 
   es-errors@1.3.0: {}
 
   es-object-atoms@1.1.2:
     dependencies:
       es-errors: 1.3.0
+    optional: true
 
   es-set-tostringtag@2.1.0:
     dependencies:
@@ -6344,6 +6343,7 @@ snapshots:
       get-intrinsic: 1.3.0
       has-tostringtag: 1.0.2
       hasown: 2.0.4
+    optional: true
 
   esbuild@0.27.7:
     optionalDependencies:
@@ -6411,7 +6411,7 @@ snapshots:
     dependencies:
       ai: 7.0.41(zod@4.4.3)
       nitro: 3.0.260610-beta(@azure/storage-blob@12.33.0)(@netlify/blobs@10.7.9)(@vercel/blob@2.5.0)(aws4fetch@1.0.20)(chokidar@4.0.3)(lru-cache@11.5.1)(rollup@4.62.0)
-      undici: 8.9.0
+      undici: 8.10.2
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
     transitivePeerDependencies:
@@ -6495,7 +6495,16 @@ snapshots:
       '@fastify/merge-json-schemas': 0.2.1
       ajv: 8.20.0
       ajv-formats: 3.0.1
-      fast-uri: 3.1.5
+      fast-uri: 3.1.8
+      json-schema-ref-resolver: 3.0.0
+      rfdc: 1.4.1
+
+  fast-json-stringify@7.0.1:
+    dependencies:
+      '@fastify/merge-json-schemas': 0.2.1
+      ajv: 8.20.0
+      ajv-formats: 3.0.1
+      fast-uri: 3.1.8
       json-schema-ref-resolver: 3.0.0
       rfdc: 1.4.1
 
@@ -6509,7 +6518,7 @@ snapshots:
     dependencies:
       fast-string-truncated-width: 3.0.3
 
-  fast-uri@3.1.5: {}
+  fast-uri@3.1.8: {}
 
   fast-wrap-ansi@0.2.2:
     dependencies:
@@ -6527,7 +6536,7 @@ snapshots:
       path-expression-matcher: 1.5.0
       strnum: 2.4.0
 
-  fastify@5.8.5:
+  fastify@5.12.5:
     dependencies:
       '@fastify/ajv-compiler': 4.0.5
       '@fastify/error': 4.2.0
@@ -6535,11 +6544,11 @@ snapshots:
       '@fastify/proxy-addr': 5.1.0
       abstract-logging: 2.0.1
       avvio: 9.2.0
-      fast-json-stringify: 6.4.0
+      fast-json-stringify: 7.0.1
       find-my-way: 9.7.0
       light-my-request: 6.6.0
       pino: 10.3.1
-      process-warning: 5.0.0
+      process-warning: 5.1.0
       rfdc: 1.4.1
       secure-json-parse: 4.1.0
       semver: 7.8.4
@@ -6562,26 +6571,31 @@ snapshots:
       node-domexception: 1.0.0
       web-streams-polyfill: 3.3.3
 
-  files-sdk@2.2.2(@aws-sdk/client-s3@3.1068.0)(@aws-sdk/s3-presigned-post@3.1068.0)(@aws-sdk/s3-request-presigner@3.1068.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@7.21.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.8.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3):
+  fflate@0.8.3: {}
+
+  files-sdk@3.1.0(@aws-sdk/client-s3@3.1079.0)(@aws-sdk/s3-presigned-post@3.1079.0)(@aws-sdk/s3-request-presigner@3.1079.0)(@azure/core-auth@1.11.0)(@azure/storage-blob@12.33.0)(@google-cloud/storage@8.2.0)(@netlify/blobs@10.7.9)(@opentelemetry/api@1.9.1)(@supabase/storage-js@2.110.6)(@vercel/blob@2.5.0)(ai@7.0.41(zod@4.4.3))(disk@0.8.21)(fastify@5.12.5)(firebase-admin@14.2.0)(google-auth-library@10.9.0)(node-appwrite@26.2.0)(openai@6.45.0(@aws-sdk/credential-provider-node@3.972.70)(@smithy/signature-v4@5.6.6)(zod@4.4.3))(zod@4.4.3):
     dependencies:
       aws4fetch: 1.0.20
       commander: 15.0.0
-      picomatch: 4.0.5
+      fflate: 0.8.3
+      mime: 4.1.0
+      p-map: 7.0.8
+      picomatch: 4.0.7
       safe-regex2: 5.1.1
     optionalDependencies:
-      '@aws-sdk/client-s3': 3.1068.0
-      '@aws-sdk/s3-presigned-post': 3.1068.0
-      '@aws-sdk/s3-request-presigner': 3.1068.0
+      '@aws-sdk/client-s3': 3.1079.0
+      '@aws-sdk/s3-presigned-post': 3.1079.0
+      '@aws-sdk/s3-request-presigner': 3.1079.0
       '@azure/core-auth': 1.11.0
       '@azure/storage-blob': 12.33.0
-      '@google-cloud/storage': 7.21.0
+      '@google-cloud/storage': 8.2.0
       '@netlify/blobs': 10.7.9
       '@opentelemetry/api': 1.9.1
       '@supabase/storage-js': 2.110.6
       '@vercel/blob': 2.5.0
       ai: 7.0.41(zod@4.4.3)
       disk: 0.8.21
-      fastify: 5.8.5
+      fastify: 5.12.5
       firebase-admin: 14.2.0
       google-auth-library: 10.9.0
       node-appwrite: 26.2.0
@@ -6605,7 +6619,7 @@ snapshots:
 
   firebase-admin@14.2.0:
     dependencies:
-      '@fastify/busboy': 3.2.0
+      '@fastify/busboy': 3.2.2
       '@firebase/database-compat': 2.1.4
       '@firebase/database-types': 1.0.20
       fast-deep-equal: 3.1.3
@@ -6639,6 +6653,7 @@ snapshots:
       hasown: 2.0.4
       mime-types: 2.1.35
       safe-buffer: 5.2.1
+    optional: true
 
   formdata-polyfill@4.0.10:
     dependencies:
@@ -6733,11 +6748,13 @@ snapshots:
       has-symbols: 1.1.0
       hasown: 2.0.4
       math-intrinsics: 1.1.0
+    optional: true
 
   get-proto@1.0.1:
     dependencies:
       dunder-proto: 1.0.1
       es-object-atoms: 1.1.2
+    optional: true
 
   get-stream@6.0.1: {}
 
@@ -6802,7 +6819,7 @@ snapshots:
 
   google-gax@5.0.7:
     dependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       '@grpc/proto-loader': 0.8.1
       duplexify: 4.1.3
       google-auth-library: 10.5.0
@@ -6821,7 +6838,8 @@ snapshots:
 
   google-logging-utils@1.1.3: {}
 
-  gopd@1.2.0: {}
+  gopd@1.2.0:
+    optional: true
 
   graceful-fs@4.2.11: {}
 
@@ -6848,11 +6866,13 @@ snapshots:
     optionalDependencies:
       crossws: 0.4.10(srvx@0.11.22)
 
-  has-symbols@1.1.0: {}
+  has-symbols@1.1.0:
+    optional: true
 
   has-tostringtag@1.0.2:
     dependencies:
       has-symbols: 1.1.0
+    optional: true
 
   hasown@2.0.4:
     dependencies:
@@ -6871,6 +6891,7 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   http-proxy-agent@7.0.2:
     dependencies:
@@ -6885,6 +6906,7 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   https-proxy-agent@7.0.6:
     dependencies:
@@ -6909,7 +6931,7 @@ snapshots:
 
   ignore@5.3.2: {}
 
-  image-size@2.0.2: {}
+  image-size@2.0.3: {}
 
   import-in-the-middle@1.7.1:
     dependencies:
@@ -7099,7 +7121,8 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  math-intrinsics@1.1.0: {}
+  math-intrinsics@1.1.0:
+    optional: true
 
   merge-stream@2.0.0: {}
 
@@ -7110,19 +7133,23 @@ snapshots:
       braces: 3.0.3
       picomatch: 2.3.2
 
-  mime-db@1.52.0: {}
+  mime-db@1.52.0:
+    optional: true
 
   mime-types@2.1.35:
     dependencies:
       mime-db: 1.52.0
+    optional: true
 
   mime@3.0.0: {}
+
+  mime@4.1.0: {}
 
   mimic-fn@2.1.0: {}
 
   minimatch@10.2.6:
     dependencies:
-      brace-expansion: 5.0.9
+      brace-expansion: 5.0.12
     optional: true
 
   minipass@7.1.3:
@@ -7206,7 +7233,7 @@ snapshots:
   node-appwrite@26.2.0:
     dependencies:
       json-bigint: 1.0.0
-      undici: 6.28.0
+      undici: 6.28.1
 
   node-domexception@1.0.0: {}
 
@@ -7281,6 +7308,8 @@ snapshots:
 
   p-map@2.1.0: {}
 
+  p-map@7.0.8: {}
+
   p-try@2.2.0: {}
 
   package-json-from-dist@1.0.1:
@@ -7316,6 +7345,8 @@ snapshots:
 
   picomatch@4.0.5: {}
 
+  picomatch@4.0.7: {}
+
   pify@4.0.1: {}
 
   pino-abstract-transport@3.0.0:
@@ -7331,7 +7362,7 @@ snapshots:
       on-exit-leak-free: 2.1.2
       pino-abstract-transport: 3.0.0
       pino-std-serializers: 7.1.0
-      process-warning: 5.0.0
+      process-warning: 5.1.0
       quick-format-unescaped: 4.0.4
       real-require: 0.2.0
       safe-stable-stringify: 2.5.0
@@ -7357,7 +7388,7 @@ snapshots:
 
   process-warning@4.0.1: {}
 
-  process-warning@5.0.0: {}
+  process-warning@5.1.0: {}
 
   proto3-json-serializer@3.0.4:
     dependencies:
@@ -7441,6 +7472,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
       - supports-color
+    optional: true
 
   retry-request@8.0.3:
     dependencies:
@@ -7449,6 +7481,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
     optional: true
+
+  retry-request@9.0.1:
+    dependencies:
+      extend: 3.0.2
+      teeny-request: 11.0.1
+    transitivePeerDependencies:
+      - supports-color
 
   retry@0.13.1: {}
 
@@ -7640,6 +7679,15 @@ snapshots:
       - supports-color
     optional: true
 
+  teeny-request@11.0.1:
+    dependencies:
+      http-proxy-agent: 7.0.2
+      https-proxy-agent: 7.0.6
+      node-fetch: 3.3.2
+      stream-events: 1.0.5
+    transitivePeerDependencies:
+      - supports-color
+
   teeny-request@9.0.0:
     dependencies:
       http-proxy-agent: 5.0.0
@@ -7650,6 +7698,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
       - supports-color
+    optional: true
 
   term-size@2.2.1: {}
 
@@ -7756,9 +7805,9 @@ snapshots:
 
   undici-types@7.18.2: {}
 
-  undici@6.28.0: {}
+  undici@6.28.1: {}
 
-  undici@8.9.0: {}
+  undici@8.10.2: {}
 
   unenv@2.0.0-rc.24:
     dependencies:

@@ -7,6 +7,9 @@ description: Inspect and analyze AgentPond traces, observations, sessions, and s
 
 Use AgentPond to inspect collected trace data.
 
+Storage integrations require Node.js 22 or later and use Files SDK 3.1.
+Applications supplying a Files client must use `files-sdk@^3.1.0`.
+
 Read only the references relevant to the current task. Provider-specific
 references are authoritative for project selection, target selection, and
 credential access:

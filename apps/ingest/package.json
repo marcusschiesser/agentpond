@@ -4,6 +4,9 @@
 	"description": "Container-ready AgentPond Langfuse-compatible ingestion service",
 	"license": "MIT",
 	"type": "module",
+	"engines": {
+		"node": ">=22"
+	},
 	"main": "./dist/index.js",
 	"files": [
 		"dist"
@@ -22,14 +25,14 @@
 		"@agentpond/fastify-ingest": "workspace:*",
 		"@agentpond/files-sdk": "workspace:*",
 		"@azure/storage-blob": "^12.26.0",
-		"@aws-sdk/client-s3": "3.1068.0",
-		"@aws-sdk/s3-presigned-post": "3.1068.0",
-		"@aws-sdk/s3-request-presigner": "3.1068.0",
-		"@google-cloud/storage": "^7.21.0",
+		"@aws-sdk/client-s3": "3.1079.0",
+		"@aws-sdk/s3-presigned-post": "3.1079.0",
+		"@aws-sdk/s3-request-presigner": "3.1079.0",
+		"@google-cloud/storage": "^8.0.0",
 		"@netlify/blobs": "^10.7.4",
 		"@supabase/storage-js": "2.110.6",
 		"disk": "^0.8.18",
-		"files-sdk": "2.2.2",
+		"files-sdk": "3.1.0",
 		"node-appwrite": "^26.0.0"
 	}
 }

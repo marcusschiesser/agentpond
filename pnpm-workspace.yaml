@@ -8,10 +8,6 @@ packages:
 reporter: silent
 autoInstallPeers: false
 
-peerDependencyRules:
-  allowedVersions:
-    'files-sdk>ai': '^7.0.0'
-
 minimumReleaseAge: 10080
 blockExoticSubdeps: true
 trustPolicy: no-downgrade
@@ -39,24 +35,28 @@ minimumReleaseAgeExclude:
   - '@duckdb/node-bindings-win32-arm64@1.5.4-r.1'
   - '@duckdb/node-bindings-win32-x64@1.5.4-r.1'
   - '@duckdb/node-bindings@1.5.4-r.1'
-  - brace-expansion@5.0.9
-  - fast-uri@3.1.5
+  - brace-expansion@5.0.12
+  - fast-uri@3.1.8
   - find-my-way@9.7.0
-  - files-sdk@2.2.2
+  - files-sdk@3.1.0
   - ai@7.0.38
   - eve@0.31.0
   - minimatch@10.2.6
   - typescript@7.0.2
-  - undici@6.28.0
+  - undici@6.28.1
   - uuid@11.1.1
 
 overrides:
-  'files-sdk@2.2.2>@modelcontextprotocol/sdk': '-'
+  'files-sdk@3.1.0>@modelcontextprotocol/sdk': '-'
   '@opentelemetry/core': ^2.9.0
-  'brace-expansion@>=4.0.0 <5.0.9': 5.0.9
-  fast-uri: 3.1.5
+  'brace-expansion@>=4.0.0 <5.0.12': 5.0.12
+  fast-uri: 3.1.8
   find-my-way: 9.7.0
   'minimatch@9.0.9': 10.2.6
+  'image-size@>=1.2.0 <2.0.3': 2.0.3
+  '@grpc/grpc-js@>=1.14.0 <1.14.5': 1.14.5
+  '@fastify/busboy@>=3.0.0 <3.2.2': 3.2.2
+  'undici@>=8.0.0 <8.10.2': 8.10.2
   protobufjs: 7.6.5
-  'undici@>=6.0.0 <6.28.0': 6.28.0
+  'undici@>=6.0.0 <6.28.1': 6.28.1
   uuid@<11.1.1: ^11.1.1

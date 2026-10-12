@@ -407,6 +407,22 @@ class MockSupabaseStorage {
 	};
 
 	from = () => ({
+		info: async (path: string) => {
+			const body = this.objects.get(path);
+			return body === undefined
+				? {
+						data: null,
+						error: { message: "Object not found", statusCode: 404 },
+					}
+				: {
+						data: {
+							name: path,
+							contentType: "application/json",
+							size: new Blob([body as BlobPart]).size,
+						},
+						error: null,
+					};
+		},
 		upload: async (path: string, body: unknown, options: unknown) => {
 			this.uploadOptions.push(options);
 			this.objects.set(path, body);
