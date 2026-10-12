@@ -4,6 +4,9 @@
 	"description": "Files SDK object storage and OpenTelemetry export adapters for AgentPond",
 	"license": "MIT",
 	"type": "module",
+	"engines": {
+		"node": ">=22"
+	},
 	"files": [
 		"dist"
 	],
@@ -32,17 +35,17 @@
 	"devDependencies": {
 		"@agentpond/otel": "workspace:*",
 		"@azure/storage-blob": "^12.26.0",
-		"@aws-sdk/client-s3": "3.1068.0",
-		"@aws-sdk/s3-presigned-post": "3.1068.0",
-		"@aws-sdk/s3-request-presigner": "3.1068.0",
+		"@aws-sdk/client-s3": "3.1079.0",
+		"@aws-sdk/s3-presigned-post": "3.1079.0",
+		"@aws-sdk/s3-request-presigner": "3.1079.0",
 		"@opentelemetry/core": "^2.9.0",
 		"@opentelemetry/resources": "^2.9.0",
 		"@opentelemetry/sdk-trace-base": "^2.9.0",
-		"files-sdk": "2.2.2"
+		"files-sdk": "3.1.0"
 	},
 	"peerDependencies": {
 		"@agentpond/otel": "workspace:*",
-		"files-sdk": "^2.2.2"
+		"files-sdk": "^3.1.0"
 	},
 	"peerDependenciesMeta": {
 		"@agentpond/otel": {

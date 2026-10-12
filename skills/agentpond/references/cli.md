@@ -2,6 +2,10 @@
 
 Run AgentPond through `npx` unless it is installed globally.
 
+Use Node.js 22 or later. Storage integrations use Files SDK 3.1, which accepts
+Google Cloud Storage 8 without a peer allowance. Existing environment files
+and stored traces do not need migration.
+
 ## Check setup support
 
 Before setup automation changes a project, run:

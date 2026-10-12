@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Writable } from "node:stream";
 import test from "node:test";
 import {
 	type AuthConfig,
@@ -1005,13 +1006,20 @@ function createBucket(
 			contentType: "application/json",
 			size: String(Buffer.byteLength(objects.get(objectName) ?? "")),
 		},
-		save: async (
-			data: string | Uint8Array,
-			options: { contentType: string },
-		) => {
-			if (missing) throw missingBucketError();
+		createWriteStream: (options: { contentType: string }) => {
 			assert.equal(options.contentType, "application/json");
-			objects.set(objectName, Buffer.from(data).toString("utf8"));
+			const chunks: Buffer[] = [];
+			return new Writable({
+				write(chunk, _encoding, callback) {
+					if (missing) return callback(missingBucketError());
+					chunks.push(Buffer.from(chunk));
+					callback();
+				},
+				final(callback) {
+					objects.set(objectName, Buffer.concat(chunks).toString("utf8"));
+					callback();
+				},
+			});
 		},
 		download: async () => {
 			if (missing) throw missingBucketError();
